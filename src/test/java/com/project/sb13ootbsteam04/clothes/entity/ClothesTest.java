@@ -2,7 +2,11 @@ package com.project.sb13ootbsteam04.clothes.entity;
 
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -11,21 +15,47 @@ import org.junit.jupiter.api.Test;
 class ClothesTest {
 
   @Test
-  @DisplayName("의상을 생성하면 소유자, 이름, 종류가 설정된다")
+  @DisplayName("의상을 생성하면 소유자, 이름, 종류, 이미지 URL이 설정된다")
   void 의상_생성_성공() {
     // given
     UUID ownerId = UUID.randomUUID();
     String name = "테스트 의상";
     ClothesType type = ClothesType.TOP;
+    String imageUrl = "https://example.com/clothes.jpg";
 
     // when
-    Clothes clothes = Clothes.create(ownerId, name, type);
+    Clothes clothes = Clothes.create(ownerId, name, type, imageUrl);
 
     // then
     assertAll(
         () -> assertEquals(ownerId, clothes.getOwnerId(), "의상 소유자"),
         () -> assertEquals(name, clothes.getName(), "의상 이름"),
-        () -> assertEquals(type, clothes.getType(), "의상 종류")
+        () -> assertEquals(type, clothes.getType(), "의상 종류"),
+        () -> assertEquals(imageUrl, clothes.getImageUrl(), "의상 이미지 URL")
+    );
+  }
+
+  @Test
+  @DisplayName("이미지와 속성 없이 의상을 생성할 수 있다")
+  void 이미지와_속성_없이_생성() {
+    Clothes clothes = Clothes.create(UUID.randomUUID(), "셔츠", ClothesType.TOP, null);
+
+    assertAll(
+        () -> assertNull(clothes.getImageUrl()),
+        () -> assertTrue(clothes.getAttributes().isEmpty())
+    );
+  }
+
+  @Test
+  @DisplayName("필수값이 없거나 이름이 비어 있으면 의상을 생성할 수 없다")
+  void 의상_필수값_검증() {
+    UUID ownerId = UUID.randomUUID();
+
+    assertAll(
+        () -> assertThrows(NullPointerException.class, () -> Clothes.create(null, "셔츠", ClothesType.TOP, null)),
+        () -> assertThrows(NullPointerException.class, () -> Clothes.create(ownerId, null, ClothesType.TOP, null)),
+        () -> assertThrows(IllegalArgumentException.class, () -> Clothes.create(ownerId, " ", ClothesType.TOP, null)),
+        () -> assertThrows(NullPointerException.class, () -> Clothes.create(ownerId, "셔츠", null, null))
     );
   }
 }
