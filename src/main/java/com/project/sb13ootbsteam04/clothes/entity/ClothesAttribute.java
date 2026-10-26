@@ -1,49 +1,44 @@
 package com.project.sb13ootbsteam04.clothes.entity;
 
-import com.project.sb13ootbsteam04.global.entity.BaseEntity;
+import com.project.sb13ootbsteam04.global.entity.IdEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
-import java.util.UUID;
+import java.util.Objects;
 import lombok.AccessLevel;
-import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+/** 의상에 선택된 속성 정의와 그 값을 저장한다. */
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@Table(name = "clothes_attribute")
-public class ClothesAttribute extends BaseEntity {
+@Table(name = "clothes_attributes")
+public class ClothesAttribute extends IdEntity {
 
-  @ManyToOne(fetch = FetchType.LAZY)
+  @ManyToOne(fetch = FetchType.LAZY, optional = false)
   @JoinColumn(name = "clothes_id", nullable = false)
   private Clothes clothes;
 
-//  @ManyToOne(fetch = FetchType.LAZY)
-//  @JoinColumn(name = "definition_id", nullable = false)
-//  private ClothsAttributeDef def;
-  @Column(name = "definition_id", nullable = false)
-  private UUID definitionId;
+  @ManyToOne(fetch = FetchType.LAZY, optional = false)
+  @JoinColumn(name = "definition_id", nullable = false)
+  private ClothesAttributeDef definition;
 
   @Column(nullable = false, length = 100)
   private String value;
 
-  @Builder
-  public ClothesAttribute(Clothes clothes, UUID definitionId, String value) {
-    this.clothes = clothes;
-    this.definitionId = definitionId;
-    this.value = value;
+  private ClothesAttribute(Clothes clothes, ClothesAttributeDef definition, String value) {
+    this.clothes = Objects.requireNonNull(clothes, "소속 의상은 필수입니다");
+    this.definition = Objects.requireNonNull(definition, "속성 정의는 필수입니다");
+    this.value = this.definition.resolveSelectableValue(value);
   }
 
-  public static ClothesAttribute create(Clothes clothes, UUID definitionId, String value) {
-    return ClothesAttribute.builder()
-        .clothes(clothes)
-        .definitionId(definitionId)
-        .value(value)
-        .build();
+  public static ClothesAttribute create(Clothes clothes, ClothesAttributeDef definition, String value) {
+    ClothesAttribute attribute = new ClothesAttribute(clothes, definition, value);
+    clothes.registerAttribute(attribute);
+    return attribute;
   }
 }
