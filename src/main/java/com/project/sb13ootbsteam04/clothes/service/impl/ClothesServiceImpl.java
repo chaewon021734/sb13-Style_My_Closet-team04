@@ -6,6 +6,7 @@ import com.project.sb13ootbsteam04.clothes.entity.ClothesAttributeDef;
 import com.project.sb13ootbsteam04.clothes.exception.ClothesAttributeDefinitionNotFoundException;
 import com.project.sb13ootbsteam04.clothes.exception.DuplicateClothesAttributeException;
 import com.project.sb13ootbsteam04.clothes.exception.InvalidClothesAttributeValueException;
+import com.project.sb13ootbsteam04.clothes.exception.ClothesOwnerNotFoundException;
 import com.project.sb13ootbsteam04.clothes.mapper.ClothesMapper;
 import com.project.sb13ootbsteam04.clothes.repository.ClothesAttributeDefRepository;
 import com.project.sb13ootbsteam04.clothes.repository.ClothesRepository;
@@ -15,10 +16,8 @@ import com.project.sb13ootbsteam04.clothes.service.dto.ClothesCreateCommand;
 import com.project.sb13ootbsteam04.clothes.service.dto.ClothesResult;
 import com.project.sb13ootbsteam04.clothes.storage.ClothesImageStorage;
 import com.project.sb13ootbsteam04.clothes.storage.StoredImage;
-// User 도메인이 dev에 병합되면 아래 import를 복원한다.
-// import com.project.sb13ootbsteam04.clothes.exception.ClothesOwnerNotFoundException;
-// import com.project.sb13ootbsteam04.user.entity.User;
-// import com.project.sb13ootbsteam04.user.repository.UserRepository;
+import com.project.sb13ootbsteam04.user.entity.User;
+import com.project.sb13ootbsteam04.user.repository.UserRepository;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -35,8 +34,7 @@ import org.springframework.transaction.support.TransactionOperations;
 @Service
 public class ClothesServiceImpl implements ClothesService {
 
-  // TODO: User 도메인이 dev에 병합되면 UserRepository 의존성과 findOwner를 활성화한다.
-  // private final UserRepository userRepository;
+  private final UserRepository userRepository;
   private final ClothesRepository clothesRepository;
   private final ClothesAttributeDefRepository clothesAttributeDefRepository;
   private final ClothesImageStorage clothesImageStorage;
@@ -45,10 +43,10 @@ public class ClothesServiceImpl implements ClothesService {
 
   @Override
   public ClothesResult create(ClothesCreateCommand command) {
-    // User owner = findOwner(command.ownerId());
+    User owner = findOwner(command.ownerId());
     Map<UUID, ClothesAttributeDef> definitions = loadDefinitions(command.attributes());
 
-    Clothes clothes = Clothes.create(command.ownerId(), command.name(), command.type(), null);
+    Clothes clothes = Clothes.create(owner, command.name(), command.type(), null);
 
     for (ClothesAttributeCommand attribute : command.attributes()) {
       try {
@@ -83,10 +81,10 @@ public class ClothesServiceImpl implements ClothesService {
     }
   }
 
-  // private User findOwner(UUID ownerId) {
-  //   return userRepository.findById(ownerId)
-  //       .orElseThrow(() -> new ClothesOwnerNotFoundException(ownerId));
-  // }
+  private User findOwner(UUID ownerId) {
+    return userRepository.findById(ownerId)
+        .orElseThrow(() -> new ClothesOwnerNotFoundException(ownerId));
+  }
 
   private Map<UUID, ClothesAttributeDef> loadDefinitions(List<ClothesAttributeCommand> attributes) {
 

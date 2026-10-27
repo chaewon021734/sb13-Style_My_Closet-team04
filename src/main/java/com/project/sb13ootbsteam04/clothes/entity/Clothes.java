@@ -1,22 +1,20 @@
 package com.project.sb13ootbsteam04.clothes.entity;
 
 import com.project.sb13ootbsteam04.global.entity.UpdatedAtEntity;
-// User 도메인이 dev에 병합되면 아래 import를 복원한다.
-// import com.project.sb13ootbsteam04.user.entity.User;
+import com.project.sb13ootbsteam04.user.entity.User;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
-// import jakarta.persistence.JoinColumn;
-// import jakarta.persistence.ManyToOne;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -29,13 +27,9 @@ import lombok.NoArgsConstructor;
 @Table(name = "clothes")
 public class Clothes extends UpdatedAtEntity {
 
-  // TODO: User 도메인이 dev에 병합되면 아래 연관관계로 교체한다.
-  // @ManyToOne(fetch = FetchType.LAZY, optional = false)
-  // @JoinColumn(name = "owner_id", nullable = false, updatable = false)
-  // private User owner;
-
-  @Column(name = "owner_id", nullable = false, updatable = false)
-  private UUID ownerId;
+  @ManyToOne(fetch = FetchType.LAZY, optional = false)
+  @JoinColumn(name = "owner_id", nullable = false, updatable = false)
+  private User owner;
 
   @Column(nullable = false, length = 255)
   private String name;
@@ -56,16 +50,16 @@ public class Clothes extends UpdatedAtEntity {
   private List<ClothesAttribute> attributes = new ArrayList<>();
 
   @Builder(access = AccessLevel.PRIVATE)
-  private Clothes(UUID ownerId, String name, ClothesType type, String imageUrl) {
-    this.ownerId = Objects.requireNonNull(ownerId, "의상 소유자 ID는 필수입니다");
+  private Clothes(User owner, String name, ClothesType type, String imageUrl) {
+    this.owner = Objects.requireNonNull(owner, "의상 소유자는 필수입니다");
     this.name = normalizeName(name);
     this.type = Objects.requireNonNull(type, "의상 종류는 필수입니다");
     this.imageUrl = normalizeImageUrl(imageUrl);
   }
 
-  public static Clothes create(UUID ownerId, String name, ClothesType type, String imageUrl) {
+  public static Clothes create(User owner, String name, ClothesType type, String imageUrl) {
     return Clothes.builder()
-        .ownerId(ownerId)
+        .owner(owner)
         .name(name)
         .type(type)
         .imageUrl(imageUrl)

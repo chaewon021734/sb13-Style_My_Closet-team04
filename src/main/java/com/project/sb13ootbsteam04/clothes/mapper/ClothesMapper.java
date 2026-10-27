@@ -22,7 +22,7 @@ public interface ClothesMapper {
 
   ClothesAttributeCommand toCommand(ClothesAttributeDto attribute);
 
-  // User 연관관계 적용 후 @Mapping(target = "ownerId", source = "owner.id")를 복원한다.
+  @Mapping(target = "ownerId", source = "owner.id")
   ClothesResult toResult(Clothes clothes);
 
   ClothesDto toDto(ClothesResult result);
