@@ -90,13 +90,11 @@ public class GlobalExceptionHandler {
 
   @ExceptionHandler(IllegalArgumentException.class)
   public ResponseEntity<ApiErrorResponse> handleIllegalArgument(IllegalArgumentException exception) {
-    log.warn("요청 값이 도메인 규칙을 위반했습니다. message={}", exception.getMessage());
+    log.warn("요청 값이 도메인 규칙을 위반했습니다.", exception);
 
     return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ApiErrorResponse(
         exception.getClass().getSimpleName(),
-        exception.getMessage() == null || exception.getMessage().isBlank()
-            ? ErrorCode.INVALID_REQUEST.getMessage()
-            : exception.getMessage(),
+        ErrorCode.INVALID_REQUEST.getMessage(),
         Map.of()
     ));
   }

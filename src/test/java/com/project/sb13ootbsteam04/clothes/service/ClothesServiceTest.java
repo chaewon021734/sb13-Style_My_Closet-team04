@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
+import static org.mockito.Mockito.inOrder;
 
 import com.project.sb13ootbsteam04.clothes.entity.Clothes;
 import com.project.sb13ootbsteam04.clothes.entity.ClothesAttributeDef;
@@ -32,9 +33,13 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.transaction.TransactionStatus;
+import org.springframework.transaction.support.TransactionOperations;
+import org.springframework.transaction.support.TransactionCallback;
 
 @DisplayName("의상 서비스")
 @ExtendWith(MockitoExtension.class)
@@ -51,6 +56,9 @@ class ClothesServiceTest {
 
   @Mock
   private ClothesMapper clothesMapper;
+
+  @Mock
+  private TransactionOperations transactionOperations;
 
   @InjectMocks
   private ClothesServiceImpl clothesService;
@@ -102,12 +110,18 @@ class ClothesServiceTest {
       return clothes;
     });
     given(clothesMapper.toResult(any(Clothes.class))).willReturn(expected);
+    givenTransactionExecution();
 
     ClothesResult result = clothesService.create(command);
 
     ArgumentCaptor<Clothes> captor = ArgumentCaptor.forClass(Clothes.class);
     then(clothesRepository).should().save(captor.capture());
     Clothes saved = captor.getValue();
+    InOrder persistenceOrder = inOrder(
+        clothesImageStorage,
+        transactionOperations,
+        clothesRepository
+    );
 
     assertAll(
         () -> assertThat(result).isEqualTo(expected),
@@ -120,7 +134,12 @@ class ClothesServiceTest {
             .containsExactly(colorId, sizeId),
         () -> assertThat(saved.getAttributes())
             .extracting(attribute -> attribute.getValue())
-            .containsExactly("블랙", "S")
+            .containsExactly("블랙", "S"),
+        () -> {
+          persistenceOrder.verify(clothesImageStorage).upload(image);
+          persistenceOrder.verify(transactionOperations).execute(any());
+          persistenceOrder.verify(clothesRepository).save(any(Clothes.class));
+        }
     );
   }
 
@@ -190,6 +209,7 @@ class ClothesServiceTest {
     );
     given(clothesRepository.save(any(Clothes.class))).willAnswer(invocation -> invocation.getArgument(0));
     given(clothesMapper.toResult(any(Clothes.class))).willReturn(expected);
+    givenTransactionExecution();
 
     ClothesResult result = clothesService.create(command);
 
@@ -242,6 +262,7 @@ class ClothesServiceTest {
     RuntimeException saveFailure = new RuntimeException("의상 저장 실패");
     given(clothesImageStorage.upload(image)).willReturn(storedImage);
     given(clothesRepository.save(any(Clothes.class))).willThrow(saveFailure);
+    givenTransactionExecution();
 
     assertThatThrownBy(() -> clothesService.create(command))
         .isSameAs(saveFailure);
@@ -262,6 +283,13 @@ class ClothesServiceTest {
         attributes,
         image
     );
+  }
+
+  private void givenTransactionExecution() {
+    given(transactionOperations.execute(any())).willAnswer(invocation -> {
+      TransactionCallback<?> callback = invocation.getArgument(0);
+      return callback.doInTransaction((TransactionStatus) null);
+    });
   }
 
   private ClothesAttributeDef definition(UUID id, String name, List<String> selectableValues) {

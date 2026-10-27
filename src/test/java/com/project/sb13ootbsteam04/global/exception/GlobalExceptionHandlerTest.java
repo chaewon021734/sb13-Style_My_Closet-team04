@@ -52,6 +52,26 @@ class GlobalExceptionHandlerTest {
     );
   }
 
+  @Test
+  @DisplayName("IllegalArgumentException의 내부 메시지를 응답에 노출하지 않는다")
+  void 잘못된_인자_내부_메시지_비노출() {
+    IllegalArgumentException exception = new IllegalArgumentException(
+        "jdbc:postgresql://internal-db:5432/otboo"
+    );
+
+    ResponseEntity<ApiErrorResponse> response = handler.handleIllegalArgument(exception);
+
+    assertAll(
+        () -> assertThat(response.getStatusCode().value()).isEqualTo(400),
+        () -> assertThat(response.getBody()).isEqualTo(new ApiErrorResponse(
+            "IllegalArgumentException",
+            ErrorCode.INVALID_REQUEST.getMessage(),
+            Map.of()
+        )),
+        () -> assertThat(response.getBody().message()).doesNotContain("internal-db")
+    );
+  }
+
   private Schema<?> property(Schema<?> schema, String name) {
     return (Schema<?>) schema.getProperties().get(name);
   }

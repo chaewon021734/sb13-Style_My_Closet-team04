@@ -22,6 +22,9 @@ public class ClothesImageStorageConfig {
 
     S3Client s3Client = S3Client.builder()
         .region(Region.of(properties.region()))
+        .overrideConfiguration(configuration -> configuration
+            .apiCallTimeout(properties.apiCallTimeout())
+            .apiCallAttemptTimeout(properties.apiCallAttemptTimeout()))
         .build();
 
     return new S3ClothesImageStorage(s3Client, properties);

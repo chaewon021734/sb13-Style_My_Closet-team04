@@ -28,14 +28,11 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionOperations;
 
 @Slf4j
 @RequiredArgsConstructor
 @Service
-@Transactional(readOnly = true)
 public class ClothesServiceImpl implements ClothesService {
 
   // TODO: User 도메인이 dev에 병합되면 UserRepository 의존성과 findOwner를 활성화한다.
@@ -44,9 +41,9 @@ public class ClothesServiceImpl implements ClothesService {
   private final ClothesAttributeDefRepository clothesAttributeDefRepository;
   private final ClothesImageStorage clothesImageStorage;
   private final ClothesMapper clothesMapper;
+  private final TransactionOperations transactionOperations;
 
   @Override
-  @Transactional
   public ClothesResult create(ClothesCreateCommand command) {
     // User owner = findOwner(command.ownerId());
     Map<UUID, ClothesAttributeDef> definitions = loadDefinitions(command.attributes());
@@ -66,20 +63,20 @@ public class ClothesServiceImpl implements ClothesService {
     }
 
     StoredImage storedImage = null;
-    boolean rollbackCleanupRegistered = false;
 
     try {
       if (command.image() != null) {
         storedImage = clothesImageStorage.upload(command.image());
         clothes.updateImageUrl(storedImage.url());
-        rollbackCleanupRegistered = registerRollbackCleanup(storedImage.objectKey());
       }
 
-      Clothes saved = clothesRepository.save(clothes);
-      return clothesMapper.toResult(saved);
+      return transactionOperations.execute(status -> {
+        Clothes saved = clothesRepository.save(clothes);
+        return clothesMapper.toResult(saved);
+      });
 
     } catch (RuntimeException exception) {
-      if (storedImage != null && !rollbackCleanupRegistered) {
+      if (storedImage != null) {
         deleteImageSafely(storedImage.objectKey());
       }
       throw exception;
@@ -118,23 +115,6 @@ public class ClothesServiceImpl implements ClothesService {
     }
 
     return definitions;
-  }
-
-  private boolean registerRollbackCleanup(String objectKey) {
-
-    if (!TransactionSynchronizationManager.isSynchronizationActive()) {
-      return false;
-    }
-
-    TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-      @Override
-      public void afterCompletion(int status) {
-        if (status == STATUS_ROLLED_BACK) {
-          deleteImageSafely(objectKey);
-        }
-      }
-    });
-    return true;
   }
 
   private void deleteImageSafely(String objectKey) {

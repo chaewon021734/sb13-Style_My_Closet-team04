@@ -103,7 +103,13 @@ class S3ClothesImageStorageTest {
 
     S3ClothesImageStorage storage = new S3ClothesImageStorage(
         s3Client,
-        new S3ClothesImageProperties("otboo-images", "ap-northeast-2", null)
+        new S3ClothesImageProperties(
+            "otboo-images",
+            "ap-northeast-2",
+            null,
+            null,
+            null
+        )
     );
     ClothesImageCommand image = new ClothesImageCommand(
         "image.jpg",
@@ -153,7 +159,9 @@ class S3ClothesImageStorageTest {
         new S3ClothesImageProperties(
             "otboo-images",
             "ap-northeast-2",
-            "https://cdn.example.com/"
+            "https://cdn.example.com/",
+            null,
+            null
         )
     );
   }
