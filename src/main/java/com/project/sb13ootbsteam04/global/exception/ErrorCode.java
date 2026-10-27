@@ -21,17 +21,17 @@ public enum ErrorCode {
   CLOTHES_IMAGE_CONTENT_MISMATCH(
       "CLT_005", HttpStatus.BAD_REQUEST, "이미지 내용과 콘텐츠 타입이 일치하지 않습니다"),
   CLOTHES_IMAGE_READ_FAILED(
-      "CLT_006", HttpStatus.BAD_REQUEST, "이미지 파일을 읽을 수 없습니다"),
+      "CLT_006", HttpStatus.INTERNAL_SERVER_ERROR, "이미지 파일을 읽을 수 없습니다"),
   CLOTHES_ATTRIBUTE_DUPLICATED(
       "CLT_007", HttpStatus.BAD_REQUEST, "같은 속성 정의를 중복해서 등록할 수 없습니다"),
   CLOTHES_ATTRIBUTE_DEFINITION_NOT_FOUND(
       "CLT_008", HttpStatus.BAD_REQUEST, "존재하지 않는 의상 속성 정의가 있습니다"),
   CLOTHES_IMAGE_STORAGE_NOT_CONFIGURED(
-      "CLT_009", HttpStatus.BAD_REQUEST, "이미지 저장소가 설정되지 않았습니다"),
+      "CLT_009", HttpStatus.INTERNAL_SERVER_ERROR, "이미지 저장소가 설정되지 않았습니다"),
   CLOTHES_IMAGE_UPLOAD_FAILED(
-      "CLT_010", HttpStatus.BAD_REQUEST, "의상 이미지를 저장하지 못했습니다"),
+      "CLT_010", HttpStatus.INTERNAL_SERVER_ERROR, "의상 이미지를 저장하지 못했습니다"),
   CLOTHES_IMAGE_DELETE_FAILED(
-      "CLT_011", HttpStatus.BAD_REQUEST, "의상 이미지를 삭제하지 못했습니다"),
+      "CLT_011", HttpStatus.INTERNAL_SERVER_ERROR, "의상 이미지를 삭제하지 못했습니다"),
   CLOTHES_OWNER_NOT_FOUND(
       "CLT_012", HttpStatus.BAD_REQUEST, "존재하지 않는 의상 소유자입니다"),
   CLOTHES_ATTRIBUTE_VALUE_INVALID(
