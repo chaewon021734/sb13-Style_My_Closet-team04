@@ -6,7 +6,6 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -28,7 +27,7 @@ class ClothesTest {
 
     // then
     assertAll(
-        () -> assertEquals(ownerId, clothes.getOwnerId(), "의상 소유자"),
+        () -> assertEquals(ownerId, clothes.getOwnerId(), "의상 소유자 ID"),
         () -> assertEquals(name, clothes.getName(), "의상 이름"),
         () -> assertEquals(type, clothes.getType(), "의상 종류"),
         () -> assertEquals(imageUrl, clothes.getImageUrl(), "의상 이미지 URL")
@@ -38,7 +37,7 @@ class ClothesTest {
   @Test
   @DisplayName("이미지와 속성 없이 의상을 생성할 수 있다")
   void 이미지와_속성_없이_생성() {
-    Clothes clothes = Clothes.create(UUID.randomUUID(), "셔츠", ClothesType.TOP, null);
+    Clothes clothes = clothes();
 
     assertAll(
         () -> assertNull(clothes.getImageUrl()),
@@ -57,5 +56,22 @@ class ClothesTest {
         () -> assertThrows(IllegalArgumentException.class, () -> Clothes.create(ownerId, " ", ClothesType.TOP, null)),
         () -> assertThrows(NullPointerException.class, () -> Clothes.create(ownerId, "셔츠", null, null))
     );
+  }
+
+  @Test
+  @DisplayName("이미지 URL을 정규화하고 빈 URL은 거부한다")
+  void 이미지_URL_수정() {
+    Clothes clothes = clothes();
+
+    clothes.updateImageUrl(" https://cdn.example.com/image.png ");
+
+    assertAll(
+        () -> assertEquals("https://cdn.example.com/image.png", clothes.getImageUrl()),
+        () -> assertThrows(IllegalArgumentException.class,() -> clothes.updateImageUrl(" "))
+    );
+  }
+
+  private Clothes clothes() {
+    return Clothes.create(UUID.randomUUID(), "셔츠", ClothesType.TOP, null);
   }
 }
