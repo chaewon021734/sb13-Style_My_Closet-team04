@@ -10,6 +10,7 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Stream;
 
 @Component
@@ -45,6 +46,7 @@ public class KakaoLocationClient {
             throw new WeatherLocationException("행정구역 조회 응답이 올바르지 않습니다.");
         }
         Region region = response.documents().stream()
+                .filter(Objects::nonNull)
                 .filter(document -> "H".equals(document.type())).findFirst()
                 .orElseThrow(() -> new WeatherLocationException("해당 좌표의 행정구역을 찾을 수 없습니다."));
         List<String> names = Stream.of(region.first(), region.second(), region.third())

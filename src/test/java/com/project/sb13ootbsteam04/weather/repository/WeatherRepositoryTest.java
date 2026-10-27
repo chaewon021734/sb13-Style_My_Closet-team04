@@ -6,7 +6,7 @@ import jakarta.persistence.EntityManagerFactory;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
+import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
@@ -98,7 +98,7 @@ class WeatherRepositoryTest {
                 .windSpeedRaw("1.5").windSpeed(1.5).windSpeedAsWord(WindStrength.WEAK).build();
     }
 
-    @Configuration
+    @TestConfiguration
     @EnableJpaRepositories(basePackageClasses = WeatherRepository.class)
     @EnableJpaAuditing
     @EnableTransactionManagement

@@ -66,6 +66,8 @@ dependencies {
 
 tasks.named('test') {
     useJUnitPlatform()
+    inputs.property('postgresIntegrationTest',
+            providers.environmentVariable('OTBOO_POSTGRES_TEST').orElse('false'))
     finalizedBy tasks.named('jacocoTestReport')
 }
 
@@ -79,6 +81,7 @@ tasks.named('jacocoTestReport') {
 }
 
 tasks.named('jacocoTestCoverageVerification') {
+    dependsOn tasks.named('test')
     violationRules {
         rule {
             limit {

@@ -5,6 +5,7 @@ import com.project.sb13ootbsteam04.user.repository.UserRepository;
 import com.project.sb13ootbsteam04.weather.entity.*;
 import com.project.sb13ootbsteam04.weather.repository.*;
 import jakarta.persistence.EntityManager;
+import org.hibernate.Session;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,6 +30,9 @@ class PostgresRepositoryIntegrationTest {
 
     @Test
     void savesAndReloadsUserAndWeatherInPostgres() {
+        String database = entityManager.unwrap(Session.class).doReturningWork(
+                connection -> connection.getMetaData().getDatabaseProductName());
+        assertThat(database).isEqualTo("PostgreSQL");
         String email = "db-test-" + UUID.randomUUID() + "@example.com";
         var user = userRepository.saveAndFlush(new User("DB 테스트", email, "test-only-encoded-password"));
         var location = locationRepository.saveAndFlush(new WeatherLocation(37.5665, 126.978, 60, 127));

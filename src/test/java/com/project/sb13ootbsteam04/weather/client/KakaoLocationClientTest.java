@@ -3,6 +3,10 @@ package com.project.sb13ootbsteam04.weather.client;
 import com.project.sb13ootbsteam04.weather.exception.WeatherLocationException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+
+import java.net.SocketTimeoutException;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
@@ -72,4 +76,31 @@ class KakaoLocationClientTest {
                 .isInstanceOf(WeatherLocationException.class);
         server.verify();
     }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"null", "{}", "{\"documents\":null}", "{\"documents\":[null]}"})
+    void rejectsMissingRegionDataWithDomainException(String body) {
+        server.expect(anything()).andRespond(withSuccess(body, MediaType.APPLICATION_JSON));
+        assertThatThrownBy(() -> client.getLocationNames(37, 127))
+                .isInstanceOf(WeatherLocationException.class);
+        server.verify();
+    }
+
+    @Test
+    void handlesEmptyResponseBody() {
+        server.expect(anything()).andRespond(withSuccess("", MediaType.APPLICATION_JSON));
+        assertThatThrownBy(() -> client.getLocationNames(37, 127))
+                .isInstanceOf(WeatherLocationException.class);
+        server.verify();
+    }
+
+    @Test
+    void handlesTimeoutWithoutLeakingRequestDetails() {
+        server.expect(anything()).andRespond(withException(new SocketTimeoutException("test-key")));
+        assertThatThrownBy(() -> client.getLocationNames(37, 127))
+                .isInstanceOf(WeatherLocationException.class)
+                .hasMessage("행정구역 정보를 조회할 수 없습니다.");
+        server.verify();
+    }
+
 }
