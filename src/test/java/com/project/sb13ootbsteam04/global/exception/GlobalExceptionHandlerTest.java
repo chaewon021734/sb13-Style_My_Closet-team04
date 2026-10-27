@@ -5,10 +5,13 @@ import static org.junit.jupiter.api.Assertions.assertAll;
 
 import io.swagger.v3.core.converter.ModelConverters;
 import io.swagger.v3.oas.models.media.Schema;
+import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 
 @DisplayName("전역 예외 처리")
 class GlobalExceptionHandlerTest {
@@ -69,6 +72,43 @@ class GlobalExceptionHandlerTest {
             Map.of()
         )),
         () -> assertThat(response.getBody().message()).doesNotContain("internal-db")
+    );
+  }
+
+  @Test
+  @DisplayName("Spring 프레임워크의 4xx 예외 상태를 500으로 변경하지 않는다")
+  void 프레임워크_클라이언트_오류_상태_보존() {
+
+    HttpRequestMethodNotSupportedException exception =
+        new HttpRequestMethodNotSupportedException("POST", List.of("GET"));
+
+    ResponseEntity<ApiErrorResponse> response = handler.handleUnexpectedException(exception);
+
+    assertAll(
+        () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.METHOD_NOT_ALLOWED),
+        () -> assertThat(response.getBody()).isEqualTo(new ApiErrorResponse(
+            "HttpRequestMethodNotSupportedException",
+            ErrorCode.INVALID_REQUEST.getMessage(),
+            Map.of()
+        ))
+    );
+  }
+
+  @Test
+  @DisplayName("예상하지 못한 서버 예외는 내부 정보를 숨긴 500 응답으로 변환한다")
+  void 예상하지_못한_서버_오류_응답() {
+    RuntimeException exception = new RuntimeException("internal-secret");
+
+    ResponseEntity<ApiErrorResponse> response = handler.handleUnexpectedException(exception);
+
+    assertAll(
+        () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR),
+        () -> assertThat(response.getBody()).isEqualTo(new ApiErrorResponse(
+            "Exception",
+            ErrorCode.INTERNAL_SERVER_ERROR.getMessage(),
+            Map.of()
+        )),
+        () -> assertThat(response.getBody().message()).doesNotContain("internal-secret")
     );
   }
 
