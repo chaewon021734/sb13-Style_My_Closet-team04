@@ -14,5 +14,8 @@ public record ClothesAttributeCommand(
     if (value.isEmpty()) {
       throw new IllegalArgumentException("속성 값은 비어 있을 수 없습니다");
     }
+    if (value.length() > 100) {
+      throw new IllegalArgumentException("속성 값은 100자까지만 입력 가능합니다");
+    }
   }
 }
