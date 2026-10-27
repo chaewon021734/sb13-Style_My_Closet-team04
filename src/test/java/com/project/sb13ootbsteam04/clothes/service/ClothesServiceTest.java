@@ -12,6 +12,7 @@ import com.project.sb13ootbsteam04.clothes.entity.Clothes;
 import com.project.sb13ootbsteam04.clothes.entity.ClothesAttributeDef;
 import com.project.sb13ootbsteam04.clothes.entity.ClothesType;
 import com.project.sb13ootbsteam04.clothes.exception.ClothesAttributeDefinitionNotFoundException;
+import com.project.sb13ootbsteam04.clothes.exception.ClothesOwnerNotFoundException;
 import com.project.sb13ootbsteam04.clothes.exception.DuplicateClothesAttributeException;
 import com.project.sb13ootbsteam04.clothes.exception.InvalidClothesAttributeValueException;
 import com.project.sb13ootbsteam04.clothes.mapper.ClothesMapper;
@@ -25,7 +26,10 @@ import com.project.sb13ootbsteam04.clothes.service.impl.ClothesServiceImpl;
 import com.project.sb13ootbsteam04.clothes.storage.ClothesImageStorage;
 import com.project.sb13ootbsteam04.clothes.storage.StoredImage;
 import com.project.sb13ootbsteam04.global.exception.ErrorCode;
+import com.project.sb13ootbsteam04.user.entity.User;
+import com.project.sb13ootbsteam04.user.repository.UserRepository;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -49,6 +53,9 @@ class ClothesServiceTest {
   private ClothesRepository clothesRepository;
 
   @Mock
+  private UserRepository userRepository;
+
+  @Mock
   private ClothesAttributeDefRepository clothesAttributeDefRepository;
 
   @Mock
@@ -64,10 +71,13 @@ class ClothesServiceTest {
   private ClothesServiceImpl clothesService;
 
   private UUID ownerId;
+  private User owner;
 
   @BeforeEach
   void setUp() {
     ownerId = UUID.randomUUID();
+    owner = new User("소유자", "owner@example.com", "encoded-password");
+    ReflectionTestUtils.setField(owner, "id", ownerId);
   }
 
   @Test
@@ -99,6 +109,7 @@ class ClothesServiceTest {
         List.of()
     );
 
+    givenOwnerExists();
     given(clothesAttributeDefRepository.findAllById(any())).willReturn(List.of(size, color));
     given(clothesImageStorage.upload(image)).willReturn(new StoredImage(
         "clothes/image.png",
@@ -125,7 +136,7 @@ class ClothesServiceTest {
 
     assertAll(
         () -> assertThat(result).isEqualTo(expected),
-        () -> assertThat(saved.getOwnerId()).isEqualTo(ownerId),
+        () -> assertThat(saved.getOwner()).isSameAs(owner),
         () -> assertThat(saved.getName()).isEqualTo("테스트 의상"),
         () -> assertThat(saved.getType()).isEqualTo(ClothesType.DRESS),
         () -> assertThat(saved.getImageUrl()).isEqualTo("https://cdn.example.com/clothes/image.png"),
@@ -155,6 +166,7 @@ class ClothesServiceTest {
         ),
         null
     );
+    givenOwnerExists();
 
     assertThatThrownBy(() -> clothesService.create(command))
         .isInstanceOfSatisfying(DuplicateClothesAttributeException.class, exception -> {
@@ -178,6 +190,7 @@ class ClothesServiceTest {
         List.of(new ClothesAttributeCommand(definitionId, "블랙")),
         null
     );
+    givenOwnerExists();
     given(clothesAttributeDefRepository.findAllById(any())).willReturn(List.of());
 
     assertThatThrownBy(() -> clothesService.create(command))
@@ -195,6 +208,28 @@ class ClothesServiceTest {
   }
 
   @Test
+  @DisplayName("존재하지 않는 소유자 ID이면 의상을 등록하지 않는다")
+  void 존재하지_않는_소유자_거부() {
+    ClothesCreateCommand command = command(List.of(), null);
+    given(userRepository.findById(ownerId)).willReturn(Optional.empty());
+
+    assertThatThrownBy(() -> clothesService.create(command))
+        .isInstanceOfSatisfying(ClothesOwnerNotFoundException.class, exception ->
+            assertAll(
+                () -> assertThat(exception.getErrorCode())
+                    .isEqualTo(ErrorCode.CLOTHES_OWNER_NOT_FOUND),
+                () -> assertThat(exception.getDetails())
+                    .containsEntry("ownerId", ownerId.toString())
+            ));
+
+    assertAll(
+        () -> then(clothesAttributeDefRepository).shouldHaveNoInteractions(),
+        () -> then(clothesImageStorage).shouldHaveNoInteractions(),
+        () -> then(clothesRepository).shouldHaveNoInteractions()
+    );
+  }
+
+  @Test
   @DisplayName("이미지가 없어도 의상을 등록할 수 있고 이때 이미지 저장소는 호출하지 않는다")
   void 이미지_없이_의상_등록_성공() {
 
@@ -207,6 +242,7 @@ class ClothesServiceTest {
         ClothesType.DRESS,
         List.of()
     );
+    givenOwnerExists();
     given(clothesRepository.save(any(Clothes.class))).willAnswer(invocation -> invocation.getArgument(0));
     given(clothesMapper.toResult(any(Clothes.class))).willReturn(expected);
     givenTransactionExecution();
@@ -230,6 +266,7 @@ class ClothesServiceTest {
         List.of(new ClothesAttributeCommand(definitionId, "크림")),
         pngImage()
     );
+    givenOwnerExists();
     given(clothesAttributeDefRepository.findAllById(any())).willReturn(List.of(definition));
 
     assertThatThrownBy(() -> clothesService.create(command))
@@ -260,6 +297,7 @@ class ClothesServiceTest {
         "https://cdn.example.com/clothes/image.png"
     );
     RuntimeException saveFailure = new RuntimeException("의상 저장 실패");
+    givenOwnerExists();
     given(clothesImageStorage.upload(image)).willReturn(storedImage);
     given(clothesRepository.save(any(Clothes.class))).willThrow(saveFailure);
     givenTransactionExecution();
@@ -283,6 +321,10 @@ class ClothesServiceTest {
         attributes,
         image
     );
+  }
+
+  private void givenOwnerExists() {
+    given(userRepository.findById(ownerId)).willReturn(Optional.of(owner));
   }
 
   private void givenTransactionExecution() {

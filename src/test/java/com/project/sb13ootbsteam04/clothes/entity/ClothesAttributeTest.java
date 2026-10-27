@@ -6,8 +6,8 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.project.sb13ootbsteam04.user.entity.User;
 import java.util.List;
-import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -84,6 +84,7 @@ class ClothesAttributeTest {
   }
 
   private Clothes clothes() {
-    return Clothes.create(UUID.randomUUID(), "셔츠", ClothesType.TOP, null);
+    User owner = new User("소유자", "owner@example.com", "encoded-password");
+    return Clothes.create(owner, "셔츠", ClothesType.TOP, null);
   }
 }

@@ -6,7 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.util.UUID;
+import com.project.sb13ootbsteam04.user.entity.User;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -17,17 +17,17 @@ class ClothesTest {
   @DisplayName("의상을 생성하면 소유자, 이름, 종류, 이미지 URL이 설정된다")
   void 의상_생성_성공() {
     // given
-    UUID ownerId = UUID.randomUUID();
+    User owner = owner();
     String name = "테스트 의상";
     ClothesType type = ClothesType.TOP;
     String imageUrl = "https://example.com/clothes.jpg";
 
     // when
-    Clothes clothes = Clothes.create(ownerId, name, type, imageUrl);
+    Clothes clothes = Clothes.create(owner, name, type, imageUrl);
 
     // then
     assertAll(
-        () -> assertEquals(ownerId, clothes.getOwnerId(), "의상 소유자 ID"),
+        () -> assertEquals(owner, clothes.getOwner(), "의상 소유자"),
         () -> assertEquals(name, clothes.getName(), "의상 이름"),
         () -> assertEquals(type, clothes.getType(), "의상 종류"),
         () -> assertEquals(imageUrl, clothes.getImageUrl(), "의상 이미지 URL")
@@ -48,13 +48,13 @@ class ClothesTest {
   @Test
   @DisplayName("필수값이 없거나 이름이 비어 있으면 의상을 생성할 수 없다")
   void 의상_필수값_검증() {
-    UUID ownerId = UUID.randomUUID();
+    User owner = owner();
 
     assertAll(
         () -> assertThrows(NullPointerException.class, () -> Clothes.create(null, "셔츠", ClothesType.TOP, null)),
-        () -> assertThrows(NullPointerException.class, () -> Clothes.create(ownerId, null, ClothesType.TOP, null)),
-        () -> assertThrows(IllegalArgumentException.class, () -> Clothes.create(ownerId, " ", ClothesType.TOP, null)),
-        () -> assertThrows(NullPointerException.class, () -> Clothes.create(ownerId, "셔츠", null, null))
+        () -> assertThrows(NullPointerException.class, () -> Clothes.create(owner, null, ClothesType.TOP, null)),
+        () -> assertThrows(IllegalArgumentException.class, () -> Clothes.create(owner, " ", ClothesType.TOP, null)),
+        () -> assertThrows(NullPointerException.class, () -> Clothes.create(owner, "셔츠", null, null))
     );
   }
 
@@ -72,6 +72,10 @@ class ClothesTest {
   }
 
   private Clothes clothes() {
-    return Clothes.create(UUID.randomUUID(), "셔츠", ClothesType.TOP, null);
+    return Clothes.create(owner(), "셔츠", ClothesType.TOP, null);
+  }
+
+  private User owner() {
+    return new User("소유자", "owner@example.com", "encoded-password");
   }
 }

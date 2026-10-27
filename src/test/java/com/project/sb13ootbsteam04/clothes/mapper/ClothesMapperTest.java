@@ -12,6 +12,7 @@ import com.project.sb13ootbsteam04.clothes.entity.ClothesAttributeDef;
 import com.project.sb13ootbsteam04.clothes.entity.ClothesType;
 import com.project.sb13ootbsteam04.clothes.service.dto.ClothesCreateCommand;
 import com.project.sb13ootbsteam04.clothes.service.dto.ClothesResult;
+import com.project.sb13ootbsteam04.user.entity.User;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -57,7 +58,9 @@ class ClothesMapperTest {
     UUID clothesId = UUID.randomUUID();
     UUID definitionId = UUID.randomUUID();
 
-    Clothes clothes = Clothes.create(ownerId, "셔츠", ClothesType.TOP, "https://cdn.example.com/image.png");
+    User owner = new User("소유자", "owner@example.com", "encoded-password");
+    ReflectionTestUtils.setField(owner, "id", ownerId);
+    Clothes clothes = Clothes.create(owner, "셔츠", ClothesType.TOP, "https://cdn.example.com/image.png");
     ClothesAttributeDef definition = ClothesAttributeDef.create("색상", List.of("블랙", "크림"));
     ReflectionTestUtils.setField(clothes, "id", clothesId);
     ReflectionTestUtils.setField(definition, "id", definitionId);
