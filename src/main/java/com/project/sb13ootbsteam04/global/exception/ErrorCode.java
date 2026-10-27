@@ -33,7 +33,9 @@ public enum ErrorCode {
   CLOTHES_IMAGE_DELETE_FAILED(
       "CLT_011", HttpStatus.BAD_REQUEST, "의상 이미지를 삭제하지 못했습니다"),
   CLOTHES_OWNER_NOT_FOUND(
-      "CLT_012", HttpStatus.BAD_REQUEST, "존재하지 않는 의상 소유자입니다");
+      "CLT_012", HttpStatus.BAD_REQUEST, "존재하지 않는 의상 소유자입니다"),
+  CLOTHES_ATTRIBUTE_VALUE_INVALID(
+      "CLT_013", HttpStatus.BAD_REQUEST, "선택할 수 없는 의상 속성 값입니다");
 
   private final String code;
   private final HttpStatus status;
