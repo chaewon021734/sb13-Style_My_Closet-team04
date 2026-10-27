@@ -1,6 +1,5 @@
 package com.project.sb13ootbsteam04.clothes.service.impl;
 
-import com.project.sb13ootbsteam04.clothes.controller.dto.ClothesDto;
 import com.project.sb13ootbsteam04.clothes.entity.Clothes;
 import com.project.sb13ootbsteam04.clothes.entity.ClothesAttribute;
 import com.project.sb13ootbsteam04.clothes.entity.ClothesAttributeDef;
@@ -13,6 +12,7 @@ import com.project.sb13ootbsteam04.clothes.repository.ClothesRepository;
 import com.project.sb13ootbsteam04.clothes.service.ClothesService;
 import com.project.sb13ootbsteam04.clothes.service.dto.ClothesAttributeCommand;
 import com.project.sb13ootbsteam04.clothes.service.dto.ClothesCreateCommand;
+import com.project.sb13ootbsteam04.clothes.service.dto.ClothesResult;
 import com.project.sb13ootbsteam04.clothes.storage.ClothesImageStorage;
 import com.project.sb13ootbsteam04.clothes.storage.StoredImage;
 // User 도메인이 dev에 병합되면 아래 import를 복원한다.
@@ -47,7 +47,7 @@ public class ClothesServiceImpl implements ClothesService {
 
   @Override
   @Transactional
-  public ClothesDto create(ClothesCreateCommand command) {
+  public ClothesResult create(ClothesCreateCommand command) {
     // User owner = findOwner(command.ownerId());
     Map<UUID, ClothesAttributeDef> definitions = loadDefinitions(command.attributes());
 
@@ -76,7 +76,7 @@ public class ClothesServiceImpl implements ClothesService {
       }
 
       Clothes saved = clothesRepository.save(clothes);
-      return clothesMapper.toDto(saved);
+      return clothesMapper.toResult(saved);
 
     } catch (RuntimeException exception) {
       if (storedImage != null && !rollbackCleanupRegistered) {
