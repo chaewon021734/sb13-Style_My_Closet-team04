@@ -1,12 +1,16 @@
 package com.project.sb13ootbsteam04.clothes.entity;
 
 import com.project.sb13ootbsteam04.global.entity.UpdatedAtEntity;
+// User 도메인이 dev에 병합되면 아래 import를 복원한다.
+// import com.project.sb13ootbsteam04.user.entity.User;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
+// import jakarta.persistence.JoinColumn;
+// import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import java.util.ArrayList;
@@ -24,11 +28,13 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Table(name = "clothes")
 public class Clothes extends UpdatedAtEntity {
-//  @ManyToOne(fetch = FetchType.LAZY)
-//  @JoinColumn(name = "owner_id", nullable = false)
-//  private User owner;
 
-  @Column(name = "owner_id", nullable = false)
+  // TODO: User 도메인이 dev에 병합되면 아래 연관관계로 교체한다.
+  // @ManyToOne(fetch = FetchType.LAZY, optional = false)
+  // @JoinColumn(name = "owner_id", nullable = false, updatable = false)
+  // private User owner;
+
+  @Column(name = "owner_id", nullable = false, updatable = false)
   private UUID ownerId;
 
   @Column(nullable = false, length = 255)
@@ -51,10 +57,10 @@ public class Clothes extends UpdatedAtEntity {
 
   @Builder(access = AccessLevel.PRIVATE)
   private Clothes(UUID ownerId, String name, ClothesType type, String imageUrl) {
-    this.ownerId = Objects.requireNonNull(ownerId, "의상 소유자는 필수입니다");
+    this.ownerId = Objects.requireNonNull(ownerId, "의상 소유자 ID는 필수입니다");
     this.name = normalizeName(name);
     this.type = Objects.requireNonNull(type, "의상 종류는 필수입니다");
-    this.imageUrl = imageUrl;
+    this.imageUrl = normalizeImageUrl(imageUrl);
   }
 
   public static Clothes create(UUID ownerId, String name, ClothesType type, String imageUrl) {
@@ -70,6 +76,10 @@ public class Clothes extends UpdatedAtEntity {
     return List.copyOf(attributes);
   }
 
+  public void updateImageUrl(String imageUrl) {
+    this.imageUrl = normalizeImageUrl(imageUrl);
+  }
+
   void registerAttribute(ClothesAttribute attribute) {
     Objects.requireNonNull(attribute, "의상 속성은 필수입니다");
     if (attribute.getClothes() != this) {
@@ -82,6 +92,17 @@ public class Clothes extends UpdatedAtEntity {
     String normalized = Objects.requireNonNull(name, "의상 이름은 필수입니다").trim();
     if (normalized.isEmpty()) {
       throw new IllegalArgumentException("의상 이름은 비어 있을 수 없습니다");
+    }
+    return normalized;
+  }
+
+  private static String normalizeImageUrl(String imageUrl) {
+    if (imageUrl == null) {
+      return null;
+    }
+    String normalized = imageUrl.trim();
+    if (normalized.isEmpty()) {
+      throw new IllegalArgumentException("이미지 URL은 비어 있을 수 없습니다");
     }
     return normalized;
   }
