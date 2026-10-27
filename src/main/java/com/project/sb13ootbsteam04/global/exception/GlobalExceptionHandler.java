@@ -8,6 +8,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.BindException;
+import org.springframework.web.ErrorResponse;
 import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -133,6 +134,20 @@ public class GlobalExceptionHandler {
 
   @ExceptionHandler(Exception.class)
   public ResponseEntity<ApiErrorResponse> handleUnexpectedException(Exception exception) {
+    if (exception instanceof ErrorResponse errorResponse
+        && errorResponse.getStatusCode().is4xxClientError()) {
+      log.warn(
+          "프레임워크 요청 예외가 발생했습니다. exceptionType={}",
+          exception.getClass().getSimpleName()
+      );
+
+      return ResponseEntity.status(errorResponse.getStatusCode()).body(new ApiErrorResponse(
+          exception.getClass().getSimpleName(),
+          ErrorCode.INVALID_REQUEST.getMessage(),
+          Map.of()
+      ));
+    }
+
     log.error("처리되지 않은 서버 오류가 발생했습니다.", exception);
 
     return ResponseEntity.status(ErrorCode.INTERNAL_SERVER_ERROR.getStatus())
