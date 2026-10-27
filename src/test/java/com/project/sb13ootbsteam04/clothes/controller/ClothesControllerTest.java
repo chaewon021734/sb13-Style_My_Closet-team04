@@ -12,10 +12,12 @@ import com.project.sb13ootbsteam04.clothes.controller.dto.ClothesAttributeDto;
 import com.project.sb13ootbsteam04.clothes.controller.dto.ClothesCreateRequest;
 import com.project.sb13ootbsteam04.clothes.controller.dto.ClothesDto;
 import com.project.sb13ootbsteam04.clothes.entity.ClothesType;
+import com.project.sb13ootbsteam04.clothes.exception.ClothesImageStorageException;
 import com.project.sb13ootbsteam04.clothes.mapper.ClothesMapper;
 import com.project.sb13ootbsteam04.clothes.service.ClothesService;
 import com.project.sb13ootbsteam04.clothes.service.dto.ClothesAttributeCommand;
 import com.project.sb13ootbsteam04.clothes.service.dto.ClothesCreateCommand;
+import com.project.sb13ootbsteam04.clothes.service.dto.ClothesResult;
 import com.project.sb13ootbsteam04.global.exception.GlobalExceptionHandler;
 import java.util.List;
 import java.util.UUID;
@@ -77,6 +79,14 @@ class ClothesControllerTest {
         List.of(new ClothesAttributeCommand(definitionId, "블랙")),
         null
     );
+    ClothesResult result = new ClothesResult(
+        clothesId,
+        ownerId,
+        "검정 셔츠",
+        "https://cdn.example.com/clothes/image.png",
+        ClothesType.TOP,
+        List.of()
+    );
     ClothesDto response = new ClothesDto(
         clothesId,
         ownerId,
@@ -88,7 +98,8 @@ class ClothesControllerTest {
     MockMultipartFile requestPart = requestPart(request);
     MockMultipartFile imagePart = pngImagePart();
     given(clothesMapper.toCommand(any(ClothesCreateRequest.class))).willReturn(mappedCommand);
-    given(clothesService.create(any(ClothesCreateCommand.class))).willReturn(response);
+    given(clothesService.create(any(ClothesCreateCommand.class))).willReturn(result);
+    given(clothesMapper.toDto(result)).willReturn(response);
 
     mockMvc.perform(multipart("/api/clothes").file(requestPart).file(imagePart))
         .andExpect(status().isCreated())
@@ -106,6 +117,149 @@ class ClothesControllerTest {
     assertThat(captor.getValue().image().contentType()).isEqualTo("image/png");
   }
 
+  @Test
+  @DisplayName("이미지 저장소 실패는 Swagger ErrorResponse 구조와 500으로 반환한다")
+  void 이미지_저장소_실패() throws Exception {
+
+    UUID ownerId = UUID.randomUUID();
+    ClothesCreateRequest request = new ClothesCreateRequest(
+        ownerId,
+        "검정 셔츠",
+        ClothesType.TOP,
+        List.of()
+    );
+    ClothesCreateCommand requestCommand = new ClothesCreateCommand(
+        ownerId,
+        "검정 셔츠",
+        ClothesType.TOP,
+        List.of(),
+        null
+    );
+    given(clothesMapper.toCommand(any(ClothesCreateRequest.class))).willReturn(requestCommand);
+    given(clothesService.create(any(ClothesCreateCommand.class))).willThrow(
+        ClothesImageStorageException.uploadFailed(new IllegalStateException("S3 unavailable"))
+    );
+
+    mockMvc.perform(multipart("/api/clothes")
+            .file(requestPart(request))
+            .file(pngImagePart()))
+        .andExpect(status().isInternalServerError())
+        .andExpect(jsonPath("$.exceptionName").value("ClothesImageStorageException"))
+        .andExpect(jsonPath("$.message").value("의상 이미지를 저장하지 못했습니다"))
+        .andExpect(jsonPath("$.details.image").value("이미지 저장소 처리에 실패했습니다"))
+        .andExpect(jsonPath("$.details.operation").value("upload"));
+  }
+
+  @Test
+  @DisplayName("필수 request part가 없으면 Swagger 오류 형식으로 400을 반환한다")
+  void request_part_누락() throws Exception {
+
+    MockMultipartFile imagePart = pngImagePart();
+
+    mockMvc.perform(multipart("/api/clothes").file(imagePart))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.exceptionName").value("MissingServletRequestPartException"))
+        .andExpect(jsonPath("$.message").value("필수 multipart 항목이 없습니다"))
+        .andExpect(jsonPath("$.details.request").value("필수 항목입니다"));
+
+    then(clothesService).shouldHaveNoInteractions();
+  }
+
+  @Test
+  @DisplayName("중첩 속성 요청이 유효하지 않으면 400을 반환한다")
+  void 중첩_속성_검증_실패() throws Exception {
+
+    ClothesCreateRequest request = new ClothesCreateRequest(
+        UUID.randomUUID(),
+        "셔츠",
+        ClothesType.TOP,
+        List.of(new ClothesAttributeDto(null, " "))
+    );
+    MockMultipartFile requestPart = requestPart(request);
+
+    mockMvc.perform(multipart("/api/clothes").file(requestPart))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.exceptionName").value("MethodArgumentNotValidException"))
+        .andExpect(jsonPath("$.details['attributes[0].definitionId']").exists())
+        .andExpect(jsonPath("$.details['attributes[0].value']").exists());
+
+    then(clothesMapper).shouldHaveNoInteractions();
+    then(clothesService).shouldHaveNoInteractions();
+  }
+
+  @Test
+  @DisplayName("엔티티 컬럼 길이를 초과한 이름과 속성 값은 저장 전에 400으로 거부한다")
+  void 문자열_길이_검증_실패() throws Exception {
+
+    ClothesCreateRequest request = new ClothesCreateRequest(
+        UUID.randomUUID(),
+        "가".repeat(256),
+        ClothesType.TOP,
+        List.of(new ClothesAttributeDto(UUID.randomUUID(), "나".repeat(101)))
+    );
+
+    mockMvc.perform(multipart("/api/clothes").file(requestPart(request)))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.exceptionName").value("MethodArgumentNotValidException"))
+        .andExpect(jsonPath("$.details.name").value("의상 이름은 255자까지만 입력 가능합니다."))
+        .andExpect(jsonPath("$.details['attributes[0].value']")
+            .value("속성 값은 100자까지만 입력 가능합니다"));
+
+    then(clothesMapper).shouldHaveNoInteractions();
+    then(clothesService).shouldHaveNoInteractions();
+  }
+
+  @Test
+  @DisplayName("도메인 필수값인 ownerId가 없으면 400을 반환한다")
+  void 소유자_ID_누락() throws Exception {
+
+    ClothesCreateRequest request = new ClothesCreateRequest(null, "셔츠", ClothesType.TOP, List.of());
+
+    mockMvc.perform(multipart("/api/clothes").file(requestPart(request)))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.exceptionName").value("MethodArgumentNotValidException"))
+        .andExpect(jsonPath("$.details.ownerId").value("의상 소유자 ID는 필수입니다"));
+
+    then(clothesMapper).shouldHaveNoInteractions();
+    then(clothesService).shouldHaveNoInteractions();
+  }
+
+  @Test
+  @DisplayName("이미지 시그니처와 콘텐츠 타입이 다르면 400을 반환한다")
+  void 이미지_검증_실패() throws Exception {
+
+    UUID ownerId = UUID.randomUUID();
+    ClothesCreateRequest request = new ClothesCreateRequest(ownerId, "셔츠", ClothesType.TOP, List.of());
+    MockMultipartFile requestPart = requestPart(request);
+    MockMultipartFile imagePart = new MockMultipartFile("image", "fake.png", MediaType.IMAGE_PNG_VALUE, "not-png".getBytes());
+
+    mockMvc.perform(multipart("/api/clothes").file(requestPart).file(imagePart))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.exceptionName").value("InvalidClothesImageException"))
+        .andExpect(jsonPath("$.details.image").exists());
+
+    then(clothesService).shouldHaveNoInteractions();
+  }
+
+  @Test
+  @DisplayName("request part의 JSON 문법이 잘못되면 400을 반환한다")
+  void request_JSON_파싱_실패() throws Exception {
+
+    MockMultipartFile requestPart = new MockMultipartFile(
+        "request",
+        "request.json",
+        MediaType.APPLICATION_JSON_VALUE,
+        "{invalid-json".getBytes()
+    );
+
+    mockMvc.perform(multipart("/api/clothes").file(requestPart))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.exceptionName").value("HttpMessageNotReadableException"))
+        .andExpect(jsonPath("$.details.request").exists());
+
+    then(clothesMapper).shouldHaveNoInteractions();
+    then(clothesService).shouldHaveNoInteractions();
+  }
 
   private MockMultipartFile requestPart(ClothesCreateRequest request) throws Exception {
     return new MockMultipartFile(
