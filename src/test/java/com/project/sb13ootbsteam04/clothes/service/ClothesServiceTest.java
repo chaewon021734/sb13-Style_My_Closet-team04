@@ -1,19 +1,31 @@
 package com.project.sb13ootbsteam04.clothes.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 
+import com.project.sb13ootbsteam04.clothes.controller.dto.ClothesDto;
 import com.project.sb13ootbsteam04.clothes.entity.Clothes;
 import com.project.sb13ootbsteam04.clothes.entity.ClothesAttributeDef;
 import com.project.sb13ootbsteam04.clothes.entity.ClothesType;
+import com.project.sb13ootbsteam04.clothes.exception.ClothesAttributeDefinitionNotFoundException;
+import com.project.sb13ootbsteam04.clothes.exception.DuplicateClothesAttributeException;
+import com.project.sb13ootbsteam04.clothes.exception.InvalidClothesAttributeValueException;
+import com.project.sb13ootbsteam04.clothes.mapper.ClothesMapper;
 import com.project.sb13ootbsteam04.clothes.repository.ClothesAttributeDefRepository;
 import com.project.sb13ootbsteam04.clothes.repository.ClothesRepository;
-
+import com.project.sb13ootbsteam04.clothes.service.dto.ClothesAttributeCommand;
+import com.project.sb13ootbsteam04.clothes.service.dto.ClothesCreateCommand;
+import com.project.sb13ootbsteam04.clothes.service.dto.ClothesImageCommand;
+import com.project.sb13ootbsteam04.clothes.service.impl.ClothesServiceImpl;
+import com.project.sb13ootbsteam04.clothes.storage.ClothesImageStorage;
+import com.project.sb13ootbsteam04.clothes.storage.StoredImage;
+import com.project.sb13ootbsteam04.global.exception.ErrorCode;
 import java.util.List;
 import java.util.UUID;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -97,7 +109,7 @@ class ClothesServiceTest {
     then(clothesRepository).should().save(captor.capture());
     Clothes saved = captor.getValue();
 
-    Assertions.assertAll(
+    assertAll(
         () -> assertThat(result).isEqualTo(expected),
         () -> assertThat(saved.getOwnerId()).isEqualTo(ownerId),
         () -> assertThat(saved.getName()).isEqualTo("테스트 의상"),
@@ -109,6 +121,135 @@ class ClothesServiceTest {
         () -> assertThat(saved.getAttributes())
             .extracting(attribute -> attribute.getValue())
             .containsExactly("블랙", "S")
+    );
+  }
+
+  @Test
+  @DisplayName("같은 속성 정의가 중복되면 구조화된 도메인 예외를 발생시킨다")
+  void 중복_속성_정의_거부() {
+
+    UUID definitionId = UUID.randomUUID();
+    ClothesCreateCommand command = command(
+        List.of(
+            new ClothesAttributeCommand(definitionId, "블랙"),
+            new ClothesAttributeCommand(definitionId, "크림")
+        ),
+        null
+    );
+
+    assertThatThrownBy(() -> clothesService.create(command))
+        .isInstanceOfSatisfying(DuplicateClothesAttributeException.class, exception -> {
+          assertAll(
+              () -> assertThat(exception.getErrorCode())
+                  .isEqualTo(ErrorCode.CLOTHES_ATTRIBUTE_DUPLICATED),
+              () -> assertThat(exception.getDetails())
+                  .containsEntry("definitionId", definitionId.toString())
+          );
+        });
+
+    then(clothesRepository).shouldHaveNoInteractions();
+  }
+
+  @Test
+  @DisplayName("속성 정의를 찾을 수 없으면 누락된 해당 ID를 포함한 도메인 예외를 발생시킨다")
+  void 존재하지_않는_속성_정의_거부() {
+
+    UUID definitionId = UUID.randomUUID();
+    ClothesCreateCommand command = command(
+        List.of(new ClothesAttributeCommand(definitionId, "블랙")),
+        null
+    );
+    given(clothesAttributeDefRepository.findAllById(any())).willReturn(List.of());
+
+    assertThatThrownBy(() -> clothesService.create(command))
+        .isInstanceOfSatisfying(
+            ClothesAttributeDefinitionNotFoundException.class,
+            exception -> assertAll(
+                () -> assertThat(exception.getErrorCode())
+                    .isEqualTo(ErrorCode.CLOTHES_ATTRIBUTE_DEFINITION_NOT_FOUND),
+                () -> assertThat(exception.getDetails())
+                    .containsEntry("definitionIds", definitionId.toString())
+            )
+        );
+
+    then(clothesRepository).shouldHaveNoInteractions();
+  }
+
+  @Test
+  @DisplayName("이미지가 없어도 의상을 등록할 수 있고 이때 이미지 저장소는 호출하지 않는다")
+  void 이미지_없이_의상_등록_성공() {
+
+    ClothesCreateCommand command = command(List.of(), null);
+    ClothesDto expected = new ClothesDto(
+        UUID.randomUUID(),
+        ownerId,
+        "테스트 의상",
+        null,
+        ClothesType.DRESS,
+        List.of()
+    );
+    given(clothesRepository.save(any(Clothes.class))).willAnswer(invocation -> invocation.getArgument(0));
+    given(clothesMapper.toDto(any(Clothes.class))).willReturn(expected);
+
+    ClothesDto result = clothesService.create(command);
+
+    assertAll(
+        () -> assertThat(result).isEqualTo(expected),
+        () -> then(clothesImageStorage).shouldHaveNoInteractions(),
+        () -> then(clothesRepository).should().save(any(Clothes.class))
+    );
+  }
+
+  @Test
+  @DisplayName("허용되지 않은 속성 값이면 이미지를 업로드하거나 의상을 저장하지 않는다")
+  void 허용되지_않은_속성값_거부() {
+
+    UUID definitionId = UUID.randomUUID();
+    ClothesAttributeDef definition = definition(definitionId, "색상", List.of("블랙"));
+    ClothesCreateCommand command = command(
+        List.of(new ClothesAttributeCommand(definitionId, "크림")),
+        pngImage()
+    );
+    given(clothesAttributeDefRepository.findAllById(any())).willReturn(List.of(definition));
+
+    assertThatThrownBy(() -> clothesService.create(command))
+        .isInstanceOfSatisfying(InvalidClothesAttributeValueException.class, exception -> {
+          assertAll(
+              () -> assertThat(exception.getErrorCode())
+                  .isEqualTo(ErrorCode.CLOTHES_ATTRIBUTE_VALUE_INVALID),
+              () -> assertThat(exception.getDetails())
+                  .containsEntry("definitionId", definitionId.toString())
+                  .containsEntry("value", "크림")
+          );
+        });
+
+    assertAll(
+        () -> then(clothesImageStorage).shouldHaveNoInteractions(),
+        () -> then(clothesRepository).shouldHaveNoInteractions()
+    );
+  }
+
+  @Test
+  @DisplayName("이미지 업로드 후 의상 저장에 실패하면 업로드한 객체를 삭제한다")
+  void 의상_저장_실패시_업로드한_이미지_정리() {
+
+    ClothesImageCommand image = pngImage();
+    ClothesCreateCommand command = command(List.of(), image);
+    StoredImage storedImage = new StoredImage(
+        "clothes/image.png",
+        "https://cdn.example.com/clothes/image.png"
+    );
+    RuntimeException saveFailure = new RuntimeException("의상 저장 실패");
+    given(clothesImageStorage.upload(image)).willReturn(storedImage);
+    given(clothesRepository.save(any(Clothes.class))).willThrow(saveFailure);
+
+    assertThatThrownBy(() -> clothesService.create(command))
+        .isSameAs(saveFailure);
+
+    assertAll(
+        () -> then(clothesImageStorage).should().upload(image),
+        () -> then(clothesImageStorage).should().delete(storedImage.objectKey()),
+        () -> then(clothesMapper).shouldHaveNoInteractions()
     );
   }
 
