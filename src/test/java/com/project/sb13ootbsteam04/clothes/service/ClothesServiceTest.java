@@ -7,7 +7,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 
-import com.project.sb13ootbsteam04.clothes.controller.dto.ClothesDto;
 import com.project.sb13ootbsteam04.clothes.entity.Clothes;
 import com.project.sb13ootbsteam04.clothes.entity.ClothesAttributeDef;
 import com.project.sb13ootbsteam04.clothes.entity.ClothesType;
@@ -20,6 +19,7 @@ import com.project.sb13ootbsteam04.clothes.repository.ClothesRepository;
 import com.project.sb13ootbsteam04.clothes.service.dto.ClothesAttributeCommand;
 import com.project.sb13ootbsteam04.clothes.service.dto.ClothesCreateCommand;
 import com.project.sb13ootbsteam04.clothes.service.dto.ClothesImageCommand;
+import com.project.sb13ootbsteam04.clothes.service.dto.ClothesResult;
 import com.project.sb13ootbsteam04.clothes.service.impl.ClothesServiceImpl;
 import com.project.sb13ootbsteam04.clothes.storage.ClothesImageStorage;
 import com.project.sb13ootbsteam04.clothes.storage.StoredImage;
@@ -82,7 +82,7 @@ class ClothesServiceTest {
         image
     );
 
-    ClothesDto expected = new ClothesDto(
+    ClothesResult expected = new ClothesResult(
         clothesId,
         ownerId,
         "테스트 의상",
@@ -101,9 +101,9 @@ class ClothesServiceTest {
       ReflectionTestUtils.setField(clothes, "id", clothesId);
       return clothes;
     });
-    given(clothesMapper.toDto(any(Clothes.class))).willReturn(expected);
+    given(clothesMapper.toResult(any(Clothes.class))).willReturn(expected);
 
-    ClothesDto result = clothesService.create(command);
+    ClothesResult result = clothesService.create(command);
 
     ArgumentCaptor<Clothes> captor = ArgumentCaptor.forClass(Clothes.class);
     then(clothesRepository).should().save(captor.capture());
@@ -180,7 +180,7 @@ class ClothesServiceTest {
   void 이미지_없이_의상_등록_성공() {
 
     ClothesCreateCommand command = command(List.of(), null);
-    ClothesDto expected = new ClothesDto(
+    ClothesResult expected = new ClothesResult(
         UUID.randomUUID(),
         ownerId,
         "테스트 의상",
@@ -189,9 +189,9 @@ class ClothesServiceTest {
         List.of()
     );
     given(clothesRepository.save(any(Clothes.class))).willAnswer(invocation -> invocation.getArgument(0));
-    given(clothesMapper.toDto(any(Clothes.class))).willReturn(expected);
+    given(clothesMapper.toResult(any(Clothes.class))).willReturn(expected);
 
-    ClothesDto result = clothesService.create(command);
+    ClothesResult result = clothesService.create(command);
 
     assertAll(
         () -> assertThat(result).isEqualTo(expected),

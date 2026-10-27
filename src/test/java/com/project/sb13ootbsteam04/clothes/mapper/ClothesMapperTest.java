@@ -11,6 +11,7 @@ import com.project.sb13ootbsteam04.clothes.entity.ClothesAttribute;
 import com.project.sb13ootbsteam04.clothes.entity.ClothesAttributeDef;
 import com.project.sb13ootbsteam04.clothes.entity.ClothesType;
 import com.project.sb13ootbsteam04.clothes.service.dto.ClothesCreateCommand;
+import com.project.sb13ootbsteam04.clothes.service.dto.ClothesResult;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -50,8 +51,8 @@ class ClothesMapperTest {
   }
 
   @Test
-  @DisplayName("의상 엔티티를 Swagger 응답 구조로 변환한다")
-  void 엔티티_DTO_변환() {
+  @DisplayName("의상 엔티티를 서비스 결과와 Swagger 응답 구조로 변환한다")
+  void 엔티티_Result_DTO_변환() {
     UUID ownerId = UUID.randomUUID();
     UUID clothesId = UUID.randomUUID();
     UUID definitionId = UUID.randomUUID();
@@ -63,7 +64,8 @@ class ClothesMapperTest {
 
     ClothesAttribute.create(clothes, definition, "블랙");
 
-    ClothesDto dto = mapper.toDto(clothes);
+    ClothesResult result = mapper.toResult(clothes);
+    ClothesDto dto = mapper.toDto(result);
 
     assertAll(
         () -> assertThat(dto.id()).isEqualTo(clothesId),
