@@ -10,6 +10,10 @@ spring:
     password: ${DB_PASSWORD:postgres}
     driver-class-name: org.postgresql.Driver
 
+  jpa:
+    hibernate:
+      ddl-auto: ${DB_DDL_AUTO:none}
+
 weather:
   kakao:
     api-key: ${KAKAO_REST_API_KEY:}
