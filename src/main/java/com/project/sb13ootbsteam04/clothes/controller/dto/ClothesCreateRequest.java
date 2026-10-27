@@ -13,16 +13,16 @@ import java.util.UUID;
 
 public record ClothesCreateRequest(
 
-    @Schema(description = "소유자 ID", requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+    @Schema(description = "소유자 ID", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotNull(message = "의상 소유자 ID는 필수입니다")
     UUID ownerId,
 
-    @Schema(description = "의상 이름", requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+    @Schema(description = "의상 이름", requiredMode = Schema.RequiredMode.REQUIRED)
     @Size(max = 255, message = "의상 이름은 255자까지만 입력 가능합니다.")
     @NotBlank(message = "의상 이름은 필수입니다")
     String name,
 
-    @Schema(description = "의상 타입", requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+    @Schema(description = "의상 타입", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotNull(message = "의상 타입은 필수입니다")
     ClothesType type,
 
