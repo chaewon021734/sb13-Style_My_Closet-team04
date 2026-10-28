@@ -141,10 +141,12 @@ public class GlobalExceptionHandler {
           exception.getClass().getSimpleName()
       );
 
-      return ResponseEntity.status(errorResponse.getStatusCode()).body(new ApiErrorResponse(
-          exception.getClass().getSimpleName(),
-          ErrorCode.INVALID_REQUEST.getMessage(),
-          Map.of()
+      return ResponseEntity.status(errorResponse.getStatusCode())
+          .headers(errorResponse.getHeaders()) // 프레임워크 오류의 응답 헤더를 그대로 전달
+          .body(new ApiErrorResponse(
+              exception.getClass().getSimpleName(),
+              ErrorCode.INVALID_REQUEST.getMessage(),
+              Map.of()
       ));
     }
 
