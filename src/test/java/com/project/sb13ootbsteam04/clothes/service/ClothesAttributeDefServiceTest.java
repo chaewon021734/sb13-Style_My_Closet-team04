@@ -1,16 +1,20 @@
 package com.project.sb13ootbsteam04.clothes.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
+import static org.mockito.Mockito.never;
 
 import com.project.sb13ootbsteam04.clothes.entity.ClothesAttributeDef;
+import com.project.sb13ootbsteam04.clothes.exception.DuplicateClothesAttributeDefNameException;
 import com.project.sb13ootbsteam04.clothes.repository.ClothesAttributeDefRepository;
 import com.project.sb13ootbsteam04.clothes.service.dto.ClothesAttributeDefCreateCommand;
 import com.project.sb13ootbsteam04.clothes.service.dto.ClothesAttributeDefResult;
 import com.project.sb13ootbsteam04.clothes.service.impl.ClothesAttributeDefServiceImpl;
+import java.sql.SQLException;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -21,6 +25,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.util.ReflectionTestUtils;
 
 @DisplayName("의상 속성 정의 서비스")
@@ -43,7 +48,8 @@ class ClothesAttributeDefServiceTest {
     List<String> selectableValues = List.of("블랙", "크림");
     ClothesAttributeDefCreateCommand command = new ClothesAttributeDefCreateCommand(name, selectableValues);
 
-    given(clothesAttributeDefRepository.save(any(ClothesAttributeDef.class)))
+    given(clothesAttributeDefRepository.existsByName(name)).willReturn(false);
+    given(clothesAttributeDefRepository.saveAndFlush(any(ClothesAttributeDef.class)))
         .willAnswer(invocation -> {
           ClothesAttributeDef saved = invocation.getArgument(0);
           ReflectionTestUtils.setField(saved, "id", definitionId);
@@ -56,7 +62,8 @@ class ClothesAttributeDefServiceTest {
 
     // then
     ArgumentCaptor<ClothesAttributeDef> captor = ArgumentCaptor.forClass(ClothesAttributeDef.class);
-    then(clothesAttributeDefRepository).should().save(captor.capture());
+    then(clothesAttributeDefRepository).should().existsByName(name);
+    then(clothesAttributeDefRepository).should().saveAndFlush(captor.capture());
     ClothesAttributeDef saved = captor.getValue();
 
     assertAll(
@@ -67,5 +74,39 @@ class ClothesAttributeDefServiceTest {
         () -> assertThat(result.selectableValues()).containsExactlyElementsOf(selectableValues),
         () -> assertThat(result.createdAt()).isEqualTo(createdAt)
     );
+  }
+
+  @Test
+  @DisplayName("같은 이름의 속성 정의가 존재하면 등록하지 않는다")
+  void 의상_속성_정의_이름_중복() {
+    // given
+    String name = "색상";
+    ClothesAttributeDefCreateCommand command = new ClothesAttributeDefCreateCommand(name, List.of("블랙", "크림"));
+    given(clothesAttributeDefRepository.existsByName(name)).willReturn(true);
+
+    // when & then
+    assertThatThrownBy(() -> clothesAttributeDefService.create(command))
+        .isInstanceOf(DuplicateClothesAttributeDefNameException.class)
+        .hasMessageContaining("이미 존재하는 의상 속성 정의 이름입니다");
+
+    then(clothesAttributeDefRepository).should(never()).saveAndFlush(any());
+  }
+
+  @Test
+  @DisplayName("동시 등록으로 이름 UNIQUE 제약을 위반하면 중복 이름 예외로 변환한다")
+  void 의상_속성_정의_동시_등록_중복() {
+    // given
+    String name = "색상";
+    ClothesAttributeDefCreateCommand command = new ClothesAttributeDefCreateCommand(name, List.of("블랙", "크림"));
+    SQLException uniqueViolation = new SQLException("duplicate key", "23505");
+
+    given(clothesAttributeDefRepository.existsByName(name)).willReturn(false);
+    given(clothesAttributeDefRepository.saveAndFlush(any(ClothesAttributeDef.class)))
+        .willThrow(new DataIntegrityViolationException("duplicate name", uniqueViolation));
+
+    // when & then
+    assertThatThrownBy(() -> clothesAttributeDefService.create(command))
+        .isInstanceOf(DuplicateClothesAttributeDefNameException.class)
+        .hasMessageContaining("이미 존재하는 의상 속성 정의 이름입니다");
   }
 }

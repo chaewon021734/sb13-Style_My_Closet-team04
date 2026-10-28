@@ -2,6 +2,7 @@ package com.project.sb13ootbsteam04.clothes.entity;
 
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
@@ -25,6 +26,19 @@ class ClothesAttributeDefTest {
         () -> assertEquals(name, definition.getName(), "속성 정의 이름"),
         () -> assertEquals(
             selectableValues, definition.getSelectableValues(), "선택 가능한 옵션 값")
+    );
+  }
+
+  @Test
+  @DisplayName("선택 가능한 값은 공백과 대소문자를 무시하고 중복될 수 없다")
+  void 선택_가능한_값_중복_실패() {
+    // given
+    List<String> duplicatedValues = List.of("Black", " black ");
+
+    // when & then
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> ClothesAttributeDef.create("색상", duplicatedValues)
     );
   }
 }
