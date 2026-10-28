@@ -4,6 +4,7 @@ import com.project.sb13ootbsteam04.global.entity.UpdatedAtEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -20,10 +21,15 @@ import org.hibernate.type.SqlTypes;
 @Getter
 @Entity
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@Table(name = "clothes_attribute_defs")
+@Table(
+    name = "clothes_attribute_defs",
+    uniqueConstraints = @UniqueConstraint(
+        name = "uk_clothes_attribute_defs_name",
+        columnNames = "name"
+    ))
 public class ClothesAttributeDef extends UpdatedAtEntity {
 
-  @Column(nullable = false, length = 100)
+  @Column(nullable = false, length = 255)
   private String name;
 
   /** 선택 가능한 문자열을 순서대로 보존하는 PostgreSQL JSONB 배열 */
