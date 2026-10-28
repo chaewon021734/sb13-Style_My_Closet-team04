@@ -77,6 +77,11 @@ public class S3ClothesImageStorage implements ClothesImageStorage { // S3 클라
     if (properties.publicBaseUrl() != null && !properties.publicBaseUrl().isBlank()) {
       return stripTrailingSlash(properties.publicBaseUrl()) + "/" + objectKey;
     }
+    // 점(.)이 포함된 버킷에서는 가상 호스트 이미지 URL이 TLS 호스트 이름 검증에 실패할 수 있으므로,
+    // 점(.)이 포함된 버킷에서는 경로 기반 URL을 사용한다.
+    if (properties.bucket().contains(".")) {
+      return "https://s3." + properties.region() + ".amazonaws.com/" + properties.bucket() + "/" + objectKey;
+    }
     return "https://" + properties.bucket() + ".s3." + properties.region() + ".amazonaws.com/" + objectKey;
   }
 
