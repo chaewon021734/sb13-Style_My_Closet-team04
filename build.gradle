@@ -20,8 +20,10 @@ repositories {
 }
 
 dependencies {
-
     implementation 'org.springframework.boot:spring-boot-starter'
+
+    // REST API 및 내장 Tomcat 웹 서버 (추가)
+    implementation 'org.springframework.boot:spring-boot-starter-webmvc'
 
     // Lombok
     compileOnly 'org.projectlombok:lombok'
@@ -32,6 +34,12 @@ dependencies {
     testCompileOnly 'org.projectlombok:lombok'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
     testAnnotationProcessor 'org.projectlombok:lombok'
+
+    // JPA 테스트
+    testImplementation 'org.springframework.boot:spring-boot-data-jpa-test'
+
+    // 테스트 전용 H2 데이터베이스
+    testRuntimeOnly 'com.h2database:h2'
 
     // 시작 전 추가 내용
     // 입력값 검증
@@ -48,6 +56,10 @@ dependencies {
     // PostgreSQL 데이터베이스
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
     runtimeOnly 'org.postgresql:postgresql'
+
+    // Flyway 데이터베이스 마이그레이션
+    implementation 'org.springframework.boot:spring-boot-starter-flyway'
+    runtimeOnly 'org.flywaydb:flyway-database-postgresql'
 
     // Redis 캐시
     implementation 'org.springframework.boot:spring-boot-starter-cache'
@@ -67,6 +79,7 @@ tasks.named('test') {
 
 tasks.named('jacocoTestReport') {
     dependsOn tasks.named('test')
+
     reports {
         html.required = true
         xml.required = true
