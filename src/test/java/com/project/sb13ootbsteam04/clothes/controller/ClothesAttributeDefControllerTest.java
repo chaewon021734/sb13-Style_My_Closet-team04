@@ -95,7 +95,8 @@ class ClothesAttributeDefControllerTest {
         .andExpect(jsonPath("$.selectableValues[1]").value("크림"))
         .andExpect(jsonPath("$.createdAt").value("2026-10-28T00:00:00Z"));
 
-    ArgumentCaptor<ClothesAttributeDefCreateRequest> captor = ArgumentCaptor.forClass(ClothesAttributeDefCreateRequest.class);
+    ArgumentCaptor<ClothesAttributeDefCreateRequest> captor =
+        ArgumentCaptor.forClass(ClothesAttributeDefCreateRequest.class);
     then(clothesAttributeDefMapper).should().toCommand(captor.capture());
     then(clothesAttributeDefService).should().create(same(command));
     then(clothesAttributeDefMapper).should().toDto(same(result));
@@ -115,7 +116,31 @@ class ClothesAttributeDefControllerTest {
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.exceptionName").value("MethodArgumentNotValidException"))
         .andExpect(jsonPath("$.details.name").value("속성 정의 이름은 필수입니다"))
-        .andExpect(jsonPath("$.details.selectableValues").value("선택 가능한 값은 최소 하나 이상 필요합니다"));
+        .andExpect(jsonPath("$.details.selectableValues")
+            .value("선택 가능한 값은 최소 하나 이상 필요합니다"));
+
+    then(clothesAttributeDefMapper).shouldHaveNoInteractions();
+    then(clothesAttributeDefService).shouldHaveNoInteractions();
+  }
+
+  @Test
+  @DisplayName("이름과 선택 가능한 값이 최대 길이를 초과하면 400을 반환한다")
+  void 의상_속성_정의_요청_길이_검증_실패() throws Exception {
+    // given
+    ClothesAttributeDefCreateRequest request = new ClothesAttributeDefCreateRequest(
+        "가".repeat(256),
+        List.of("나".repeat(101))
+    );
+
+    // when & then
+    mockMvc.perform(post("/api/clothes/attribute-defs")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(objectMapper.writeValueAsBytes(request)))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.exceptionName").value("MethodArgumentNotValidException"))
+        .andExpect(jsonPath("$.details.name").value("속성 정의 이름은 255자까지만 입력 가능합니다"))
+        .andExpect(jsonPath("$.details['selectableValues[0]']")
+            .value("선택 가능한 값은 100자까지만 입력 가능합니다"));
 
     then(clothesAttributeDefMapper).shouldHaveNoInteractions();
     then(clothesAttributeDefService).shouldHaveNoInteractions();
