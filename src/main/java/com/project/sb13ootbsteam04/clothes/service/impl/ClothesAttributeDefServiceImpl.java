@@ -24,15 +24,15 @@ public class ClothesAttributeDefServiceImpl implements ClothesAttributeDefServic
     ClothesAttributeDef definition = ClothesAttributeDef.create(command.name(), command.selectableValues());
     String normalizedName = definition.getName();
 
-    if (clothesAttributeDefRepository.existsByName(normalizedName)) {
-      throw new DuplicateClothesAttributeDefNameException(normalizedName);
-    }
-
     try {
+      // UNIQUE 제약을 즉시 확인해 추가 조회 없이 동시 등록까지 동일하게 처리한다.
       ClothesAttributeDef saved = clothesAttributeDefRepository.saveAndFlush(definition);
-      // 서비스 내부 UNIQUE 계약 위반을 400으로 변환할 수 있도록 saveAndFlush() 사용
-
-      return new ClothesAttributeDefResult(saved.getId(), saved.getName(), saved.getSelectableValues(), saved.getCreatedAt());
+      return new ClothesAttributeDefResult(
+          saved.getId(),
+          saved.getName(),
+          saved.getSelectableValues(),
+          saved.getCreatedAt()
+      );
 
     } catch (DataIntegrityViolationException exception) {
       if (isUniqueViolation(exception)) {
