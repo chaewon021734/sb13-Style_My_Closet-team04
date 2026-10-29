@@ -41,4 +41,20 @@ class ClothesAttributeDefTest {
         () -> ClothesAttributeDef.create("색상", duplicatedValues)
     );
   }
+
+  @Test
+  @DisplayName("속성 이름과 선택 가능한 값은 ERD 최대 길이를 초과할 수 없다")
+  void 속성_이름과_선택값_길이_검증() {
+    // when & then
+    assertAll(
+        () -> assertThrows(
+            IllegalArgumentException.class,
+            () -> ClothesAttributeDef.create("가".repeat(256), List.of("블랙"))
+        ),
+        () -> assertThrows(
+            IllegalArgumentException.class,
+            () -> ClothesAttributeDef.create("색상", List.of("가".repeat(101)))
+        )
+    );
+  }
 }

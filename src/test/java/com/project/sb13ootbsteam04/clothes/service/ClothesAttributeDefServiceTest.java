@@ -6,7 +6,6 @@ import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
-import static org.mockito.Mockito.never;
 
 import com.project.sb13ootbsteam04.clothes.entity.ClothesAttributeDef;
 import com.project.sb13ootbsteam04.clothes.exception.DuplicateClothesAttributeDefNameException;
@@ -48,7 +47,6 @@ class ClothesAttributeDefServiceTest {
     List<String> selectableValues = List.of("블랙", "크림");
     ClothesAttributeDefCreateCommand command = new ClothesAttributeDefCreateCommand(name, selectableValues);
 
-    given(clothesAttributeDefRepository.existsByName(name)).willReturn(false);
     given(clothesAttributeDefRepository.saveAndFlush(any(ClothesAttributeDef.class)))
         .willAnswer(invocation -> {
           ClothesAttributeDef saved = invocation.getArgument(0);
@@ -62,7 +60,6 @@ class ClothesAttributeDefServiceTest {
 
     // then
     ArgumentCaptor<ClothesAttributeDef> captor = ArgumentCaptor.forClass(ClothesAttributeDef.class);
-    then(clothesAttributeDefRepository).should().existsByName(name);
     then(clothesAttributeDefRepository).should().saveAndFlush(captor.capture());
     ClothesAttributeDef saved = captor.getValue();
 
@@ -77,36 +74,38 @@ class ClothesAttributeDefServiceTest {
   }
 
   @Test
-  @DisplayName("같은 이름의 속성 정의가 존재하면 등록하지 않는다")
+  @DisplayName("이름 UNIQUE 제약을 위반하면 중복 이름 예외로 변환한다")
   void 의상_속성_정의_이름_중복() {
-    // given
-    String name = "색상";
-    ClothesAttributeDefCreateCommand command = new ClothesAttributeDefCreateCommand(name, List.of("블랙", "크림"));
-    given(clothesAttributeDefRepository.existsByName(name)).willReturn(true);
-
-    // when & then
-    assertThatThrownBy(() -> clothesAttributeDefService.create(command))
-        .isInstanceOf(DuplicateClothesAttributeDefNameException.class)
-        .hasMessageContaining("이미 존재하는 의상 속성 정의 이름입니다");
-
-    then(clothesAttributeDefRepository).should(never()).saveAndFlush(any());
-  }
-
-  @Test
-  @DisplayName("동시 등록으로 이름 UNIQUE 제약을 위반하면 중복 이름 예외로 변환한다")
-  void 의상_속성_정의_동시_등록_중복() {
     // given
     String name = "색상";
     ClothesAttributeDefCreateCommand command = new ClothesAttributeDefCreateCommand(name, List.of("블랙", "크림"));
     SQLException uniqueViolation = new SQLException("duplicate key", "23505");
 
-    given(clothesAttributeDefRepository.existsByName(name)).willReturn(false);
     given(clothesAttributeDefRepository.saveAndFlush(any(ClothesAttributeDef.class)))
         .willThrow(new DataIntegrityViolationException("duplicate name", uniqueViolation));
 
     // when & then
     assertThatThrownBy(() -> clothesAttributeDefService.create(command))
         .isInstanceOf(DuplicateClothesAttributeDefNameException.class)
-        .hasMessageContaining("이미 존재하는 의상 속성 정의 이름입니다");
+        .hasMessageContaining("이미 존재하는 의상 속성 정의 이름입니다")
+        .satisfies(exception -> assertThat(((DuplicateClothesAttributeDefNameException) exception).getDetails())
+            .containsEntry("name", name));
+  }
+
+  @Test
+  @DisplayName("UNIQUE 이외의 무결성 위반은 중복 이름 예외로 숨기지 않는다")
+  void 의상_속성_정의_다른_무결성_위반() {
+    // given
+    String name = "색상";
+    ClothesAttributeDefCreateCommand command = new ClothesAttributeDefCreateCommand(name, List.of("블랙", "크림"));
+    SQLException notNullViolation = new SQLException("not-null violation", "23502");
+    DataIntegrityViolationException exception = new DataIntegrityViolationException("invalid definition", notNullViolation);
+
+    given(clothesAttributeDefRepository.saveAndFlush(any(ClothesAttributeDef.class)))
+        .willThrow(exception);
+
+    // when & then
+    assertThatThrownBy(() -> clothesAttributeDefService.create(command))
+        .isSameAs(exception);
   }
 }
