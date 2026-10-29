@@ -11,6 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.project.sb13ootbsteam04.clothes.controller.dto.ClothesAttributeDefCreateRequest;
 import com.project.sb13ootbsteam04.clothes.controller.dto.ClothesAttributeDefDto;
+import com.project.sb13ootbsteam04.clothes.exception.DuplicateClothesAttributeDefNameException;
 import com.project.sb13ootbsteam04.clothes.mapper.ClothesAttributeDefMapper;
 import com.project.sb13ootbsteam04.clothes.service.ClothesAttributeDefService;
 import com.project.sb13ootbsteam04.clothes.service.dto.ClothesAttributeDefCreateCommand;
@@ -99,5 +100,48 @@ class ClothesAttributeDefControllerTest {
     then(clothesAttributeDefService).should().create(same(command));
     then(clothesAttributeDefMapper).should().toDto(same(result));
     assertThat(captor.getValue()).isEqualTo(request);
+  }
+
+  @Test
+  @DisplayName("이름과 선택 가능한 값이 유효하지 않으면 400을 반환한다")
+  void 의상_속성_정의_요청_검증_실패() throws Exception {
+    // given
+    ClothesAttributeDefCreateRequest request = new ClothesAttributeDefCreateRequest(" ", List.of());
+
+    // when & then
+    mockMvc.perform(post("/api/clothes/attribute-defs")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(objectMapper.writeValueAsBytes(request)))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.exceptionName").value("MethodArgumentNotValidException"))
+        .andExpect(jsonPath("$.details.name").value("속성 정의 이름은 필수입니다"))
+        .andExpect(jsonPath("$.details.selectableValues").value("선택 가능한 값은 최소 하나 이상 필요합니다"));
+
+    then(clothesAttributeDefMapper).shouldHaveNoInteractions();
+    then(clothesAttributeDefService).shouldHaveNoInteractions();
+  }
+
+  @Test
+  @DisplayName("같은 이름이 이미 존재하면 Swagger 오류 구조와 409를 반환한다")
+  void 의상_속성_정의_이름_중복() throws Exception {
+    // given
+    ClothesAttributeDefCreateRequest request = new ClothesAttributeDefCreateRequest("색상", List.of("블랙", "크림"));
+    ClothesAttributeDefCreateCommand command = new ClothesAttributeDefCreateCommand("색상", List.of("블랙", "크림"));
+
+    given(clothesAttributeDefMapper.toCommand(any(ClothesAttributeDefCreateRequest.class))).willReturn(command);
+    given(clothesAttributeDefService.create(command)).willThrow(new DuplicateClothesAttributeDefNameException("색상"));
+
+    // when & then
+    mockMvc.perform(post("/api/clothes/attribute-defs")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(objectMapper.writeValueAsBytes(request)))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.exceptionName").value("DuplicateClothesAttributeDefNameException"))
+        .andExpect(jsonPath("$.message").value("이미 존재하는 의상 속성 정의 이름입니다"))
+        .andExpect(jsonPath("$.details.name").value("색상"));
+
+    then(clothesAttributeDefMapper).should().toCommand(any(ClothesAttributeDefCreateRequest.class));
+    then(clothesAttributeDefService).should().create(same(command));
+    then(clothesAttributeDefMapper).shouldHaveNoMoreInteractions();
   }
 }
