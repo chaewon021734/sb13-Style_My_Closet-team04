@@ -28,6 +28,18 @@ public interface ClothesApi {
           description = "옷 등록 실패",
           content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
       @ApiResponse(
+          responseCode = "404",
+          description = "소유자 또는 의상 속성 정의를 찾을 수 없음",
+          content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
+      @ApiResponse(
+          responseCode = "413",
+          description = "이미지 크기 제한 초과",
+          content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
+      @ApiResponse(
+          responseCode = "415",
+          description = "지원하지 않는 이미지 형식",
+          content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
+      @ApiResponse(
           responseCode = "500",
           description = "이미지 저장소 또는 서버 처리 실패",
           content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))

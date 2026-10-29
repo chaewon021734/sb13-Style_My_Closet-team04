@@ -71,7 +71,7 @@ public class GlobalExceptionHandler {
   public ResponseEntity<ApiErrorResponse> handleMaxUploadSize(MaxUploadSizeExceededException exception) {
     log.warn("업로드 가능한 파일 크기를 초과했습니다.", exception);
 
-    return ResponseEntity.badRequest().body(new ApiErrorResponse(
+    return ResponseEntity.status(HttpStatus.CONTENT_TOO_LARGE).body(new ApiErrorResponse(
         exception.getClass().getSimpleName(),
         "업로드 가능한 파일 크기를 초과했습니다",
         Map.of("image", "파일 크기를 확인해 주세요")
