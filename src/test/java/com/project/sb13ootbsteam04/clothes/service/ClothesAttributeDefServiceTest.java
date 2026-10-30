@@ -17,6 +17,7 @@ import java.sql.SQLException;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import org.hibernate.exception.ConstraintViolationException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -79,10 +80,9 @@ class ClothesAttributeDefServiceTest {
     // given
     String name = "색상";
     ClothesAttributeDefCreateCommand command = new ClothesAttributeDefCreateCommand(name, List.of("블랙", "크림"));
-    SQLException uniqueViolation = new SQLException("duplicate key", "23505");
+    DataIntegrityViolationException uniqueViolation = uniqueViolation("uk_clothes_attribute_defs_name");
 
-    given(clothesAttributeDefRepository.saveAndFlush(any(ClothesAttributeDef.class)))
-        .willThrow(new DataIntegrityViolationException("duplicate name", uniqueViolation));
+    given(clothesAttributeDefRepository.saveAndFlush(any(ClothesAttributeDef.class))).willThrow(uniqueViolation);
 
     // when & then
     assertThatThrownBy(() -> clothesAttributeDefService.create(command))
@@ -90,6 +90,41 @@ class ClothesAttributeDefServiceTest {
         .hasMessageContaining("이미 존재하는 의상 속성 정의 이름입니다")
         .satisfies(exception -> assertThat(((DuplicateClothesAttributeDefNameException) exception).getDetails())
             .containsEntry("name", name));
+  }
+
+  @Test
+  @DisplayName("다른 UNIQUE 제약 위반은 중복 이름 예외로 숨기지 않는다")
+  void 의상_속성_정의_다른_UNIQUE_제약_위반() {
+    // given
+    ClothesAttributeDefCreateCommand command = new ClothesAttributeDefCreateCommand(
+        "색상",
+        List.of("블랙", "크림")
+    );
+    DataIntegrityViolationException exception = uniqueViolation("pk_clothes_attribute_defs");
+
+    given(clothesAttributeDefRepository.saveAndFlush(any(ClothesAttributeDef.class))).willThrow(exception);
+
+    // when & then
+    assertThatThrownBy(() -> clothesAttributeDefService.create(command)).isSameAs(exception);
+  }
+
+  @Test
+  @DisplayName("제약 이름을 확인할 수 없는 UNIQUE 위반은 중복 이름 예외로 추측하지 않는다")
+  void 의상_속성_정의_제약_이름_없는_UNIQUE_위반() {
+    // given
+    ClothesAttributeDefCreateCommand command = new ClothesAttributeDefCreateCommand(
+        "색상",
+        List.of("블랙", "크림")
+    );
+    DataIntegrityViolationException exception = new DataIntegrityViolationException(
+        "unknown unique violation",
+        new SQLException("duplicate key", "23505")
+    );
+
+    given(clothesAttributeDefRepository.saveAndFlush(any(ClothesAttributeDef.class))).willThrow(exception);
+
+    // when & then
+    assertThatThrownBy(() -> clothesAttributeDefService.create(command)).isSameAs(exception);
   }
 
   @Test
@@ -107,5 +142,15 @@ class ClothesAttributeDefServiceTest {
     // when & then
     assertThatThrownBy(() -> clothesAttributeDefService.create(command))
         .isSameAs(exception);
+  }
+
+  private DataIntegrityViolationException uniqueViolation(String constraintName) {
+    SQLException sqlException = new SQLException("duplicate key", "23505");
+    ConstraintViolationException constraintViolation = new ConstraintViolationException(
+        "unique constraint violation",
+        sqlException,
+        constraintName
+    );
+    return new DataIntegrityViolationException("data integrity violation", constraintViolation);
   }
 }
