@@ -1,5 +1,6 @@
 package com.project.sb13ootbsteam04.clothes.repository;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -8,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import com.project.sb13ootbsteam04.clothes.entity.ClothesAttributeDef;
 import com.project.sb13ootbsteam04.global.config.JpaAuditingConfig;
 import jakarta.persistence.EntityManager;
+import java.sql.SQLException;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -59,6 +61,11 @@ class ClothesAttributeDefRepositoryTest {
     // when & then
     assertThatThrownBy(() -> clothesAttributeDefRepository.saveAndFlush(
         ClothesAttributeDef.create(" 색상 ", List.of("화이트", "핑크"))))
-        .isInstanceOf(DataIntegrityViolationException.class);
+        // SQLSTATE 23505 검증
+        .isInstanceOf(DataIntegrityViolationException.class)
+        .satisfies(exception -> assertThat(
+            ((DataIntegrityViolationException) exception).getMostSpecificCause())
+        .isInstanceOfSatisfying(SQLException.class,
+            sqlException -> assertThat(sqlException.getSQLState()).isEqualTo("23505")));
   }
 }
