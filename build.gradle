@@ -22,7 +22,9 @@ repositories {
 dependencies {
 
     implementation 'org.springframework.boot:spring-boot-starter'
-    implementation 'org.springframework.boot:spring-boot-starter-web'
+
+    // HTTP API 및 외부 위치 API 호출
+    implementation 'org.springframework.boot:spring-boot-starter-webmvc'
 
     // Lombok
     compileOnly 'org.projectlombok:lombok'
@@ -78,6 +80,8 @@ dependencies {
 
 tasks.named('test') {
     useJUnitPlatform()
+    inputs.property('postgresIntegrationTest',
+            providers.environmentVariable('OTBOO_POSTGRES_TEST').orElse('false'))
     finalizedBy tasks.named('jacocoTestReport')
 }
 
@@ -91,6 +95,7 @@ tasks.named('jacocoTestReport') {
 }
 
 tasks.named('jacocoTestCoverageVerification') {
+    dependsOn tasks.named('test')
     violationRules {
         rule {
             limit {
