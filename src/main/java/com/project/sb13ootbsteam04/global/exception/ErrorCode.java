@@ -1,9 +1,7 @@
 package com.project.sb13ootbsteam04.global.exception;
 
-import lombok.Getter;
 import org.springframework.http.HttpStatus;
 
-@Getter
 public enum ErrorCode {
 
   INVALID_REQUEST("GLB_001", HttpStatus.BAD_REQUEST, "요청 값이 올바르지 않습니다"),
@@ -13,11 +11,11 @@ public enum ErrorCode {
   CLOTHES_IMAGE_CONTENT_TYPE_REQUIRED(
       "CLT_001", HttpStatus.BAD_REQUEST, "이미지 콘텐츠 타입은 필수입니다"),
   CLOTHES_IMAGE_TYPE_UNSUPPORTED(
-      "CLT_002", HttpStatus.BAD_REQUEST, "지원하지 않는 이미지 형식입니다"),
+      "CLT_002", HttpStatus.UNSUPPORTED_MEDIA_TYPE, "지원하지 않는 이미지 형식입니다"),
   CLOTHES_IMAGE_EMPTY(
       "CLT_003", HttpStatus.BAD_REQUEST, "빈 이미지 파일은 등록할 수 없습니다"),
   CLOTHES_IMAGE_TOO_LARGE(
-      "CLT_004", HttpStatus.BAD_REQUEST, "이미지는 10MB를 초과할 수 없습니다"),
+      "CLT_004", HttpStatus.CONTENT_TOO_LARGE, "이미지는 10MB를 초과할 수 없습니다"),
   CLOTHES_IMAGE_CONTENT_MISMATCH(
       "CLT_005", HttpStatus.BAD_REQUEST, "이미지 내용과 콘텐츠 타입이 일치하지 않습니다"),
   CLOTHES_IMAGE_READ_FAILED(
@@ -25,7 +23,7 @@ public enum ErrorCode {
   CLOTHES_ATTRIBUTE_DUPLICATED(
       "CLT_007", HttpStatus.BAD_REQUEST, "같은 속성 정의를 중복해서 등록할 수 없습니다"),
   CLOTHES_ATTRIBUTE_DEFINITION_NOT_FOUND(
-      "CLT_008", HttpStatus.BAD_REQUEST, "존재하지 않는 의상 속성 정의가 있습니다"),
+      "CLT_008", HttpStatus.NOT_FOUND, "존재하지 않는 의상 속성 정의가 있습니다"),
   CLOTHES_IMAGE_STORAGE_NOT_CONFIGURED(
       "CLT_009", HttpStatus.INTERNAL_SERVER_ERROR, "이미지 저장소가 설정되지 않았습니다"),
   CLOTHES_IMAGE_UPLOAD_FAILED(
@@ -33,9 +31,11 @@ public enum ErrorCode {
   CLOTHES_IMAGE_DELETE_FAILED(
       "CLT_011", HttpStatus.INTERNAL_SERVER_ERROR, "의상 이미지를 삭제하지 못했습니다"),
   CLOTHES_OWNER_NOT_FOUND(
-      "CLT_012", HttpStatus.BAD_REQUEST, "존재하지 않는 의상 소유자입니다"),
+      "CLT_012", HttpStatus.NOT_FOUND, "존재하지 않는 의상 소유자입니다"),
   CLOTHES_ATTRIBUTE_VALUE_INVALID(
       "CLT_013", HttpStatus.BAD_REQUEST, "선택할 수 없는 의상 속성 값입니다"),
+  CLOTHES_ATTRIBUTE_DEFINITION_NAME_DUPLICATED(
+      "CLT_014", HttpStatus.CONFLICT, "이미 존재하는 의상 속성 정의 이름입니다"),
 
   // WEATHER
   WEATHER_LOCATION_LOOKUP_FAILED(

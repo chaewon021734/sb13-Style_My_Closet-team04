@@ -52,7 +52,8 @@ dependencies {
 
     // PostgreSQL 데이터베이스
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
-    runtimeOnly 'org.postgresql:postgresql'
+    // 구조화된 PostgreSQL 오류 정보로 위반 제약조건을 식별한다.
+    implementation 'org.postgresql:postgresql'
 
     // Redis 캐시
     implementation 'org.springframework.boot:spring-boot-starter-cache'
