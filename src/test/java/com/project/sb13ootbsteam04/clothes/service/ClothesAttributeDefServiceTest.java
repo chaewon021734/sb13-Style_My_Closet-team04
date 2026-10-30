@@ -25,6 +25,8 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.postgresql.util.PSQLException;
+import org.postgresql.util.ServerErrorMessage;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -93,6 +95,23 @@ class ClothesAttributeDefServiceTest {
   }
 
   @Test
+  @DisplayName("PostgreSQL 메시지 언어와 무관하게 구조화된 이름 UNIQUE 제약을 판별한다")
+  void PostgreSQL_구조화_제약_이름_판별() {
+    // given
+    ClothesAttributeDefCreateCommand command = new ClothesAttributeDefCreateCommand(
+        "색상",
+        List.of("블랙", "크림")
+    );
+    DataIntegrityViolationException exception = postgresUniqueViolation("uk_clothes_attribute_defs_name");
+
+    given(clothesAttributeDefRepository.saveAndFlush(any(ClothesAttributeDef.class))).willThrow(exception);
+
+    // when & then
+    assertThatThrownBy(() -> clothesAttributeDefService.create(command))
+        .isInstanceOf(DuplicateClothesAttributeDefNameException.class);
+  }
+
+  @Test
   @DisplayName("다른 UNIQUE 제약 위반은 중복 이름 예외로 숨기지 않는다")
   void 의상_속성_정의_다른_UNIQUE_제약_위반() {
     // given
@@ -150,6 +169,20 @@ class ClothesAttributeDefServiceTest {
         "unique constraint violation",
         sqlException,
         constraintName
+    );
+    return new DataIntegrityViolationException("data integrity violation", constraintViolation);
+  }
+
+  private DataIntegrityViolationException postgresUniqueViolation(String constraintName) {
+    ServerErrorMessage serverErrorMessage = new ServerErrorMessage(
+        "S오류\0C23505\0M중복 키 값이 고유성 제약 조건을 위반했습니다\0n"
+            + constraintName + "\0\0"
+    );
+    PSQLException sqlException = new PSQLException(serverErrorMessage);
+    ConstraintViolationException constraintViolation = new ConstraintViolationException(
+        "unique constraint violation",
+        sqlException,
+        null
     );
     return new DataIntegrityViolationException("data integrity violation", constraintViolation);
   }
