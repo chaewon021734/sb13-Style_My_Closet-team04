@@ -67,9 +67,30 @@ class ClothesTest {
 
     assertAll(
         () -> assertEquals("https://cdn.example.com/image.png", clothes.getImageUrl()),
-        () -> assertThrows(IllegalArgumentException.class,() -> clothes.updateImageUrl(" "))
+        () -> assertThrows(IllegalArgumentException.class, () -> clothes.updateImageUrl(" "))
     );
   }
+
+  @Test
+  @DisplayName("의상 이름과 이미지 URL은 ERD 최대 길이를 초과할 수 없다")
+  void 의상_문자열_길이_검증() {
+    // given
+    User owner = owner();
+
+    // when & then
+    assertAll(
+        () -> assertThrows(
+            IllegalArgumentException.class,
+            () -> Clothes.create(owner, "가".repeat(256), ClothesType.TOP, null)
+        ),
+        () -> assertThrows(
+            IllegalArgumentException.class,
+            () -> Clothes.create(owner, "셔츠", ClothesType.TOP, "a".repeat(501))
+        )
+    );
+  }
+
+
 
   private Clothes clothes() {
     return Clothes.create(owner(), "셔츠", ClothesType.TOP, null);
