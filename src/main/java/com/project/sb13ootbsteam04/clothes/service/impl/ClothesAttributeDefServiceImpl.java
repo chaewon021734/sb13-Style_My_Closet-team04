@@ -11,6 +11,8 @@ import java.util.Arrays;
 import java.util.Locale;
 import lombok.RequiredArgsConstructor;
 import org.hibernate.exception.ConstraintViolationException;
+import org.postgresql.util.PSQLException;
+import org.postgresql.util.ServerErrorMessage;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -55,12 +57,26 @@ public class ClothesAttributeDefServiceImpl implements ClothesAttributeDefServic
       return false;
     }
 
+    return isNameUniqueConstraint(resolveConstraintName(exception));
+  }
+
+  private String resolveConstraintName(Throwable exception) {
+    String hibernateConstraintName = null;
+
     for (Throwable current = exception; current != null; current = current.getCause()) {
-      if (current instanceof ConstraintViolationException violation) {
-        return isNameUniqueConstraint(violation.getConstraintName());
+      if (current instanceof PSQLException postgresException) { // 구조화된 제약조건명 추출
+        ServerErrorMessage serverErrorMessage = postgresException.getServerErrorMessage();
+        if (serverErrorMessage != null && serverErrorMessage.getConstraint() != null) {
+          // PostgreSQL 프로토콜의 구조화 필드는 서버 메시지 언어에 영향을 받지 않는다.
+          return serverErrorMessage.getConstraint();
+        }
+      }
+      if (current instanceof ConstraintViolationException violation && hibernateConstraintName == null) {
+        // H2 등 PostgreSQL 이외 테스트 DB에서는 Hibernate가 추출한 이름을 사용한다.
+        hibernateConstraintName = violation.getConstraintName();
       }
     }
-    return false;
+    return hibernateConstraintName;
   }
 
   private boolean isNameUniqueConstraint(String constraintName) {
