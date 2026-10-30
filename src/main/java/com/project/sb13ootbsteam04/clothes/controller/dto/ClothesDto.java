@@ -13,10 +13,10 @@ public record ClothesDto(
     @Schema(description = "소유자 ID")
     UUID ownerId,
 
-    @Schema(description = "의상 이름")
+    @Schema(description = "의상 이름", maxLength = 255)
     String name,
 
-    @Schema(description = "의상 이미지 URL")
+    @Schema(description = "의상 이미지 URL", maxLength = 500, nullable = true)
     String imageUrl,
 
     @Schema(description = "의상 타입")
