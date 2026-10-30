@@ -51,7 +51,7 @@ class KakaoLocationClientTest {
         server.expect(anything()).andRespond(withSuccess("{\"documents\":[]}", MediaType.APPLICATION_JSON));
         assertThatThrownBy(() -> client.getLocationNames(37, 127))
                 .isInstanceOfSatisfying(WeatherLocationException.class,
-                        exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST))
+                        exception -> assertThat(exception.getErrorCode().getStatus()).isEqualTo(HttpStatus.BAD_REQUEST))
                 .hasMessageContaining("찾을 수 없습니다");
         server.verify();
     }
@@ -61,7 +61,7 @@ class KakaoLocationClientTest {
         server.expect(anything()).andRespond(withServerError().body("upstream-secret"));
         assertThatThrownBy(() -> client.getLocationNames(37, 127))
                 .isInstanceOfSatisfying(WeatherLocationException.class,
-                        exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.BAD_GATEWAY))
+                        exception -> assertThat(exception.getErrorCode().getStatus()).isEqualTo(HttpStatus.BAD_GATEWAY))
                 .hasMessage("행정구역 정보를 조회할 수 없습니다.");
         server.verify();
     }
@@ -71,7 +71,7 @@ class KakaoLocationClientTest {
         var noKeyClient = new KakaoLocationClient(RestClient.create(), "");
         assertThatThrownBy(() -> noKeyClient.getLocationNames(37, 127))
                 .isInstanceOfSatisfying(WeatherLocationException.class,
-                        exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR))
+                        exception -> assertThat(exception.getErrorCode().getStatus()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR))
                 .hasMessageContaining("키가 설정되지 않았습니다");
     }
 
@@ -105,7 +105,7 @@ class KakaoLocationClientTest {
         server.expect(anything()).andRespond(withException(new SocketTimeoutException("test-key")));
         assertThatThrownBy(() -> client.getLocationNames(37, 127))
                 .isInstanceOfSatisfying(WeatherLocationException.class,
-                        exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE))
+                        exception -> assertThat(exception.getErrorCode().getStatus()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE))
                 .hasMessage("행정구역 정보를 조회할 수 없습니다.");
         server.verify();
     }

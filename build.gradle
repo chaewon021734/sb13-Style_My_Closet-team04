@@ -32,9 +32,10 @@ dependencies {
 
     // 테스트
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.springframework.boot:spring-boot-data-jpa-test'
+    testRuntimeOnly 'com.h2database:h2'
     testCompileOnly 'org.projectlombok:lombok'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
-    testRuntimeOnly 'com.h2database:h2'
     testAnnotationProcessor 'org.projectlombok:lombok'
 
     // 시작 전 추가 내용
@@ -62,6 +63,18 @@ dependencies {
 
     // Elasticsearch 검색
     implementation 'org.springframework.boot:spring-boot-starter-data-elasticsearch'
+
+    // MapStruct
+    implementation 'org.mapstruct:mapstruct:1.6.3'
+    annotationProcessor 'org.mapstruct:mapstruct-processor:1.6.3'
+    annotationProcessor 'org.projectlombok:lombok-mapstruct-binding:0.2.0'
+
+    // AWS S3 이미지 저장
+    implementation platform('software.amazon.awssdk:bom:2.57.3')
+    implementation 'software.amazon.awssdk:s3'
+
+    // Swagger
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.1.0'
 }
 
 tasks.named('test') {

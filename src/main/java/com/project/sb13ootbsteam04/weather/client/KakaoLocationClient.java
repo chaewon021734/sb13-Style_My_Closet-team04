@@ -6,7 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
-import org.springframework.http.HttpStatus;
+import com.project.sb13ootbsteam04.global.exception.ErrorCode;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
@@ -30,7 +30,7 @@ public class KakaoLocationClient {
 
     public List<String> getLocationNames(double latitude, double longitude) {
         if (apiKey.isBlank()) {
-            throw new WeatherLocationException(HttpStatus.INTERNAL_SERVER_ERROR, "카카오 위치 조회 API 키가 설정되지 않았습니다.");
+            throw new WeatherLocationException(ErrorCode.WEATHER_LOCATION_API_KEY_NOT_CONFIGURED);
         }
         RegionResponse response;
         try {
@@ -41,23 +41,23 @@ public class KakaoLocationClient {
                     .retrieve().body(RegionResponse.class);
         } catch (ResourceAccessException exception) {
             log.warn("카카오 행정구역 연결 실패: {}", exception.getClass().getSimpleName());
-            throw new WeatherLocationException(HttpStatus.SERVICE_UNAVAILABLE, "행정구역 정보를 조회할 수 없습니다.");
+            throw new WeatherLocationException(ErrorCode.WEATHER_LOCATION_SERVICE_UNAVAILABLE);
         } catch (RestClientException exception) {
             // 외부 응답 본문이나 인증 키를 클라이언트에 노출하지 않는다.
             log.warn("카카오 행정구역 조회 실패: {}", exception.getClass().getSimpleName());
-            throw new WeatherLocationException("행정구역 정보를 조회할 수 없습니다.");
+            throw new WeatherLocationException(ErrorCode.WEATHER_LOCATION_LOOKUP_FAILED);
         }
         if (response == null || response.documents() == null) {
-            throw new WeatherLocationException("행정구역 조회 응답이 올바르지 않습니다.");
+            throw new WeatherLocationException(ErrorCode.WEATHER_LOCATION_RESPONSE_INVALID);
         }
         Region region = response.documents().stream()
                 .filter(Objects::nonNull)
                 .filter(document -> "H".equals(document.type())).findFirst()
-                .orElseThrow(() -> new WeatherLocationException(HttpStatus.BAD_REQUEST, "해당 좌표의 행정구역을 찾을 수 없습니다."));
+                .orElseThrow(() -> new WeatherLocationException(ErrorCode.WEATHER_LOCATION_NOT_FOUND));
         List<String> names = Stream.of(region.first(), region.second(), region.third())
                 .filter(name -> name != null && !name.isBlank()).toList();
         if (names.isEmpty()) {
-            throw new WeatherLocationException(HttpStatus.BAD_REQUEST, "해당 좌표의 행정구역을 찾을 수 없습니다.");
+            throw new WeatherLocationException(ErrorCode.WEATHER_LOCATION_NOT_FOUND);
         }
         return names;
     }

@@ -8,7 +8,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
-import org.springframework.http.HttpStatus;
+import com.project.sb13ootbsteam04.global.exception.ErrorCode;
+import com.project.sb13ootbsteam04.global.exception.GlobalExceptionHandler;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
@@ -27,7 +28,7 @@ class WeatherControllerTest {
     @BeforeEach
     void setUp() {
         mvc = MockMvcBuilders.standaloneSetup(new WeatherController(service))
-                .setControllerAdvice(new WeatherExceptionHandler()).build();
+                .setControllerAdvice(new GlobalExceptionHandler()).build();
     }
 
     @Test
@@ -59,7 +60,7 @@ class WeatherControllerTest {
 
     @Test
     void returnsBadGatewayWhenExternalLookupFails() throws Exception {
-        when(service.getLocation(any())).thenThrow(new WeatherLocationException("행정구역 정보를 조회할 수 없습니다."));
+        when(service.getLocation(any())).thenThrow(new WeatherLocationException(ErrorCode.WEATHER_LOCATION_LOOKUP_FAILED));
         mvc.perform(get("/api/weathers/location").param("longitude", "127").param("latitude", "37"))
                 .andExpect(status().isBadGateway())
                 .andExpect(jsonPath("$.exceptionName").value("WeatherLocationException"))
@@ -69,12 +70,14 @@ class WeatherControllerTest {
     }
 
     @ParameterizedTest
-    @EnumSource(value = HttpStatus.class, names = {"INTERNAL_SERVER_ERROR", "SERVICE_UNAVAILABLE", "BAD_REQUEST"})
-    void preservesLookupFailureStatus(HttpStatus status) throws Exception {
-        when(service.getLocation(any())).thenThrow(new WeatherLocationException(status, "위치 조회 실패"));
+    @EnumSource(value = ErrorCode.class, names = {
+            "WEATHER_LOCATION_API_KEY_NOT_CONFIGURED", "WEATHER_LOCATION_SERVICE_UNAVAILABLE",
+            "WEATHER_LOCATION_NOT_FOUND", "WEATHER_LOCATION_RESPONSE_INVALID"})
+    void preservesLookupFailureStatus(ErrorCode errorCode) throws Exception {
+        when(service.getLocation(any())).thenThrow(new WeatherLocationException(errorCode));
         mvc.perform(get("/api/weathers/location").param("longitude", "127").param("latitude", "37"))
-                .andExpect(status().is(status.value()))
-                .andExpect(jsonPath("$.details.errorCode").value("WEATHER_LOCATION_LOOKUP_FAILED"));
+                .andExpect(status().is(errorCode.getStatus().value()))
+                .andExpect(jsonPath("$.details.errorCode").value(errorCode.name()));
     }
 
 }

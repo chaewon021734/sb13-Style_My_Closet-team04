@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.ActiveProfiles;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -23,6 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 // PostgreSQL DB 접속 정보와 해당 DB의 스키마 생성 권한이 필요하다.
 // OTBOO_POSTGRES_TEST=true로 켜면 실행마다 전용 스키마를 생성하고 종료 시 제거한다.
 @SpringBootTest
+@ActiveProfiles("postgres-test")
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 @Transactional
 @EnabledIfEnvironmentVariable(named = "OTBOO_POSTGRES_TEST", matches = "true")
