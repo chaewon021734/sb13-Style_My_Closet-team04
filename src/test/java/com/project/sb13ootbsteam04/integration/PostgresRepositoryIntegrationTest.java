@@ -11,16 +11,31 @@ import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.test.annotation.DirtiesContext;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 
 import java.time.Instant;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+// PostgreSQL DB 접속 정보와 해당 DB의 스키마 생성 권한이 필요하다.
+// OTBOO_POSTGRES_TEST=true로 켜면 실행마다 전용 스키마를 생성하고 종료 시 제거한다.
 @SpringBootTest
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 @Transactional
 @EnabledIfEnvironmentVariable(named = "OTBOO_POSTGRES_TEST", matches = "true")
 class PostgresRepositoryIntegrationTest {
+
+    private static final String TEST_SCHEMA = "otboo_test_" + UUID.randomUUID().toString().replace("-", "");
+
+    @DynamicPropertySource
+    static void configureTestSchema(DynamicPropertyRegistry registry) {
+        registry.add("spring.jpa.properties.hibernate.default_schema", () -> TEST_SCHEMA);
+        registry.add("spring.jpa.properties.hibernate.hbm2ddl.create_namespaces", () -> true);
+        registry.add("spring.jpa.hibernate.ddl-auto", () -> "create-drop");
+    }
 
     @Autowired private UserRepository userRepository;
     @Autowired private WeatherRepository weatherRepository;

@@ -8,6 +8,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 import java.net.SocketTimeoutException;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
@@ -49,7 +50,9 @@ class KakaoLocationClientTest {
     void rejectsEmptyResults() {
         server.expect(anything()).andRespond(withSuccess("{\"documents\":[]}", MediaType.APPLICATION_JSON));
         assertThatThrownBy(() -> client.getLocationNames(37, 127))
-                .isInstanceOf(WeatherLocationException.class).hasMessageContaining("찾을 수 없습니다");
+                .isInstanceOfSatisfying(WeatherLocationException.class,
+                        exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST))
+                .hasMessageContaining("찾을 수 없습니다");
         server.verify();
     }
 
@@ -57,7 +60,8 @@ class KakaoLocationClientTest {
     void hidesUpstreamErrorBody() {
         server.expect(anything()).andRespond(withServerError().body("upstream-secret"));
         assertThatThrownBy(() -> client.getLocationNames(37, 127))
-                .isInstanceOf(WeatherLocationException.class)
+                .isInstanceOfSatisfying(WeatherLocationException.class,
+                        exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.BAD_GATEWAY))
                 .hasMessage("행정구역 정보를 조회할 수 없습니다.");
         server.verify();
     }
@@ -66,7 +70,9 @@ class KakaoLocationClientTest {
     void rejectsMissingKeyWithoutHttpCall() {
         var noKeyClient = new KakaoLocationClient(RestClient.create(), "");
         assertThatThrownBy(() -> noKeyClient.getLocationNames(37, 127))
-                .isInstanceOf(WeatherLocationException.class).hasMessageContaining("키가 설정되지 않았습니다");
+                .isInstanceOfSatisfying(WeatherLocationException.class,
+                        exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR))
+                .hasMessageContaining("키가 설정되지 않았습니다");
     }
 
     @Test
@@ -98,7 +104,8 @@ class KakaoLocationClientTest {
     void handlesTimeoutWithoutLeakingRequestDetails() {
         server.expect(anything()).andRespond(withException(new SocketTimeoutException("test-key")));
         assertThatThrownBy(() -> client.getLocationNames(37, 127))
-                .isInstanceOf(WeatherLocationException.class)
+                .isInstanceOfSatisfying(WeatherLocationException.class,
+                        exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE))
                 .hasMessage("행정구역 정보를 조회할 수 없습니다.");
         server.verify();
     }

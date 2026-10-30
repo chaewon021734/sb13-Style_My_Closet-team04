@@ -14,14 +14,19 @@ import java.util.Map;
 @RestControllerAdvice(assignableTypes = WeatherController.class)
 public class WeatherExceptionHandler {
 
-    @ExceptionHandler({IllegalArgumentException.class, WeatherLocationException.class,
+    @ExceptionHandler({IllegalArgumentException.class,
             MissingServletRequestParameterException.class, MethodArgumentTypeMismatchException.class,
             HandlerMethodValidationException.class})
     public ResponseEntity<ErrorResponse> handleBadRequest(Exception exception) {
-        Map<String, String> details = exception instanceof WeatherLocationException weatherException
-                ? Map.of("errorCode", weatherException.getErrorCode().name()) : Map.of();
         return ResponseEntity.badRequest().body(new ErrorResponse(
-                exception.getClass().getSimpleName(), exception.getMessage(), details));
+                exception.getClass().getSimpleName(), exception.getMessage(), Map.of()));
+    }
+
+    @ExceptionHandler(WeatherLocationException.class)
+    public ResponseEntity<ErrorResponse> handleLocationFailure(WeatherLocationException exception) {
+        return ResponseEntity.status(exception.getStatus()).body(new ErrorResponse(
+                exception.getClass().getSimpleName(), exception.getMessage(),
+                Map.of("errorCode", exception.getErrorCode().name())));
     }
 
     public record ErrorResponse(String exceptionName, String message, Map<String, String> details) {
