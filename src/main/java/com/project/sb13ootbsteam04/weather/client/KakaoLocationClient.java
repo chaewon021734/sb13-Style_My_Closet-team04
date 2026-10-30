@@ -47,11 +47,11 @@ public class KakaoLocationClient {
             log.warn("카카오 행정구역 조회 실패: {}", exception.getClass().getSimpleName());
             throw new WeatherLocationException(ErrorCode.WEATHER_LOCATION_LOOKUP_FAILED);
         }
-        if (response == null || response.documents() == null) {
+        if (response == null || response.documents() == null
+                || response.documents().stream().anyMatch(Objects::isNull)) {
             throw new WeatherLocationException(ErrorCode.WEATHER_LOCATION_RESPONSE_INVALID);
         }
         Region region = response.documents().stream()
-                .filter(Objects::nonNull)
                 .filter(document -> "H".equals(document.type())).findFirst()
                 .orElseThrow(() -> new WeatherLocationException(ErrorCode.WEATHER_LOCATION_NOT_FOUND));
         List<String> names = Stream.of(region.first(), region.second(), region.third())

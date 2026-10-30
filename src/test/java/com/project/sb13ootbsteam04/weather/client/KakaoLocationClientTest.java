@@ -1,6 +1,7 @@
 package com.project.sb13ootbsteam04.weather.client;
 
 import com.project.sb13ootbsteam04.weather.exception.WeatherLocationException;
+import com.project.sb13ootbsteam04.global.exception.ErrorCode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -51,7 +52,10 @@ class KakaoLocationClientTest {
         server.expect(anything()).andRespond(withSuccess("{\"documents\":[]}", MediaType.APPLICATION_JSON));
         assertThatThrownBy(() -> client.getLocationNames(37, 127))
                 .isInstanceOfSatisfying(WeatherLocationException.class,
-                        exception -> assertThat(exception.getErrorCode().getStatus()).isEqualTo(HttpStatus.BAD_REQUEST))
+                        exception -> {
+                            assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.WEATHER_LOCATION_NOT_FOUND);
+                            assertThat(exception.getErrorCode().getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+                        })
                 .hasMessageContaining("찾을 수 없습니다");
         server.verify();
     }
@@ -84,11 +88,18 @@ class KakaoLocationClientTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"null", "{}", "{\"documents\":null}", "{\"documents\":[null]}"})
-    void rejectsMissingRegionDataWithDomainException(String body) {
+    @ValueSource(strings = {
+            "null", "{}", "{\"documents\":null}", "{\"documents\":[null]}",
+            "{\"documents\":[null,{\"region_type\":\"H\",\"region_1depth_name\":\"서울특별시\"}]}",
+            "{\"documents\":[{\"region_type\":\"H\",\"region_1depth_name\":\"서울특별시\"},null]}"
+    })
+    void rejectsMissingOrCorruptedRegionDataAsBadGateway(String body) {
         server.expect(anything()).andRespond(withSuccess(body, MediaType.APPLICATION_JSON));
         assertThatThrownBy(() -> client.getLocationNames(37, 127))
-                .isInstanceOf(WeatherLocationException.class);
+                .isInstanceOfSatisfying(WeatherLocationException.class, exception -> {
+                    assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.WEATHER_LOCATION_RESPONSE_INVALID);
+                    assertThat(exception.getErrorCode().getStatus()).isEqualTo(HttpStatus.BAD_GATEWAY);
+                });
         server.verify();
     }
 
