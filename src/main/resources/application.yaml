@@ -1,4 +1,7 @@
 spring:
+  config:
+    import: optional:file:.env[.properties]
+
   application:
     name: sb13-OOTBS-team04
 
@@ -15,14 +18,19 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: validate
+      ddl-auto: ${DB_DDL_AUTO:validate}
     open-in-view: false
 
   flyway:
     enabled: true
     locations: classpath:db/migration
 
-# JWT 인증 설정
+# JWT 로그인 및 인증 설정
 jwt:
   secret: ${JWT_SECRET}
   access-token-expiration: ${JWT_ACCESS_TOKEN_EXPIRATION:3600000}
+
+# 날씨 API 설정
+weather:
+  kakao:
+    api-key: ${KAKAO_REST_API_KEY:}

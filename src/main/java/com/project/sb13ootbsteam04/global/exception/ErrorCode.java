@@ -35,7 +35,19 @@ public enum ErrorCode {
   CLOTHES_OWNER_NOT_FOUND(
       "CLT_012", HttpStatus.BAD_REQUEST, "존재하지 않는 의상 소유자입니다"),
   CLOTHES_ATTRIBUTE_VALUE_INVALID(
-      "CLT_013", HttpStatus.BAD_REQUEST, "선택할 수 없는 의상 속성 값입니다");
+      "CLT_013", HttpStatus.BAD_REQUEST, "선택할 수 없는 의상 속성 값입니다"),
+
+  // WEATHER
+  WEATHER_LOCATION_LOOKUP_FAILED(
+      "WTH_001", HttpStatus.BAD_GATEWAY, "행정구역 정보를 조회할 수 없습니다."),
+  WEATHER_LOCATION_SERVICE_UNAVAILABLE(
+      "WTH_002", HttpStatus.SERVICE_UNAVAILABLE, "행정구역 정보를 조회할 수 없습니다."),
+  WEATHER_LOCATION_API_KEY_NOT_CONFIGURED(
+      "WTH_003", HttpStatus.INTERNAL_SERVER_ERROR, "카카오 위치 조회 API 키가 설정되지 않았습니다."),
+  WEATHER_LOCATION_NOT_FOUND(
+      "WTH_004", HttpStatus.BAD_REQUEST, "해당 좌표의 행정구역을 찾을 수 없습니다."),
+  WEATHER_LOCATION_RESPONSE_INVALID(
+      "WTH_005", HttpStatus.BAD_GATEWAY, "행정구역 조회 응답이 올바르지 않습니다.");
 
   private final String code;
   private final HttpStatus status;

@@ -12,3 +12,8 @@ spring:
 
   flyway:
     enabled: false
+
+  # 테스트 전용 JWT 설정
+  jwt:
+    secret: AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=
+    access-token-expiration: 3600000
