@@ -23,7 +23,8 @@ import org.hibernate.type.SqlTypes;
 @Table(name = "clothes_attribute_defs")
 public class ClothesAttributeDef extends UpdatedAtEntity {
 
-  @Column(nullable = false, length = 100)
+  // Flyway V5 및 속성 정의 생성 API의 이름 길이 정책과 일치시킨다.
+  @Column(nullable = false, length = 255)
   private String name;
 
   /** 선택 가능한 문자열을 순서대로 보존하는 PostgreSQL JSONB 배열 */
