@@ -4,9 +4,11 @@ import com.project.sb13ootbsteam04.global.config.JwtConfig;
 import com.project.sb13ootbsteam04.user.entity.User;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
+import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import javax.crypto.SecretKey;
@@ -35,7 +37,10 @@ class JwtTokenProviderTest {
 
         SecretKey secretKey = jwtConfig.jwtSecretKey(encodedKey);
         JwtEncoder jwtEncoder = jwtConfig.jwtEncoder(secretKey);
-        jwtDecoder = jwtConfig.jwtDecoder(secretKey);
+        jwtDecoder = NimbusJwtDecoder
+                .withSecretKey(secretKey)
+                .macAlgorithm(MacAlgorithm.HS256)
+                .build();
 
         jwtTokenProvider = new JwtTokenProvider(jwtEncoder);
 
