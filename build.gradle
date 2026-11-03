@@ -20,31 +20,47 @@ repositories {
 }
 
 dependencies {
+    // Spring Boot 기본
     implementation 'org.springframework.boot:spring-boot-starter'
     implementation 'org.springframework.boot:spring-boot-starter-web'
 
-    // REST API 및 내장 Tomcat 웹 서버 (추가)
+    // REST API 및 내장 Tomcat 웹 서버
     implementation 'org.springframework.boot:spring-boot-starter-webmvc'
 
     // Lombok
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
 
+    // =========================
     // 테스트
+    // =========================
+
+    // Spring Boot 기본 테스트
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
-    testImplementation 'org.springframework.boot:spring-boot-data-jpa-test'
-    testRuntimeOnly 'com.h2database:h2'
-    testCompileOnly 'org.projectlombok:lombok'
-    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
-    testAnnotationProcessor 'org.projectlombok:lombok'
 
     // JPA 테스트
     testImplementation 'org.springframework.boot:spring-boot-data-jpa-test'
 
+    // Spring MVC 테스트
+    testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+
+    // Spring Security 및 JWT 인증 테스트
+    testImplementation 'org.springframework.boot:spring-boot-starter-security-test'
+
     // 테스트 전용 H2 데이터베이스
     testRuntimeOnly 'com.h2database:h2'
 
-    // 시작 전 추가 내용
+    // Lombok 테스트
+    testCompileOnly 'org.projectlombok:lombok'
+    testAnnotationProcessor 'org.projectlombok:lombok'
+
+    // JUnit
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
+    // =========================
+    // 애플리케이션 의존성
+    // =========================
+
     // 입력값 검증
     implementation 'org.springframework.boot:spring-boot-starter-validation'
 
@@ -68,7 +84,7 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-cache'
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
 
-    // Kafka 이벤트·메시징 (Confluent Cloud 연결)
+    // Kafka 이벤트·메시징
     implementation 'org.springframework.boot:spring-boot-starter-kafka'
 
     // Elasticsearch 검색
