@@ -7,10 +7,14 @@ import com.project.sb13ootbsteam04.feed.dto.FeedResponse;
 import com.project.sb13ootbsteam04.feed.dto.UpdateFeedRequest;
 import com.project.sb13ootbsteam04.feed.service.FeedService;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
@@ -26,12 +30,11 @@ public class FeedController {
     private final FeedService feedService;
 
     // 피드 목록 조회
-    // GET /api/feeds
     @GetMapping
     public ResponseEntity<FeedPageResponse> getFeeds(
             @RequestParam(required = false) String cursor,
             @RequestParam(required = false) UUID idAfter,
-            @RequestParam @Min(1) int limit,
+            @RequestParam @Min(1) @Max(100) int limit,
             @RequestParam String sortBy,
             @RequestParam String sortDirection,
             @RequestParam(required = false) String keywordLike,
@@ -66,14 +69,19 @@ public class FeedController {
         return ResponseEntity.ok(response);
     }
 
-    // 피드 등록
-    // POST /api/feeds
+    // 피드 생성
     @PostMapping
     public ResponseEntity<FeedResponse> createFeed(
-            @Valid @RequestBody CreateFeedRequest request
+            @Valid @RequestBody CreateFeedRequest request,
+            Authentication authentication
     ) {
 
-        UUID feedId = feedService.createFeed(request);
+        UUID currentUserId = getCurrentUserId(authentication);
+
+        UUID feedId = feedService.createFeed(
+                request,
+                currentUserId
+        );
 
         FeedResponse response = feedService.getFeedResponse(feedId);
 
@@ -86,31 +94,54 @@ public class FeedController {
     }
 
     // 피드 수정
-    // PATCH /api/feeds/{feedId}
     @PatchMapping("/{feedId}")
     public ResponseEntity<FeedResponse> updateFeed(
             @PathVariable UUID feedId,
-            @Valid @RequestBody UpdateFeedRequest request
+            @Valid @RequestBody UpdateFeedRequest request,
+            Authentication authentication
     ) {
 
-        // 피드 내용 수정
-        feedService.updateFeed(feedId, request);
+        UUID currentUserId = getCurrentUserId(authentication);
 
-        // 수정된 피드 정보 조회
+        feedService.updateFeed(
+                feedId,
+                request,
+                currentUserId
+        );
+
         FeedResponse response = feedService.getFeedResponse(feedId);
 
         return ResponseEntity.ok(response);
     }
 
     // 피드 삭제
-    // DELETE /api/feeds/{feedId}
     @DeleteMapping("/{feedId}")
     public ResponseEntity<Void> deleteFeed(
-            @PathVariable UUID feedId
+            @PathVariable UUID feedId,
+            Authentication authentication
     ) {
 
-        feedService.deleteFeed(feedId);
+        UUID currentUserId = getCurrentUserId(authentication);
+
+        feedService.deleteFeed(feedId, currentUserId);
 
         return ResponseEntity.noContent().build();
+    }
+
+    // JWT에서 로그인 사용자 UUID 추출
+    private UUID getCurrentUserId(Authentication authentication) {
+
+        if (!(authentication instanceof JwtAuthenticationToken jwtAuth)
+                || !authentication.isAuthenticated()) {
+            throw new AccessDeniedException("로그인이 필요합니다.");
+        }
+
+        try {
+            return UUID.fromString(jwtAuth.getToken().getSubject());
+        } catch (IllegalArgumentException e) {
+            throw new AccessDeniedException(
+                    "유효하지 않은 사용자 인증 정보입니다."
+            );
+        }
     }
 }
