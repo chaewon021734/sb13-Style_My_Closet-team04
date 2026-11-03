@@ -9,10 +9,10 @@ import com.project.sb13ootbsteam04.follow.entity.Follow;
 import com.project.sb13ootbsteam04.follow.repository.FollowRepository;
 import com.project.sb13ootbsteam04.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -56,24 +56,37 @@ public class FollowService {
                 .orElseThrow(() ->
                         new IllegalArgumentException(
                                 "생성된 팔로우 정보를 찾을 수 없습니다: " + followId
-                        ));
+                        )
+                );
 
         return followResponseService.toResponse(follow);
     }
 
-    // 팔로우 취소
+    // 팔로우 취소 - 로그인 사용자 권한 검증
     @Transactional
-    public void deleteFollow(UUID followId) {
+    public void deleteFollow(UUID followId, UUID currentUserId) {
 
         if (followId == null) {
             throw new IllegalArgumentException("팔로우 ID는 필수입니다.");
+        }
+
+        if (currentUserId == null) {
+            throw new AccessDeniedException("로그인이 필요합니다.");
         }
 
         Follow follow = followRepository.findById(followId)
                 .orElseThrow(() ->
                         new IllegalArgumentException(
                                 "존재하지 않는 팔로우입니다: " + followId
-                        ));
+                        )
+                );
+
+        // 본인이 생성한 팔로우만 취소 가능
+        if (!follow.getFollowerId().equals(currentUserId)) {
+            throw new AccessDeniedException(
+                    "본인의 팔로우만 취소할 수 있습니다."
+            );
+        }
 
         followRepository.delete(follow);
     }
@@ -254,7 +267,6 @@ public class FollowService {
 
         if (cursor == null || cursor.isBlank()) {
 
-            // 첫 페이지: 나를 팔로우하는 사용자 조회
             follows = followRepository.findFirstFollowerPage(
                     followeeId,
                     normalizedNameLike,
@@ -263,7 +275,6 @@ public class FollowService {
 
         } else {
 
-            // 다음 페이지: 커서 기준 조회
             Instant cursorTime = parseCursor(cursor);
 
             follows = followRepository.findNextFollowerPage(
@@ -275,7 +286,6 @@ public class FollowService {
             );
         }
 
-        // 검색 조건을 적용한 전체 팔로워 수
         long totalCount = followRepository.countFollowersByName(
                 followeeId,
                 normalizedNameLike
@@ -284,7 +294,7 @@ public class FollowService {
         return toPageResponse(follows, limit, totalCount);
     }
 
-    // 팔로잉 및 팔로워 목록 공통 응답 생성
+    // 페이지 응답 생성
     private FollowPageResponse toPageResponse(
             List<Follow> follows,
             int limit,
@@ -330,9 +340,9 @@ public class FollowService {
             int limit
     ) {
 
-        if (limit < 1 || limit == Integer.MAX_VALUE) {
+        if (limit < 1 || limit > 100) {
             throw new IllegalArgumentException(
-                    "limit은 1 이상이고 너무 큰 값은 사용할 수 없습니다."
+                    "limit은 1 이상 100 이하여야 합니다."
             );
         }
 
