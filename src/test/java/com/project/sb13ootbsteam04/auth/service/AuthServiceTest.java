@@ -15,7 +15,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import org.springframework.security.authentication.BadCredentialsException;
-import org.springframework.security.authentication.LockedException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -27,6 +26,9 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class AuthServiceTest {
+
+    private static final String LOGIN_FAILURE_MESSAGE =
+            "이메일 또는 비밀번호가 올바르지 않습니다.";
 
     @Mock
     private UserRepository userRepository;
@@ -58,7 +60,10 @@ class AuthServiceTest {
         );
     }
 
+    // ========================================
     // 1. 정상 로그인
+    // ========================================
+
     @Test
     void shouldLoginSuccessfully() {
 
@@ -91,7 +96,10 @@ class AuthServiceTest {
         verify(jwtTokenProvider).generateAccessToken(user);
     }
 
+    // ========================================
     // 2. 존재하지 않는 이메일
+    // ========================================
+
     @Test
     void shouldRejectUnknownEmail() {
 
@@ -99,20 +107,27 @@ class AuthServiceTest {
         when(userRepository.findByEmail("test@example.com"))
                 .thenReturn(Optional.empty());
 
-        // when & then
-        assertThrows(
+        // when
+        BadCredentialsException exception = assertThrows(
                 BadCredentialsException.class,
                 () -> authService.login(loginRequest)
         );
 
-        // 사용자가 없으면 비밀번호 검사와 JWT 발급을 하지 않음
-        verifyNoInteractions(
-                passwordEncoder,
-                jwtTokenProvider
-        );
+        // then
+        assertEquals(LOGIN_FAILURE_MESSAGE, exception.getMessage());
+
+        // 사용자가 없으면 JWT를 발급하지 않음
+        verifyNoInteractions(jwtTokenProvider);
+
+        // 현재 구현에서는 존재하지 않는 이메일에 대해
+        // 비밀번호 비교를 수행하지 않음
+        verifyNoInteractions(passwordEncoder);
     }
 
+    // ========================================
     // 3. 비밀번호가 틀린 경우
+    // ========================================
+
     @Test
     void shouldRejectWrongPassword() {
 
@@ -125,10 +140,18 @@ class AuthServiceTest {
                 "encodedPassword"
         )).thenReturn(false);
 
-        // when & then
-        assertThrows(
+        // when
+        BadCredentialsException exception = assertThrows(
                 BadCredentialsException.class,
                 () -> authService.login(loginRequest)
+        );
+
+        // then
+        assertEquals(LOGIN_FAILURE_MESSAGE, exception.getMessage());
+
+        verify(passwordEncoder).matches(
+                "password123",
+                "encodedPassword"
         );
 
         // 비밀번호가 틀리면 JWT를 발급하지 않음
@@ -136,31 +159,78 @@ class AuthServiceTest {
                 .generateAccessToken(any(User.class));
     }
 
-    // 4. 잠긴 계정으로 로그인하는 경우
+    // ========================================
+    // 4. 잠긴 계정 + 올바른 비밀번호
+    // ========================================
+
     @Test
     void shouldRejectLoginWhenAccountIsLocked() {
 
         // given
-        // 사용자 계정을 잠금 상태로 변경
         ReflectionTestUtils.setField(user, "locked", true);
 
-        // 이메일 조회 시 잠긴 사용자 반환
         when(userRepository.findByEmail("test@example.com"))
                 .thenReturn(Optional.of(user));
 
+        // 비밀번호 검증은 성공
+        when(passwordEncoder.matches(
+                "password123",
+                "encodedPassword"
+        )).thenReturn(true);
+
         // when
-        LockedException exception = assertThrows(
-                LockedException.class,
+        BadCredentialsException exception = assertThrows(
+                BadCredentialsException.class,
                 () -> authService.login(loginRequest)
         );
 
         // then
-        assertEquals("잠긴 계정입니다.", exception.getMessage());
+        assertEquals(LOGIN_FAILURE_MESSAGE, exception.getMessage());
 
-        // 잠긴 계정은 JWT가 발급되면 안 됨
+        // 잠금 상태 확인 전에 비밀번호 검증을 수행했는지 확인
+        verify(passwordEncoder).matches(
+                "password123",
+                "encodedPassword"
+        );
+
+        // 잠긴 계정에는 JWT를 발급하지 않음
         verifyNoInteractions(jwtTokenProvider);
+    }
 
-        // 현재 AuthService는 비밀번호 검사 전에 잠금 여부를 확인함
-        verifyNoInteractions(passwordEncoder);
+    // ========================================
+    // 5. 잠긴 계정 + 잘못된 비밀번호
+    // ========================================
+
+    @Test
+    void shouldRejectLockedAccountWithWrongPassword() {
+
+        // given
+        ReflectionTestUtils.setField(user, "locked", true);
+
+        when(userRepository.findByEmail("test@example.com"))
+                .thenReturn(Optional.of(user));
+
+        // 비밀번호 검증 실패
+        when(passwordEncoder.matches(
+                "password123",
+                "encodedPassword"
+        )).thenReturn(false);
+
+        // when
+        BadCredentialsException exception = assertThrows(
+                BadCredentialsException.class,
+                () -> authService.login(loginRequest)
+        );
+
+        // then
+        assertEquals(LOGIN_FAILURE_MESSAGE, exception.getMessage());
+
+        verify(passwordEncoder).matches(
+                "password123",
+                "encodedPassword"
+        );
+
+        // 잠긴 계정 + 잘못된 비밀번호에서도 JWT 발급 금지
+        verifyNoInteractions(jwtTokenProvider);
     }
 }

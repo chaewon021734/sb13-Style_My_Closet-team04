@@ -1,159 +1,284 @@
 package com.project.sb13ootbsteam04.global.exception;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertAll;
+import com.project.sb13ootbsteam04.user.exception.DuplicateEmailException;
 
 import io.swagger.v3.core.converter.ModelConverters;
 import io.swagger.v3.oas.models.media.Schema;
+
 import java.util.List;
 import java.util.Map;
+
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertAll;
+
 @DisplayName("전역 예외 처리")
 class GlobalExceptionHandlerTest {
 
-  private final GlobalExceptionHandler handler = new GlobalExceptionHandler();
+  private final GlobalExceptionHandler handler =
+          new GlobalExceptionHandler();
+
+  // ========================================
+  // 1. 공통 비즈니스 예외 처리
+  // ========================================
 
   @Test
   @DisplayName("공통 예외를 Swagger ErrorResponse 구조로 변환한다")
   void 공통_예외_응답_변환() {
+
     // given
     OtbooException exception = new TestOtbooException(
-        ErrorCode.CLOTHES_ATTRIBUTE_DEFINITION_NOT_FOUND,
-        Map.of("definitionIds", "definition-1")
+            ErrorCode.CLOTHES_ATTRIBUTE_DEFINITION_NOT_FOUND,
+            Map.of("definitionIds", "definition-1")
     );
 
     // when
-    ResponseEntity<ApiErrorResponse> response = handler.handleOtbooException(exception);
+    ResponseEntity<ApiErrorResponse> response =
+            handler.handleOtbooException(exception);
 
     // then
     assertAll(
-        () -> assertThat(response.getStatusCode())
-            .isEqualTo(ErrorCode.CLOTHES_ATTRIBUTE_DEFINITION_NOT_FOUND.getStatus()),
-        () -> assertThat(response.getBody()).isEqualTo(new ApiErrorResponse(
-            "TestOtbooException",
-            ErrorCode.CLOTHES_ATTRIBUTE_DEFINITION_NOT_FOUND.getMessage(),
-            Map.of("definitionIds", "definition-1")
-        ))
+            () -> assertThat(response.getStatusCode())
+                    .isEqualTo(
+                            ErrorCode.CLOTHES_ATTRIBUTE_DEFINITION_NOT_FOUND
+                                    .getStatus()
+                    ),
+            () -> assertThat(response.getBody())
+                    .isEqualTo(new ApiErrorResponse(
+                            "TestOtbooException",
+                            ErrorCode.CLOTHES_ATTRIBUTE_DEFINITION_NOT_FOUND
+                                    .getMessage(),
+                            Map.of("definitionIds", "definition-1")
+                    ))
     );
   }
 
+  // ========================================
+  // 2. 이메일 중복 예외 처리 (추가)
+  // ========================================
+
+
+  @Test
+  @DisplayName("이메일이 중복되면 공통 오류 응답 형식으로 409를 반환한다")
+  void 이메일_중복_409_응답() {
+
+    // given
+    DuplicateEmailException exception =
+            new DuplicateEmailException(
+                    new RuntimeException("이메일 중복")
+            );
+
+    // when
+    ResponseEntity<ApiErrorResponse> response =
+            handler.handleDuplicateEmail(exception);
+
+    // then
+    assertAll(
+            // HTTP 409 Conflict 확인
+            () -> assertThat(response.getStatusCode())
+                    .isEqualTo(HttpStatus.CONFLICT),
+
+            // 예외 클래스명 확인
+            () -> assertThat(response.getBody().exceptionName())
+                    .isEqualTo("DuplicateEmailException"),
+
+            // 예외 메시지 확인
+            () -> assertThat(response.getBody().message())
+                    .isEqualTo(exception.getMessage()),
+
+            // details는 빈 객체
+            () -> assertThat(response.getBody().details())
+                    .isEmpty()
+    );
+  }
+
+
+  // ========================================
+  // 3. Multipart 예외 처리
+  // ========================================
 
   @Test
   @DisplayName("서버 multipart 제한을 초과하면 413 오류 응답을 반환한다")
   void multipart_크기_제한_초과_응답() {
+
     // given
-    MaxUploadSizeExceededException exception = new MaxUploadSizeExceededException(10 * 1024 * 1024);
+    MaxUploadSizeExceededException exception =
+            new MaxUploadSizeExceededException(10 * 1024 * 1024);
 
     // when
-    ResponseEntity<ApiErrorResponse> response = handler.handleMaxUploadSize(exception);
+    ResponseEntity<ApiErrorResponse> response =
+            handler.handleMaxUploadSize(exception);
 
     // then
     assertAll(
-        () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONTENT_TOO_LARGE),
-        () -> assertThat(response.getBody()).isEqualTo(new ApiErrorResponse(
-            "MaxUploadSizeExceededException",
-            "업로드 가능한 파일 크기를 초과했습니다",
-            Map.of("image", "파일 크기를 확인해 주세요")
-        ))
+            () -> assertThat(response.getStatusCode())
+                    .isEqualTo(HttpStatus.CONTENT_TOO_LARGE),
+
+            () -> assertThat(response.getBody())
+                    .isEqualTo(new ApiErrorResponse(
+                            "MaxUploadSizeExceededException",
+                            "업로드 가능한 파일 크기를 초과했습니다",
+                            Map.of("image", "파일 크기를 확인해 주세요")
+                    ))
     );
   }
+
+  // ========================================
+  // 4. Swagger 오류 응답 스키마
+  // ========================================
 
   @Test
   @DisplayName("오류 응답 스키마는 공식 OpenAPI의 세 필드만 제공한다")
   void 오류_응답_Swagger_스키마() {
+
     // when
     Schema<?> schema = ModelConverters.getInstance()
-        .read(ApiErrorResponse.class)
-        .get("ErrorResponse");
+            .read(ApiErrorResponse.class)
+            .get("ErrorResponse");
 
     // then
     assertAll(
-        () -> assertThat(schema.getProperties())
-            .containsOnlyKeys("exceptionName", "message", "details"),
-        () -> assertThat(property(schema, "exceptionName").getDescription()).isEqualTo("예외 이름"),
-        () -> assertThat(property(schema, "message").getDescription()).isEqualTo("오류 메시지"),
-        () -> assertThat(property(schema, "details").getDescription()).isEqualTo("오류 부가 정보")
+            () -> assertThat(schema.getProperties())
+                    .containsOnlyKeys(
+                            "exceptionName",
+                            "message",
+                            "details"
+                    ),
+
+            () -> assertThat(
+                    property(schema, "exceptionName").getDescription()
+            ).isEqualTo("예외 이름"),
+
+            () -> assertThat(
+                    property(schema, "message").getDescription()
+            ).isEqualTo("오류 메시지"),
+
+            () -> assertThat(
+                    property(schema, "details").getDescription()
+            ).isEqualTo("오류 부가 정보")
     );
   }
+
+  // ========================================
+  // 5. 잘못된 요청 예외 처리
+  // ========================================
 
   @Test
   @DisplayName("IllegalArgumentException의 내부 메시지를 응답에 노출하지 않는다")
   void 잘못된_인자_내부_메시지_비노출() {
+
     // given
-    IllegalArgumentException exception = new IllegalArgumentException(
-        "jdbc:postgresql://internal-db:5432/otboo"
-    );
+    IllegalArgumentException exception =
+            new IllegalArgumentException(
+                    "jdbc:postgresql://internal-db:5432/otboo"
+            );
 
     // when
-    ResponseEntity<ApiErrorResponse> response = handler.handleIllegalArgument(exception);
+    ResponseEntity<ApiErrorResponse> response =
+            handler.handleIllegalArgument(exception);
 
     // then
     assertAll(
-        () -> assertThat(response.getStatusCode().value()).isEqualTo(400),
-        () -> assertThat(response.getBody()).isEqualTo(new ApiErrorResponse(
-            "IllegalArgumentException",
-            ErrorCode.INVALID_REQUEST.getMessage(),
-            Map.of()
-        )),
-        () -> assertThat(response.getBody().message()).doesNotContain("internal-db")
+            () -> assertThat(response.getStatusCode().value())
+                    .isEqualTo(400),
+
+            () -> assertThat(response.getBody())
+                    .isEqualTo(new ApiErrorResponse(
+                            "IllegalArgumentException",
+                            ErrorCode.INVALID_REQUEST.getMessage(),
+                            Map.of()
+                    )),
+
+            () -> assertThat(response.getBody().message())
+                    .doesNotContain("internal-db")
     );
   }
+
+  // ========================================
+  // 6. Spring 프레임워크 4xx 예외 처리
+  // ========================================
 
   @Test
   @DisplayName("Spring 프레임워크의 4xx 예외 상태를 500으로 변경하지 않는다")
   void 프레임워크_클라이언트_오류_상태_보존() {
+
     // given
     HttpRequestMethodNotSupportedException exception =
-        new HttpRequestMethodNotSupportedException("POST", List.of("GET"));
+            new HttpRequestMethodNotSupportedException(
+                    "POST",
+                    List.of("GET")
+            );
 
     // when
-    ResponseEntity<ApiErrorResponse> response = handler.handleUnexpectedException(exception);
+    ResponseEntity<ApiErrorResponse> response =
+            handler.handleUnexpectedException(exception);
 
     // then
     assertAll(
-        () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.METHOD_NOT_ALLOWED),
-        () -> assertThat(response.getBody()).isEqualTo(new ApiErrorResponse(
-            "HttpRequestMethodNotSupportedException",
-            ErrorCode.INVALID_REQUEST.getMessage(),
-            Map.of()
-        ))
+            () -> assertThat(response.getStatusCode())
+                    .isEqualTo(HttpStatus.METHOD_NOT_ALLOWED),
+
+            () -> assertThat(response.getBody())
+                    .isEqualTo(new ApiErrorResponse(
+                            "HttpRequestMethodNotSupportedException",
+                            ErrorCode.INVALID_REQUEST.getMessage(),
+                            Map.of()
+                    ))
     );
   }
+
+  // ========================================
+  // 7. 예상하지 못한 서버 오류 처리
+  // ========================================
 
   @Test
   @DisplayName("예상하지 못한 서버 예외는 내부 정보를 숨긴 500 응답으로 변환한다")
   void 예상하지_못한_서버_오류_응답() {
+
     // given
-    RuntimeException exception = new RuntimeException("internal-secret");
+    RuntimeException exception =
+            new RuntimeException("internal-secret");
 
     // when
-    ResponseEntity<ApiErrorResponse> response = handler.handleUnexpectedException(exception);
+    ResponseEntity<ApiErrorResponse> response =
+            handler.handleUnexpectedException(exception);
 
     // then
     assertAll(
-        () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR),
-        () -> assertThat(response.getBody()).isEqualTo(new ApiErrorResponse(
-            "Exception",
-            ErrorCode.INTERNAL_SERVER_ERROR.getMessage(),
-            Map.of()
-        )),
-        () -> assertThat(response.getBody().message()).doesNotContain("internal-secret")
+            () -> assertThat(response.getStatusCode())
+                    .isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR),
+
+            () -> assertThat(response.getBody())
+                    .isEqualTo(new ApiErrorResponse(
+                            "Exception",
+                            ErrorCode.INTERNAL_SERVER_ERROR.getMessage(),
+                            Map.of()
+                    )),
+
+            () -> assertThat(response.getBody().message())
+                    .doesNotContain("internal-secret")
     );
   }
 
+  // Swagger 스키마 속성 조회
   private Schema<?> property(Schema<?> schema, String name) {
     return (Schema<?>) schema.getProperties().get(name);
   }
 
+  // 테스트용 공통 예외 클래스
   private static final class TestOtbooException extends OtbooException {
 
-    private TestOtbooException(ErrorCode errorCode, Map<String, String> details) {
+    private TestOtbooException(
+            ErrorCode errorCode,
+            Map<String, String> details
+    ) {
       super(errorCode, details);
     }
   }

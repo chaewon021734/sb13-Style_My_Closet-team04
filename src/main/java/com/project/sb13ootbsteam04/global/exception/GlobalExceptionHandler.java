@@ -38,19 +38,23 @@ public class GlobalExceptionHandler {
     // ========================================
 
     // 이메일 중복 요청 → 409 Conflict
+
+    // 이메일 중복 요청 → 409 Conflict
     @ExceptionHandler(DuplicateEmailException.class)
-    public ResponseEntity<Map<String, String>> handleDuplicateEmail(
+    public ResponseEntity<ApiErrorResponse> handleDuplicateEmail(
             DuplicateEmailException exception
     ) {
         log.warn("이메일 중복 요청이 발생했습니다.");
 
         return ResponseEntity
                 .status(HttpStatus.CONFLICT)
-                .body(Map.of(
-                        "message",
-                        exception.getMessage()
+                .body(new ApiErrorResponse(
+                        exception.getClass().getSimpleName(),
+                        exception.getMessage(),
+                        Map.of()
                 ));
     }
+
 
     // ========================================
     // JWT 로그인 예외 처리
