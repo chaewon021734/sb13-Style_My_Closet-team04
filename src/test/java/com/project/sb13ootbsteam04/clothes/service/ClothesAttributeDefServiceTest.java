@@ -12,6 +12,7 @@ import com.project.sb13ootbsteam04.clothes.exception.DuplicateClothesAttributeDe
 import com.project.sb13ootbsteam04.clothes.repository.ClothesAttributeDefRepository;
 import com.project.sb13ootbsteam04.clothes.service.dto.ClothesAttributeDefCreateCommand;
 import com.project.sb13ootbsteam04.clothes.service.dto.ClothesAttributeDefResult;
+import com.project.sb13ootbsteam04.clothes.service.dto.ClothesAttributeDefSearchCommand;
 import com.project.sb13ootbsteam04.clothes.service.impl.ClothesAttributeDefServiceImpl;
 import java.sql.SQLException;
 import java.time.Instant;
@@ -28,6 +29,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.postgresql.util.PSQLException;
 import org.postgresql.util.ServerErrorMessage;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.domain.Sort.Direction;
 import org.springframework.test.util.ReflectionTestUtils;
 
 @DisplayName("의상 속성 정의 서비스")
@@ -162,6 +165,96 @@ class ClothesAttributeDefServiceTest {
     assertThatThrownBy(() -> clothesAttributeDefService.create(command))
         .isSameAs(exception);
   }
+
+  @Test
+  @DisplayName("생성일 기준 내림차순 정렬로 의상 속성 정의 목록을 조회한다")
+  void 생성일_내림차순_기준_의상_속성_정의_목록_조회() {
+    // given
+    ClothesAttributeDef older = definition(UUID.randomUUID(), "색상", Instant.parse("2026-11-04T00:00:00Z"));
+    ClothesAttributeDef newer = definition(UUID.randomUUID(), "사이즈", Instant.parse("2026-11-04T00:03:00Z"));
+    ClothesAttributeDefSearchCommand command = new ClothesAttributeDefSearchCommand("createdAt", Direction.DESC, null);
+    Sort sort = Sort.by(Direction.DESC, "createdAt");
+    given(clothesAttributeDefRepository.findAll(sort)).willReturn(List.of(newer, older));
+
+    // when
+    List<ClothesAttributeDefResult> result = clothesAttributeDefService.findAll(command);
+
+    // then
+    then(clothesAttributeDefRepository).should().findAll(sort);
+    assertThat(result)
+        .extracting(ClothesAttributeDefResult::name)
+        .containsExactly("사이즈", "색상");
+  }
+
+  @Test
+  @DisplayName("생성일 기준 오름차순 정렬로 의상 속성 정의 목록을 조회한다")
+  void 생성일_오름차순_기준_의상_속성_정의_목록_조회() {
+    // given
+    ClothesAttributeDef older = definition(UUID.randomUUID(), "색상", Instant.parse("2026-11-04T00:00:00Z"));
+    ClothesAttributeDef newer = definition(UUID.randomUUID(), "사이즈", Instant.parse("2026-11-04T00:03:00Z"));
+    ClothesAttributeDefSearchCommand command = new ClothesAttributeDefSearchCommand("createdAt", Direction.ASC, null);
+    Sort sort = Sort.by(Direction.ASC, "createdAt");
+    given(clothesAttributeDefRepository.findAll(sort)).willReturn(List.of(older, newer));
+
+    // when
+    List<ClothesAttributeDefResult> result = clothesAttributeDefService.findAll(command);
+
+    // then
+    then(clothesAttributeDefRepository).should().findAll(sort);
+    assertThat(result)
+        .extracting(ClothesAttributeDefResult::name)
+        .containsExactly("색상", "사이즈");
+  }
+
+  @Test
+  @DisplayName("속성 정의 이름 기준 내림차순 정렬로 의상 속성 정의 목록을 조회한다")
+  void 속성_정의_이름_내림차순_기준_의상_속성_정의_목록_조회() {
+    // given
+    Instant createdAt = Instant.parse("2026-11-04T00:00:00Z");
+    ClothesAttributeDef colorDefinition = definition(UUID.randomUUID(), "Color", createdAt);
+    ClothesAttributeDef sizeDefinition = definition(UUID.randomUUID(), "Size", createdAt);
+    ClothesAttributeDefSearchCommand command = new ClothesAttributeDefSearchCommand("name", Direction.DESC, null);
+    Sort sort = Sort.by(Direction.DESC, "name");
+    given(clothesAttributeDefRepository.findAll(sort)).willReturn(List.of(sizeDefinition, colorDefinition));
+
+    // when
+    List<ClothesAttributeDefResult> result = clothesAttributeDefService.findAll(command);
+
+    // then
+    then(clothesAttributeDefRepository).should().findAll(sort);
+    assertThat(result)
+        .extracting(ClothesAttributeDefResult::name)
+        .containsExactly("Size", "Color");
+  }
+
+  @Test
+  @DisplayName("속성 정의 이름 기준 오름차순 정렬로 의상 속성 정의 목록을 조회한다")
+  void 속성_정의_이름_오름차순_기준_의상_속성_정의_목록_조회() {
+    // given
+    Instant createdAt = Instant.parse("2026-11-04T00:00:00Z");
+    ClothesAttributeDef colorDefinition = definition(UUID.randomUUID(), "Color", createdAt);
+    ClothesAttributeDef sizeDefinition = definition(UUID.randomUUID(), "Size", createdAt);
+    ClothesAttributeDefSearchCommand command = new ClothesAttributeDefSearchCommand("name", Direction.ASC, null);
+    Sort sort = Sort.by(Direction.ASC, "name");
+    given(clothesAttributeDefRepository.findAll(sort)).willReturn(List.of(colorDefinition, sizeDefinition));
+
+    // when
+    List<ClothesAttributeDefResult> result = clothesAttributeDefService.findAll(command);
+
+    // then
+    then(clothesAttributeDefRepository).should().findAll(sort);
+    assertThat(result)
+        .extracting(ClothesAttributeDefResult::name)
+        .containsExactly("Color", "Size");
+  }
+
+  private ClothesAttributeDef definition(UUID id, String name, Instant createdAt) {
+    ClothesAttributeDef definition = ClothesAttributeDef.create(name, List.of("옵션"));
+    ReflectionTestUtils.setField(definition, "id", id);
+    ReflectionTestUtils.setField(definition, "createdAt", createdAt);
+    return definition;
+  }
+
 
   private DataIntegrityViolationException uniqueViolation(String constraintName) {
     SQLException sqlException = new SQLException("duplicate key", "23505");
