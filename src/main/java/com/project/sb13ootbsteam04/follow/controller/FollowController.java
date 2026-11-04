@@ -7,11 +7,14 @@ import com.project.sb13ootbsteam04.follow.dto.FollowResponse;
 import com.project.sb13ootbsteam04.follow.dto.FollowSummaryResponse;
 import com.project.sb13ootbsteam04.follow.service.FollowService;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
@@ -29,8 +32,17 @@ public class FollowController {
     // POST /api/follows
     @PostMapping
     public ResponseEntity<FollowResponse> createFollow(
-            @Valid @RequestBody CreateFollowRequest request
+            @Valid @RequestBody CreateFollowRequest request,
+            Authentication authentication
     ) {
+        UUID currentUserId = getCurrentUserId(authentication);
+
+        // 다른 사용자 계정으로 팔로우하는 행위 방지
+        if (!currentUserId.equals(request.followerId())) {
+            throw new AccessDeniedException(
+                    "본인의 계정으로만 팔로우할 수 있습니다."
+            );
+        }
 
         FollowResponse response =
                 followService.createFollowResponse(request);
@@ -44,10 +56,12 @@ public class FollowController {
     // DELETE /api/follows/{followId}
     @DeleteMapping("/{followId}")
     public ResponseEntity<Void> deleteFollow(
-            @PathVariable UUID followId
+            @PathVariable UUID followId,
+            Authentication authentication
     ) {
+        UUID currentUserId = getCurrentUserId(authentication);
 
-        followService.deleteFollow(followId);
+        followService.deleteFollow(followId, currentUserId);
 
         return ResponseEntity.noContent().build();
     }
@@ -59,7 +73,6 @@ public class FollowController {
             @RequestParam UUID userId,
             Authentication authentication
     ) {
-
         UUID currentUserId = getCurrentUserId(authentication);
 
         FollowSummaryResponse response =
@@ -78,10 +91,9 @@ public class FollowController {
             @RequestParam UUID followerId,
             @RequestParam(required = false) String cursor,
             @RequestParam(required = false) UUID idAfter,
-            @RequestParam @Min(1) int limit,
+            @RequestParam @Min(1) @Max(100) int limit,
             @RequestParam(required = false) String nameLike
     ) {
-
         FollowPageResponse response =
                 followService.getFollowingPage(
                         followerId,
@@ -101,10 +113,9 @@ public class FollowController {
             @RequestParam UUID followeeId,
             @RequestParam(required = false) String cursor,
             @RequestParam(required = false) UUID idAfter,
-            @RequestParam @Min(1) int limit,
+            @RequestParam @Min(1) @Max(100) int limit,
             @RequestParam(required = false) String nameLike
     ) {
-
         FollowPageResponse response =
                 followService.getFollowerPage(
                         followeeId,
@@ -117,18 +128,20 @@ public class FollowController {
         return ResponseEntity.ok(response);
     }
 
-    // 로그인 사용자 ID 조회
-    // 팀원 인증 모듈 연동 후 실제 구현 예정
+    // JWT에서 로그인 사용자 UUID 추출
     private UUID getCurrentUserId(Authentication authentication) {
 
-        if (authentication == null
-                || !authentication.isAuthenticated()
-                || "anonymousUser".equals(authentication.getPrincipal())) {
-            return null;
+        if (!(authentication instanceof JwtAuthenticationToken jwtAuth)
+                || !authentication.isAuthenticated()) {
+            throw new AccessDeniedException("로그인이 필요합니다.");
         }
 
-        // 현재 인증 principal 구조가 확정되지 않았으므로
-        // 사용자 UUID를 임의로 추측하지 않는다.
-        return null;
+        try {
+            return UUID.fromString(jwtAuth.getToken().getSubject());
+        } catch (IllegalArgumentException e) {
+            throw new AccessDeniedException(
+                    "유효하지 않은 사용자 인증 정보입니다."
+            );
+        }
     }
 }
