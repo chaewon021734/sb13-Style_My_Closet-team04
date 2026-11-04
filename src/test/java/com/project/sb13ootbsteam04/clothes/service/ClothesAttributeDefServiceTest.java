@@ -248,6 +248,35 @@ class ClothesAttributeDefServiceTest {
         .containsExactly("Color", "Size");
   }
 
+  @Test
+  @DisplayName("검색어의 앞뒤 공백을 제거하고 이름 부분 일치로 속성 정의를 조회한다")
+  void 속성_정의_이름_부분_일치_검색() {
+    // given
+    ClothesAttributeDef definition = definition(UUID.randomUUID(), "BackgroundColor", Instant.parse("2026-11-04T00:00:00Z"));
+    ClothesAttributeDefSearchCommand command = new ClothesAttributeDefSearchCommand("name", Direction.ASC, " Color ");
+    Sort sort = Sort.by(Direction.ASC, "name");
+    given(clothesAttributeDefRepository.findByNameContaining("Color", sort)).willReturn(List.of(definition));
+
+    // when
+    List<ClothesAttributeDefResult> result = clothesAttributeDefService.findAll(command);
+
+    // then
+    then(clothesAttributeDefRepository).should().findByNameContaining("Color", sort);
+    assertThat(result)
+        .extracting(ClothesAttributeDefResult::name)
+        .containsExactly("BackgroundColor");
+  }
+
+  @Test
+  @DisplayName("조회 조건이 없으면 속성 정의 목록을 조회하지 않는다")
+  void 의상_속성_정의_조회_조건_누락() {
+    // when & then
+    assertThatThrownBy(() -> clothesAttributeDefService.findAll(null))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("의상 속성 정의 조회 조건은 필수입니다");
+    then(clothesAttributeDefRepository).shouldHaveNoInteractions();
+  }
+
   private ClothesAttributeDef definition(UUID id, String name, Instant createdAt) {
     ClothesAttributeDef definition = ClothesAttributeDef.create(name, List.of("옵션"));
     ReflectionTestUtils.setField(definition, "id", id);
