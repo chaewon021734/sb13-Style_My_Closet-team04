@@ -44,14 +44,14 @@ public class ClothesAttributeDefController implements ClothesAttributeDefApi {
   @GetMapping
   @Override
   public ResponseEntity<List<ClothesAttributeDefDto>> findAll(
-      @RequestParam String sortBy,
-      @RequestParam String sortDirection,
-      @RequestParam(required = false) String keywordLike) {
+      @RequestParam(name = "sortBy") String sortBy,
+      @RequestParam(name = "sortDirection") String sortDirection,
+      @RequestParam(name = "keywordLike", required = false) String keywordLike) {
 
     Direction direction = switch (sortDirection) {
       case "ASCENDING" -> Direction.ASC;
       case "DESCENDING" -> Direction.DESC;
-      default -> throw new IllegalArgumentException("지원하지 않는 정렬 방식입니다: " + sortDirection);
+      default -> throw new IllegalArgumentException("지원하지 않는 정렬 방향입니다: " + sortDirection);
     };
 
     // API 문자열을 검증된 서비스 조회 조건으로 변환한다.
