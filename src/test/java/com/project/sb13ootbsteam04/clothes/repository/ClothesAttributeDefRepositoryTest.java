@@ -141,7 +141,10 @@ class ClothesAttributeDefRepositoryTest {
   @DisplayName("속성 정의 이름은 대소문자를 구분하여 부분 일치 검색한다")
   void 속성_정의_이름_대소문자_구분_부분_일치_검색() {
     // given
-    clothesAttributeDefRepository.saveAndFlush(ClothesAttributeDef.create("BackgroundColor", List.of("Black", "Cream")));
+    // 검색어와 일치하는 행을 두 개 이상 저장하여 정렬을 검증한다
+    clothesAttributeDefRepository.save(ClothesAttributeDef.create("BackgroundColor", List.of("Black", "Cream")));
+    clothesAttributeDefRepository.save(ClothesAttributeDef.create("AccentColor", List.of("Red")));
+    clothesAttributeDefRepository.flush();
     Sort sort = Sort.by(Sort.Direction.ASC, "name");
 
     // when
@@ -152,7 +155,7 @@ class ClothesAttributeDefRepositoryTest {
     assertAll(
         () -> assertThat(matched)
             .extracting(ClothesAttributeDef::getName)
-            .containsExactly("BackgroundColor"),
+            .containsExactly("AccentColor", "BackgroundColor"),
         () -> assertThat(caseMismatch).isEmpty()
     );
   }
