@@ -255,4 +255,34 @@ class ClothesAttributeDefControllerTest {
     then(clothesAttributeDefService).shouldHaveNoInteractions();
     then(clothesAttributeDefMapper).shouldHaveNoInteractions();
   }
+
+  @Test
+  @DisplayName("지원하지 않는 정렬 기준이라면 Swagger 오류 구조와 400을 반환한다")
+  void 의상_속성_정의_목록_조회_정렬_기준_오류() throws Exception {
+    // when & then
+    mockMvc.perform(get("/api/clothes/attribute-defs")
+            .param("sortBy", "updatedAt")
+            .param("sortDirection", "ASCENDING"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.exceptionName").value("IllegalArgumentException"))
+        .andExpect(jsonPath("$.message").value("요청 값이 올바르지 않습니다"));
+
+    then(clothesAttributeDefService).shouldHaveNoInteractions();
+    then(clothesAttributeDefMapper).shouldHaveNoInteractions();
+  }
+
+  @Test
+  @DisplayName("지원하지 않는 정렬 방향이면 Swagger 오류 구조와 400을 반환한다")
+  void 의상_속성_정의_목록_조회_정렬_방향_오류() throws Exception {
+    // when & then
+    mockMvc.perform(get("/api/clothes/attribute-defs")
+            .param("sortBy", "name")
+            .param("sortDirection", "ASC"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.exceptionName").value("IllegalArgumentException"))
+        .andExpect(jsonPath("$.message").value("요청 값이 올바르지 않습니다"));
+
+    then(clothesAttributeDefService).shouldHaveNoInteractions();
+    then(clothesAttributeDefMapper).shouldHaveNoInteractions();
+  }
 }
