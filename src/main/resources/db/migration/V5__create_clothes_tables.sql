@@ -7,6 +7,8 @@ CREATE TABLE clothes_attribute_defs (
     updated_at TIMESTAMP(6) WITH TIME ZONE,
 
     CONSTRAINT pk_clothes_attribute_defs PRIMARY KEY (id),
+    -- 프로토타입과 동일하게 속성명은 대소문자를 구분해 중복을 판정한다.
+    CONSTRAINT uk_clothes_attribute_defs_name UNIQUE (name),
     CONSTRAINT chk_clothes_attribute_defs_selectable_values
         CHECK (CASE
             WHEN jsonb_typeof(selectable_values) = 'array'
@@ -14,10 +16,6 @@ CREATE TABLE clothes_attribute_defs (
             ELSE FALSE
         END)
 );
-
--- 대소문자만 다른 중복도 차단한다.
-CREATE UNIQUE INDEX uk_clothes_attribute_defs_name
-    ON clothes_attribute_defs (LOWER(name));
 
 -- 사용자 의상: 이미지가 없는 등록을 허용하므로 image_url은 NULL을 허용한다.
 CREATE TABLE clothes (

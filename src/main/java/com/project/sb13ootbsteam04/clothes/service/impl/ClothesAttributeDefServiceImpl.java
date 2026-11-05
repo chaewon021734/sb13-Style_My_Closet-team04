@@ -33,7 +33,7 @@ public class ClothesAttributeDefServiceImpl implements ClothesAttributeDefServic
     String normalizedName = definition.getName();
 
     try {
-      // DB UNIQUE 인덱스로 대소문자 중복과 동시 등록 경쟁을 원자적으로 처리한다.
+      // DB UNIQUE 제약으로 동일한 이름의 동시 등록 경쟁까지 원자적으로 처리한다.
       ClothesAttributeDef saved = clothesAttributeDefRepository.saveAndFlush(definition);
       return new ClothesAttributeDefResult(
           saved.getId(),
