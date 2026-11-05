@@ -48,7 +48,6 @@ public interface ClothesAttributeDefApi {
   );
 
   @Operation(
-      operationId = "getClothesAttributeDef",
       summary = "의상 속성 정의 목록 조회",
       description = "의상 속성 정의 목록 조회 API")
   @ApiResponses({
@@ -70,13 +69,13 @@ public interface ClothesAttributeDefApi {
           description = "정렬 기준",
           required = true,
           schema = @Schema(type = "string", allowableValues = {"createdAt", "name"}))
-      @RequestParam(name = "sortBy") String sortBy,
+      @RequestParam String sortBy,
       @Parameter(
           description = "정렬 방향",
           required = true,
           schema = @Schema(type = "string", allowableValues = {"ASCENDING", "DESCENDING"}))
-      @RequestParam(name = "sortDirection") String sortDirection,
+      @RequestParam String sortDirection,
       @Parameter(description = "속성 정의 이름 검색어")
-      @RequestParam(name = "keywordLike", required = false) String keywordLike
+      @RequestParam(required = false) String keywordLike
   );
 }

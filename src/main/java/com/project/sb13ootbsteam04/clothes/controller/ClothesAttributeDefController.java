@@ -44,9 +44,9 @@ public class ClothesAttributeDefController implements ClothesAttributeDefApi {
   @GetMapping
   @Override
   public ResponseEntity<List<ClothesAttributeDefDto>> findAll(
-      @RequestParam(name = "sortBy") String sortBy,
-      @RequestParam(name = "sortDirection") String sortDirection,
-      @RequestParam(name = "keywordLike", required = false) String keywordLike) {
+      @RequestParam String sortBy,
+      @RequestParam String sortDirection,
+      @RequestParam(required = false) String keywordLike) {
 
     Direction direction = switch (sortDirection) {
       case "ASCENDING" -> Direction.ASC;
