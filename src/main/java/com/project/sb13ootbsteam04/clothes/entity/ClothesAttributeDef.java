@@ -89,8 +89,8 @@ public class ClothesAttributeDef extends UpdatedAtEntity {
     Set<String> uniqueValues = new HashSet<>();
     for (String value : values) {
       String normalized = normalizeValue(value);
-      // 프로토타입과 동일하게 옵션값은 대소문자를 구분하지 않고 중복을 판정한다.
-      if (!uniqueValues.add(canonicalizeValue(normalized))) {
+      // Locale.ROOT로 실행 환경과 무관하게 중복을 판정한다.
+      if (!uniqueValues.add(normalized.toLowerCase(Locale.ROOT))) {
         throw new IllegalArgumentException("중복된 선택지입니다");
       }
       normalizedValues.add(normalized);
@@ -101,14 +101,9 @@ public class ClothesAttributeDef extends UpdatedAtEntity {
   String resolveSelectableValue(String value) {
     // 입력값 정규화는 목록 순회 전에 한 번만 수행한다.
     String normalizedValue = normalizeValue(value);
-    String canonicalValue = canonicalizeValue(normalizedValue);
     return selectableValues.stream()
-        .filter(selectableValue -> canonicalizeValue(selectableValue).equals(canonicalValue))
+        .filter(selectableValue -> selectableValue.equalsIgnoreCase(normalizedValue))
         .findFirst()
         .orElseThrow(() -> new IllegalArgumentException("선택할 수 없는 속성값입니다"));
-  }
-
-  private static String canonicalizeValue(String value) {
-    return value.toLowerCase(Locale.ROOT);
   }
 }

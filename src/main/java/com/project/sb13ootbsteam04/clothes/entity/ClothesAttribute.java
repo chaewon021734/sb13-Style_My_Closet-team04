@@ -4,11 +4,9 @@ import com.project.sb13ootbsteam04.global.entity.IdEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
-import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
 import java.util.Objects;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -18,14 +16,7 @@ import lombok.NoArgsConstructor;
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@Table(
-    name = "clothes_attributes",
-    uniqueConstraints = @UniqueConstraint(
-        name = "uk_clothes_attributes_clothes_definition",
-        columnNames = {"clothes_id", "definition_id"}
-    ),
-    indexes = @Index(name = "idx_clothes_attributes_definition_id", columnList = "definition_id")
-)
+@Table(name = "clothes_attributes")
 public class ClothesAttribute extends IdEntity {
 
   @ManyToOne(fetch = FetchType.LAZY, optional = false)
