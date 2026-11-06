@@ -68,7 +68,7 @@ public class ClothesAttributeDefServiceImpl implements ClothesAttributeDefServic
     if (keywordLike == null || keywordLike.isBlank()) {
       return null;
     }
-    return keywordLike.trim();
+    return keywordLike.strip(); // 검색어의 유니코드 공백도 제거
   }
 
   private ClothesAttributeDefResult toResult(ClothesAttributeDef definition) {
