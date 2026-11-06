@@ -6,16 +6,20 @@ import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
+import static org.mockito.BDDMockito.willThrow;
 
 import com.project.sb13ootbsteam04.clothes.entity.ClothesAttributeDef;
+import com.project.sb13ootbsteam04.clothes.exception.ClothesAttributeDefinitionNotFoundException;
 import com.project.sb13ootbsteam04.clothes.exception.DuplicateClothesAttributeDefNameException;
 import com.project.sb13ootbsteam04.clothes.repository.ClothesAttributeDefRepository;
 import com.project.sb13ootbsteam04.clothes.service.dto.ClothesAttributeDefCreateCommand;
 import com.project.sb13ootbsteam04.clothes.service.dto.ClothesAttributeDefResult;
+import com.project.sb13ootbsteam04.clothes.service.dto.ClothesAttributeDefUpdateCommand;
 import com.project.sb13ootbsteam04.clothes.service.impl.ClothesAttributeDefServiceImpl;
 import java.sql.SQLException;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.hibernate.exception.ConstraintViolationException;
 import org.junit.jupiter.api.DisplayName;
@@ -161,6 +165,89 @@ class ClothesAttributeDefServiceTest {
     // when & then
     assertThatThrownBy(() -> clothesAttributeDefService.create(command))
         .isSameAs(exception);
+  }
+
+  @Test
+  @DisplayName("의상 속성 정의 ID로 의상 속성 정의를 수정한다")
+  void 의상_속성_정의_수정_성공() {
+    // given
+    UUID definitionId = UUID.randomUUID();
+    Instant createdAt = Instant.parse("2026-10-28T00:00:00Z");
+    ClothesAttributeDef clothesAttributeDef = ClothesAttributeDef.create("색상", List.of("블랙", "크림"));
+    ReflectionTestUtils.setField(clothesAttributeDef, "id", definitionId);
+    ReflectionTestUtils.setField(clothesAttributeDef, "createdAt", createdAt);
+
+    ClothesAttributeDefUpdateCommand command = new ClothesAttributeDefUpdateCommand(definitionId, "사이즈", List.of("S", "M", "L"));
+    given(clothesAttributeDefRepository.findById(definitionId)).willReturn(Optional.of(clothesAttributeDef));
+
+    // when
+    ClothesAttributeDefResult result = clothesAttributeDefService.update(command);
+
+    // then
+    assertAll(
+        () -> assertThat(clothesAttributeDef.getName()).isEqualTo("사이즈"),
+        () -> assertThat(clothesAttributeDef.getSelectableValues()).containsExactly("S", "M", "L"),
+        () -> assertThat(result.id()).isEqualTo(definitionId),
+        () -> assertThat(result.name()).isEqualTo("사이즈"),
+        () -> assertThat(result.selectableValues()).containsExactly("S", "M", "L"),
+        () -> assertThat(result.createdAt()).isEqualTo(createdAt)
+    );
+  }
+
+  @Test
+  @DisplayName("속성 정의 이름은 유지한 채 선택 가능한 값만 수정할 수 있다")
+  void 의상_속성_정의_동일_이름_수정() {
+    // given
+    UUID definitionId = UUID.randomUUID();
+    ClothesAttributeDef clothesAttributeDef = ClothesAttributeDef.create("색상", List.of("블랙", "크림"));
+    ReflectionTestUtils.setField(clothesAttributeDef, "id", definitionId);
+
+    ClothesAttributeDefUpdateCommand command = new ClothesAttributeDefUpdateCommand(definitionId, "색상", List.of("핑크", "그린"));
+    given(clothesAttributeDefRepository.findById(definitionId)).willReturn(Optional.of(clothesAttributeDef));
+
+    // when
+    ClothesAttributeDefResult result = clothesAttributeDefService.update(command);
+
+    // then
+    assertAll(
+        () -> assertThat(result.name()).isEqualTo("색상"),
+        () -> assertThat(result.selectableValues()).containsExactly("핑크", "그린")
+    );
+  }
+
+  @Test
+  @DisplayName("존재하지 않는 ID로 수정하면 의상 속성 정의 미존재 예외를 던진다")
+  void 의상_속성_정의_수정_대상_없음() {
+    // given
+    UUID definitionId = UUID.randomUUID();
+    ClothesAttributeDefUpdateCommand command = new ClothesAttributeDefUpdateCommand(definitionId, "사이즈", List.of("S", "M", "L"));
+    given(clothesAttributeDefRepository.findById(definitionId)).willReturn(Optional.empty());
+
+    // when & then
+    assertThatThrownBy(() -> clothesAttributeDefService.update(command))
+        .isInstanceOf(ClothesAttributeDefinitionNotFoundException.class)
+        .satisfies(exception -> assertThat(((ClothesAttributeDefinitionNotFoundException) exception).getDetails())
+            .containsEntry("definitionIds", definitionId.toString()));
+    then(clothesAttributeDefRepository).should().findById(definitionId);
+    then(clothesAttributeDefRepository).shouldHaveNoMoreInteractions();
+  }
+
+  @Test
+  @DisplayName("수정한 속성 정의 이름이 기존 속성 정의 이름과 중복되면 중복 이름 예외로 변환한다")
+  void 의상_속성_정의_수정_이름_중복() {
+    // given
+    UUID definitionId = UUID.randomUUID();
+    ClothesAttributeDef clothesAttributeDef = ClothesAttributeDef.create("색상", List.of("블랙", "크림"));
+    ClothesAttributeDefUpdateCommand command = new ClothesAttributeDefUpdateCommand(definitionId, "사이즈", List.of("S", "M", "L"));
+    DataIntegrityViolationException uniqueViolation = uniqueViolation("uk_clothes_attribute_defs_name");
+    given(clothesAttributeDefRepository.findById(definitionId)).willReturn(Optional.of(clothesAttributeDef));
+    willThrow(uniqueViolation).given(clothesAttributeDefRepository).flush();
+
+    // when & then
+    assertThatThrownBy(() -> clothesAttributeDefService.update(command))
+        .isInstanceOf(DuplicateClothesAttributeDefNameException.class)
+        .hasMessageContaining("이미 존재하는 의상 속성 정의 이름입니다")
+        .satisfies(exception -> assertThat(((DuplicateClothesAttributeDefNameException) exception).getDetails()).containsEntry("name", "사이즈"));
   }
 
   private DataIntegrityViolationException uniqueViolation(String constraintName) {
