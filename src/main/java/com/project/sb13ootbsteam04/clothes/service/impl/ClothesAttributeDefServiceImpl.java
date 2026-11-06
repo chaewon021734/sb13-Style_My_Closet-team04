@@ -6,6 +6,7 @@ import com.project.sb13ootbsteam04.clothes.repository.ClothesAttributeDefReposit
 import com.project.sb13ootbsteam04.clothes.service.ClothesAttributeDefService;
 import com.project.sb13ootbsteam04.clothes.service.dto.ClothesAttributeDefCreateCommand;
 import com.project.sb13ootbsteam04.clothes.service.dto.ClothesAttributeDefResult;
+import com.project.sb13ootbsteam04.clothes.service.dto.ClothesAttributeDefUpdateCommand;
 import java.sql.SQLException;
 import java.util.Arrays;
 import java.util.Locale;
@@ -87,5 +88,10 @@ public class ClothesAttributeDefServiceImpl implements ClothesAttributeDefServic
     // H2는 스키마·인덱스 정보까지 포함할 수 있어 제약 이름을 토큰 단위로 비교한다.
     return Arrays.stream(constraintName.toLowerCase(Locale.ROOT).split("[^a-z0-9_]+"))
         .anyMatch(NAME_UNIQUE_CONSTRAINT::equals);
+  }
+
+  @Override
+  public ClothesAttributeDefResult update(ClothesAttributeDefUpdateCommand command) {
+    throw new UnsupportedOperationException("의상 속성 정의 수정은 아직 구현되지 않았습니다.");
   }
 }
