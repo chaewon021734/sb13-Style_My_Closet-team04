@@ -267,7 +267,32 @@ class ClothesAttributeDefServiceTest {
         .containsExactly("BackgroundColor");
   }
 
-  // 공백뿐인 검색어 분기에 대한 테스트 추가
+  @Test
+  @DisplayName("검색어의 앞뒤 유니코드 공백을 제거하고 속성 정의를 조회한다")
+  void 속성_정의_이름_유니코드_공백_제거_검색() {
+    // given
+    String emSpace = Character.toString(0x2003);
+    ClothesAttributeDef definition = definition(
+        UUID.randomUUID(),
+        "BackgroundColor",
+        Instant.parse("2026-11-04T00:00:00Z")
+    );
+    ClothesAttributeDefSearchCommand command = new ClothesAttributeDefSearchCommand(
+        "name",
+        Direction.ASC,
+        emSpace + "Color" + emSpace
+    );
+    Sort sort = Sort.by(Direction.ASC, "name");
+    given(clothesAttributeDefRepository.findByNameContaining("Color", sort)).willReturn(List.of(definition));
+
+    // when
+    List<ClothesAttributeDefResult> result = clothesAttributeDefService.findAll(command);
+
+    // then
+    then(clothesAttributeDefRepository).should().findByNameContaining("Color", sort);
+    assertThat(result).extracting(ClothesAttributeDefResult::name).containsExactly("BackgroundColor");
+  }
+
   @Test
   @DisplayName("공백뿐인 검색어는 이름 필터 없이 전체 속성 정의를 조회한다")
   void 속성_정의_공백_검색어_전체_조회() {
@@ -284,7 +309,6 @@ class ClothesAttributeDefServiceTest {
     then(clothesAttributeDefRepository).should().findAll(sort);
     then(clothesAttributeDefRepository).shouldHaveNoMoreInteractions();
     assertThat(result).extracting(ClothesAttributeDefResult::name).containsExactly("Color");
-
   }
 
   @Test
