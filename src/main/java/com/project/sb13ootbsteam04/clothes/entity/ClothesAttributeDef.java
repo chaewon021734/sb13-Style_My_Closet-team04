@@ -106,4 +106,10 @@ public class ClothesAttributeDef extends UpdatedAtEntity {
         .findFirst()
         .orElseThrow(() -> new IllegalArgumentException("선택할 수 없는 속성값입니다"));
   }
+
+  public void update(String name, List<String> selectableValues) {
+    this.name = normalizeName(name);
+    this.selectableValues = normalizeValues(selectableValues);
+  }
+
 }

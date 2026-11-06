@@ -1,6 +1,7 @@
 package com.project.sb13ootbsteam04.clothes.service.impl;
 
 import com.project.sb13ootbsteam04.clothes.entity.ClothesAttributeDef;
+import com.project.sb13ootbsteam04.clothes.exception.ClothesAttributeDefinitionNotFoundException;
 import com.project.sb13ootbsteam04.clothes.exception.DuplicateClothesAttributeDefNameException;
 import com.project.sb13ootbsteam04.clothes.repository.ClothesAttributeDefRepository;
 import com.project.sb13ootbsteam04.clothes.service.ClothesAttributeDefService;
@@ -9,6 +10,7 @@ import com.project.sb13ootbsteam04.clothes.service.dto.ClothesAttributeDefResult
 import com.project.sb13ootbsteam04.clothes.service.dto.ClothesAttributeDefUpdateCommand;
 import java.sql.SQLException;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Locale;
 import lombok.RequiredArgsConstructor;
 import org.hibernate.exception.ConstraintViolationException;
@@ -36,13 +38,7 @@ public class ClothesAttributeDefServiceImpl implements ClothesAttributeDefServic
     try {
       // UNIQUE 제약을 즉시 확인해 추가 조회 없이 동시 등록까지 동일하게 처리한다.
       ClothesAttributeDef saved = clothesAttributeDefRepository.saveAndFlush(definition);
-      return new ClothesAttributeDefResult(
-          saved.getId(),
-          saved.getName(),
-          saved.getSelectableValues(),
-          saved.getCreatedAt()
-      );
-
+      return toResult(saved);
     } catch (DataIntegrityViolationException exception) {
       if (isNameUniqueViolation(exception)) {
         throw new DuplicateClothesAttributeDefNameException(normalizedName, exception);
@@ -91,7 +87,30 @@ public class ClothesAttributeDefServiceImpl implements ClothesAttributeDefServic
   }
 
   @Override
+  @Transactional
   public ClothesAttributeDefResult update(ClothesAttributeDefUpdateCommand command) {
-    throw new UnsupportedOperationException("의상 속성 정의 수정은 아직 구현되지 않았습니다.");
+    ClothesAttributeDef definition = clothesAttributeDefRepository.findById(command.definitionId())
+        .orElseThrow(() -> new ClothesAttributeDefinitionNotFoundException(List.of(command.definitionId())));
+
+    try {
+      definition.update(command.name(), command.selectableValues());
+      clothesAttributeDefRepository.flush(); // 명시적 flush로 UNIQUE 제약 위반을 즉시 확인한다.
+      return toResult(definition);
+
+    } catch (DataIntegrityViolationException exception) {
+      if (isNameUniqueViolation(exception)) { // uk_clothes_attribute_defs_name 위반이면 중복 이름 예외로 변환한다.
+        throw new DuplicateClothesAttributeDefNameException(definition.getName(), exception);
+      }
+      throw exception;
+    }
+  }
+
+  private ClothesAttributeDefResult toResult(ClothesAttributeDef definition) {
+    return new ClothesAttributeDefResult(
+        definition.getId(),
+        definition.getName(),
+        definition.getSelectableValues(),
+        definition.getCreatedAt()
+    );
   }
 }
