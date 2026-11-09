@@ -24,8 +24,8 @@ public interface FeedRepository extends JpaRepository<Feed, UUID> {
             WHERE (:authorId IS NULL OR f.userId = :authorId)
               AND (
                   :keyword IS NULL
-                  OR LOWER(f.content) LIKE LOWER(
-                      CONCAT('%', :keyword, '%')
+                  OR LOWER(f.content) LIKE CONCAT(
+                      '%', LOWER(CAST(:keyword AS string)), '%'
                   )
               )
             ORDER BY f.createdAt DESC, f.id DESC
@@ -43,8 +43,8 @@ public interface FeedRepository extends JpaRepository<Feed, UUID> {
             WHERE (:authorId IS NULL OR f.userId = :authorId)
               AND (
                   :keyword IS NULL
-                  OR LOWER(f.content) LIKE LOWER(
-                      CONCAT('%', :keyword, '%')
+                  OR LOWER(f.content) LIKE CONCAT(
+                      '%', LOWER(CAST(:keyword AS string)), '%'
                   )
               )
               AND (
@@ -75,8 +75,8 @@ public interface FeedRepository extends JpaRepository<Feed, UUID> {
             WHERE (:authorId IS NULL OR f.userId = :authorId)
               AND (
                   :keyword IS NULL
-                  OR LOWER(f.content) LIKE LOWER(
-                      CONCAT('%', :keyword, '%')
+                  OR LOWER(f.content) LIKE CONCAT(
+                      '%', LOWER(CAST(:keyword AS string)), '%'
                   )
               )
             ORDER BY f.createdAt ASC, f.id ASC
@@ -94,8 +94,8 @@ public interface FeedRepository extends JpaRepository<Feed, UUID> {
             WHERE (:authorId IS NULL OR f.userId = :authorId)
               AND (
                   :keyword IS NULL
-                  OR LOWER(f.content) LIKE LOWER(
-                      CONCAT('%', :keyword, '%')
+                  OR LOWER(f.content) LIKE CONCAT(
+                      '%', LOWER(CAST(:keyword AS string)), '%'
                   )
               )
               AND (
@@ -125,8 +125,8 @@ public interface FeedRepository extends JpaRepository<Feed, UUID> {
             WHERE (:authorId IS NULL OR f.userId = :authorId)
               AND (
                   :keyword IS NULL
-                  OR LOWER(f.content) LIKE LOWER(
-                      CONCAT('%', :keyword, '%')
+                  OR LOWER(f.content) LIKE CONCAT(
+                      '%', LOWER(CAST(:keyword AS string)), '%'
                   )
               )
             """)

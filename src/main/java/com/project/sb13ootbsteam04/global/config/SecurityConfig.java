@@ -1,3 +1,4 @@
+
 package com.project.sb13ootbsteam04.global.config;
 
 import org.springframework.context.annotation.Bean;
@@ -34,6 +35,14 @@ public class SecurityConfig {
 
                         // 오류 경로 허용
                         .requestMatchers("/error").permitAll()
+
+                        // Swagger UI 및 OpenAPI 문서 접근 허용
+                        .requestMatchers(
+                                "/swagger-ui.html",
+                                "/swagger-ui/**",
+                                "/v3/api-docs",
+                                "/v3/api-docs/**"
+                        ).permitAll()
 
                         // 회원가입은 인증 없이 허용
                         .requestMatchers(
