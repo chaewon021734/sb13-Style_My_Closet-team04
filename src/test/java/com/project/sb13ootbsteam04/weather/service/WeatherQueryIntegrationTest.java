@@ -32,7 +32,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import({JpaAuditingConfig.class, WeatherController.class, WeatherGridConverter.class,
-        WeatherForecastService.class, KmaForecastMapper.class})
+        WeatherForecastService.class, KmaForecastMapper.class, WeatherQueryService.class})
 class WeatherQueryIntegrationTest {
 
     @Autowired private WeatherController controller;
@@ -85,7 +85,7 @@ class WeatherQueryIntegrationTest {
                 .andExpect(jsonPath("$[0].precipitation.probability").value(0.2))
                 .andExpect(jsonPath("$[0].humidity.current").value(60.0))
                 .andExpect(jsonPath("$[0].temperature.current").value(12.0))
-                .andExpect(jsonPath("$[0].temperature.min").doesNotExist())
+                .andExpect(jsonPath("$[0].temperature.min").doesNotHaveJsonPath())
                 .andExpect(jsonPath("$[0].windSpeed.speed").value(1.2))
                 .andExpect(jsonPath("$[0].windSpeed.asWord").value("WEAK"));
         verifyNoInteractions(locationService);

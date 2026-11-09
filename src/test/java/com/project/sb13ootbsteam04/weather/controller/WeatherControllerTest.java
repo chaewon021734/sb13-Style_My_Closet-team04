@@ -3,6 +3,7 @@ package com.project.sb13ootbsteam04.weather.controller;
 import com.project.sb13ootbsteam04.weather.dto.WeatherLocationResponse;
 import com.project.sb13ootbsteam04.weather.exception.WeatherLocationException;
 import com.project.sb13ootbsteam04.weather.service.WeatherLocationService;
+import com.project.sb13ootbsteam04.weather.service.WeatherQueryService;
 import com.project.sb13ootbsteam04.weather.service.condition.WeatherLocationCondition;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -27,7 +28,7 @@ class WeatherControllerTest {
 
     @BeforeEach
     void setUp() {
-        mvc = MockMvcBuilders.standaloneSetup(new WeatherController(service))
+        mvc = MockMvcBuilders.standaloneSetup(new WeatherController(service, mock(WeatherQueryService.class)))
                 .setControllerAdvice(new GlobalExceptionHandler()).build();
     }
 
