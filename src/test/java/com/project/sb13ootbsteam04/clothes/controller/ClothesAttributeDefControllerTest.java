@@ -2,6 +2,7 @@ package com.project.sb13ootbsteam04.clothes.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.same;
@@ -13,6 +14,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.project.sb13ootbsteam04.clothes.controller.dto.ClothesAttributeDefCreateRequest;
 import com.project.sb13ootbsteam04.clothes.controller.dto.ClothesAttributeDefDto;
+import com.project.sb13ootbsteam04.clothes.controller.dto.ClothesAttributeDefUpdateRequest;
+import com.project.sb13ootbsteam04.clothes.exception.ClothesAttributeDefinitionNotFoundException;
 import com.project.sb13ootbsteam04.clothes.exception.DuplicateClothesAttributeDefNameException;
 import com.project.sb13ootbsteam04.clothes.mapper.ClothesAttributeDefMapper;
 import com.project.sb13ootbsteam04.clothes.service.ClothesAttributeDefService;
@@ -187,9 +190,11 @@ class ClothesAttributeDefControllerTest {
         "selectableValues", selectableValues
     );
     ClothesAttributeDefResult result = new ClothesAttributeDefResult(definitionId, name, selectableValues, createdAt);
+    ClothesAttributeDefUpdateCommand command = new ClothesAttributeDefUpdateCommand(definitionId, name, selectableValues);
     ClothesAttributeDefDto response = new ClothesAttributeDefDto(definitionId, name, selectableValues, createdAt);
 
-    given(clothesAttributeDefService.update(any(ClothesAttributeDefUpdateCommand.class))).willReturn(result);
+    given(clothesAttributeDefMapper.toCommand(eq(definitionId), any(ClothesAttributeDefUpdateRequest.class))).willReturn(command);
+    given(clothesAttributeDefService.update(same(command))).willReturn(result);
     given(clothesAttributeDefMapper.toDto(result)).willReturn(response);
 
     // when & then
@@ -204,14 +209,47 @@ class ClothesAttributeDefControllerTest {
         .andExpect(jsonPath("$.selectableValues[1]").value("크림"))
         .andExpect(jsonPath("$.createdAt").value("2026-11-06T00:00:00Z"));
 
-    ArgumentCaptor<ClothesAttributeDefUpdateCommand> commandCaptor = ArgumentCaptor.forClass(ClothesAttributeDefUpdateCommand.class);
-    then(clothesAttributeDefService).should().update(commandCaptor.capture());
+    ArgumentCaptor<ClothesAttributeDefUpdateRequest> requestCaptor = ArgumentCaptor.forClass(ClothesAttributeDefUpdateRequest.class);
+
+    then(clothesAttributeDefMapper).should().toCommand(eq(definitionId), requestCaptor.capture());
+    then(clothesAttributeDefService).should().update(same(command));
     then(clothesAttributeDefMapper).should().toDto(same(result));
-    assertThat(commandCaptor.getValue()).satisfies(command -> {
-      assertThat(command.definitionId()).isEqualTo(definitionId);
-      assertThat(command.name()).isEqualTo(name);
-      assertThat(command.selectableValues()).containsExactlyElementsOf(selectableValues);
+
+    assertThat(requestCaptor.getValue()).satisfies(capturedRequest -> {
+      assertThat(capturedRequest.name()).isEqualTo(name);
+      assertThat(capturedRequest.selectableValues()).containsExactlyElementsOf(selectableValues);
     });
+  }
+
+  @Test
+  @DisplayName("존재하지 않는 의상 속성 정의를 수정하면 오류 구조와 404를 반환한다")
+  void 의상_속성_정의_수정_대상_없음() throws Exception {
+    // given
+    UUID definitionId = UUID.randomUUID();
+    Map<String, Object> request = Map.of(
+        "name", "색상",
+        "selectableValues", List.of("블랙", "크림")
+    );
+    ClothesAttributeDefUpdateCommand command = new ClothesAttributeDefUpdateCommand(
+        definitionId,
+        "색상",
+        List.of("블랙", "크림")
+    );
+    given(clothesAttributeDefMapper.toCommand(eq(definitionId), any(ClothesAttributeDefUpdateRequest.class))).willReturn(command);
+    given(clothesAttributeDefService.update(same(command))).willThrow(new ClothesAttributeDefinitionNotFoundException(List.of(definitionId)));
+
+    // when & then
+    mockMvc.perform(patch("/api/clothes/attribute-defs/{definitionId}", definitionId)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(objectMapper.writeValueAsBytes(request)))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.exceptionName").value("ClothesAttributeDefinitionNotFoundException"))
+        .andExpect(jsonPath("$.message").value("존재하지 않는 의상 속성 정의가 있습니다"))
+        .andExpect(jsonPath("$.details.definitionIds").value(definitionId.toString()));
+
+    then(clothesAttributeDefMapper).should().toCommand(eq(definitionId), any(ClothesAttributeDefUpdateRequest.class));
+    then(clothesAttributeDefService).should().update(same(command));
+    then(clothesAttributeDefMapper).shouldHaveNoMoreInteractions();
   }
 
   @Test
