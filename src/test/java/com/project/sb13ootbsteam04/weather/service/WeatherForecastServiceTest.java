@@ -1,13 +1,14 @@
 package com.project.sb13ootbsteam04.weather.service;
 
 import com.project.sb13ootbsteam04.global.config.JpaAuditingConfig;
-import com.project.sb13ootbsteam04.global.exception.OtbooException;
+import com.project.sb13ootbsteam04.global.exception.ErrorCode;
 import com.project.sb13ootbsteam04.weather.dto.KmaForecastItem;
 import com.project.sb13ootbsteam04.weather.entity.PrecipitationType;
 import com.project.sb13ootbsteam04.weather.entity.SkyStatus;
 import com.project.sb13ootbsteam04.weather.entity.Weather;
 import com.project.sb13ootbsteam04.weather.entity.WeatherLocation;
 import com.project.sb13ootbsteam04.weather.entity.WindStrength;
+import com.project.sb13ootbsteam04.weather.exception.WeatherForecastException;
 import com.project.sb13ootbsteam04.weather.repository.WeatherLocationRepository;
 import com.project.sb13ootbsteam04.weather.repository.WeatherRepository;
 import jakarta.persistence.EntityManager;
@@ -17,19 +18,23 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.context.annotation.Import;
+import org.springframework.test.context.transaction.TestTransaction;
 
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import({JpaAuditingConfig.class, WeatherForecastService.class})
+@Import({JpaAuditingConfig.class, WeatherForecastService.class, KmaForecastMapper.class})
 class WeatherForecastServiceTest {
 
     private static final Instant ISSUE = Instant.parse("2026-11-09T02:00:00Z");
@@ -87,7 +92,11 @@ class WeatherForecastServiceTest {
         var items = new ArrayList<>(slot("1100", "1400", DRY));
         slot("1100", "1500", DRY).stream().filter(item -> !item.category().equals("TMP")).forEach(items::add);
 
-        assertThatThrownBy(() -> service.saveForecast(locationId, items)).isInstanceOf(OtbooException.class);
+        assertThatThrownBy(() -> service.saveForecast(locationId, items))
+                .isInstanceOfSatisfying(WeatherForecastException.class, error -> {
+                    assertThat(error.getErrorCode()).isEqualTo(ErrorCode.WEATHER_FORECAST_RESPONSE_INVALID);
+                    assertThat(error.getDetails()).hasEntrySatisfying("reason", reason -> assertThat(reason).contains("TMP"));
+                });
         assertThat(weathers.findAllByLocationIdAndForecastedAtOrderByForecastAtAsc(locationId, ISSUE)).isEmpty();
     }
 
@@ -105,9 +114,70 @@ class WeatherForecastServiceTest {
                 .hasSize(1).doesNotContain(originalId);
     }
 
+    @Test
+    void concurrentSavesForTheSameLocationAndIssuePersistOneForecast() throws Exception {
+        // 두 작업이 별도 트랜잭션에서 등록된 위치를 볼 수 있도록 한다.
+        TestTransaction.flagForCommit();
+        TestTransaction.end();
+        var items = slot("1100", "1400", DRY);
+        var executor = Executors.newFixedThreadPool(2);
+        var start = new CyclicBarrier(2);
+        try {
+            var first = executor.submit(() -> {
+                start.await(5, TimeUnit.SECONDS);
+                return service.saveForecast(locationId, items);
+            });
+            var second = executor.submit(() -> {
+                start.await(5, TimeUnit.SECONDS);
+                return service.saveForecast(locationId, items);
+            });
+            assertThat(List.of(first.get(10, TimeUnit.SECONDS), second.get(10, TimeUnit.SECONDS)))
+                    .containsExactlyInAnyOrder(1, 0);
+            assertThat(weathers.findAllByLocationIdAndForecastedAtOrderByForecastAtAsc(locationId, ISSUE))
+                    .hasSize(1);
+        } finally {
+            executor.shutdownNow();
+            weathers.deleteAll(weathers.findAllByLocationIdAndForecastedAtOrderByForecastAtAsc(locationId, ISSUE));
+            locations.deleteById(locationId);
+        }
+    }
+
+    @Test
+    void keepsPrecipitationRangesAndExtendedForecastCodesWithoutInventingMeasurements() {
+        var hourly = slot("1100", "20261112", "0000", Map.of(
+                "SKY", "4", "PTY", "1", "PCP", "1.0mm 미만", "REH", "75", "TMP", "8", "WSD", "2"));
+        var extended = slot("1100", "20261112", "0300", Map.of(
+                "SKY", "4", "PTY", "1", "PCP", "2", "REH", "75", "TMP", "7", "WSD", "2"));
+        var items = new ArrayList<>(hourly);
+        items.addAll(extended);
+
+        assertThat(service.saveForecast(locationId, items)).isEqualTo(2);
+
+        var saved = forecasts(ISSUE);
+        var atMidnight = saved.get(0);
+        assertThat(atMidnight.getForecastStepMinutes()).isEqualTo(60);
+        assertThat(atMidnight.getPrecipitationAmountRaw()).isEqualTo("1.0mm 미만");
+        assertThat(atMidnight.getPrecipitationAmount()).isNull();
+        assertThat(atMidnight.getWindSpeed()).isEqualTo(2.0);
+        assertThat(atMidnight.getPrecipitationProbability()).isNull();
+
+        var afterMidnight = saved.get(1);
+        assertThat(afterMidnight.getForecastStepMinutes()).isEqualTo(180);
+        assertThat(afterMidnight.getPrecipitationAmountRaw()).isEqualTo("2");
+        assertThat(afterMidnight.getPrecipitationAmount()).isNull();
+        assertThat(afterMidnight.getWindSpeedRaw()).isEqualTo("2");
+        assertThat(afterMidnight.getWindSpeed()).isNull();
+        assertThat(afterMidnight.getWindSpeedAsWord()).isEqualTo(WindStrength.MODERATE);
+    }
+
     private List<KmaForecastItem> slot(String baseTime, String forecastTime, Map<String, String> values) {
+        return slot(baseTime, "20261109", forecastTime, values);
+    }
+
+    private List<KmaForecastItem> slot(String baseTime, String forecastDate, String forecastTime,
+                                       Map<String, String> values) {
         return values.entrySet().stream()
-                .map(entry -> new KmaForecastItem("20261109", baseTime, "20261109", forecastTime,
+                .map(entry -> new KmaForecastItem("20261109", baseTime, forecastDate, forecastTime,
                         entry.getKey(), entry.getValue(), 60, 127))
                 .toList();
     }
