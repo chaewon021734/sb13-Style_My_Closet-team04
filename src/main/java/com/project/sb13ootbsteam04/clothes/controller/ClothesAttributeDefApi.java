@@ -2,15 +2,19 @@ package com.project.sb13ootbsteam04.clothes.controller;
 
 import com.project.sb13ootbsteam04.clothes.controller.dto.ClothesAttributeDefCreateRequest;
 import com.project.sb13ootbsteam04.clothes.controller.dto.ClothesAttributeDefDto;
+import com.project.sb13ootbsteam04.clothes.controller.dto.ClothesAttributeDefUpdateRequest;
 import com.project.sb13ootbsteam04.global.exception.ApiErrorResponse;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.parameters.RequestBody;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import java.util.UUID;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PathVariable;
 
 @Tag(name = "의상 속성 정의", description = "의상 속성 정의 관련 API")
 public interface ClothesAttributeDefApi {
@@ -41,5 +45,43 @@ public interface ClothesAttributeDefApi {
           required = true,
           content = @Content(schema = @Schema(implementation = ClothesAttributeDefCreateRequest.class)))
       ClothesAttributeDefCreateRequest request
+  );
+
+  @Operation(
+      summary = "의상 속성 정의 수정",
+      description = "의상 속성 정의 수정 API")
+  @ApiResponses({
+      @ApiResponse(
+          responseCode = "200",
+          description = "의상 속성 정의 수정 성공",
+          content = @Content(schema = @Schema(implementation = ClothesAttributeDefDto.class))),
+      @ApiResponse(
+          responseCode = "400",
+          description = "의상 속성 정의 수정 실패",
+          content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
+      @ApiResponse(
+          responseCode = "409",
+          description = "이미 존재하는 의상 속성 정의 이름",
+          content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
+      @ApiResponse(
+          responseCode = "404",
+          description = "존재하지 않는 의상 속성 정의",
+          content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
+      @ApiResponse(
+          responseCode = "500",
+          description = "서버 처리 실패",
+          content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
+  })
+  ResponseEntity<ClothesAttributeDefDto> update(
+      @PathVariable
+      @Parameter(
+          description = "수정할 의상 속성 정의 ID",
+          required = true,
+          schema = @Schema(type = "string", format = "uuid")
+      ) UUID definitionId,
+      @RequestBody(
+          required = true,
+          content = @Content(schema = @Schema(implementation = ClothesAttributeDefUpdateRequest.class)))
+      ClothesAttributeDefUpdateRequest request
   );
 }
