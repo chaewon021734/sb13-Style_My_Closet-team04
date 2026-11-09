@@ -6,15 +6,14 @@ import com.project.sb13ootbsteam04.feed.dto.FeedPageResponse;
 import com.project.sb13ootbsteam04.feed.dto.FeedResponse;
 import com.project.sb13ootbsteam04.feed.dto.UpdateFeedRequest;
 import com.project.sb13ootbsteam04.feed.service.FeedService;
+import com.project.sb13ootbsteam04.global.security.JwtUserIdResolver;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
@@ -28,6 +27,7 @@ import java.util.UUID;
 public class FeedController {
 
     private final FeedService feedService;
+    private final JwtUserIdResolver jwtUserIdResolver;
 
     // 피드 목록 조회
     @GetMapping
@@ -76,7 +76,7 @@ public class FeedController {
             Authentication authentication
     ) {
 
-        UUID currentUserId = getCurrentUserId(authentication);
+        UUID currentUserId = jwtUserIdResolver.resolve(authentication);
 
         UUID feedId = feedService.createFeed(
                 request,
@@ -101,7 +101,7 @@ public class FeedController {
             Authentication authentication
     ) {
 
-        UUID currentUserId = getCurrentUserId(authentication);
+        UUID currentUserId = jwtUserIdResolver.resolve(authentication);
 
         feedService.updateFeed(
                 feedId,
@@ -121,27 +121,10 @@ public class FeedController {
             Authentication authentication
     ) {
 
-        UUID currentUserId = getCurrentUserId(authentication);
+        UUID currentUserId = jwtUserIdResolver.resolve(authentication);
 
         feedService.deleteFeed(feedId, currentUserId);
 
         return ResponseEntity.noContent().build();
-    }
-
-    // JWT에서 로그인 사용자 UUID 추출
-    private UUID getCurrentUserId(Authentication authentication) {
-
-        if (!(authentication instanceof JwtAuthenticationToken jwtAuth)
-                || !authentication.isAuthenticated()) {
-            throw new AccessDeniedException("로그인이 필요합니다.");
-        }
-
-        try {
-            return UUID.fromString(jwtAuth.getToken().getSubject());
-        } catch (IllegalArgumentException e) {
-            throw new AccessDeniedException(
-                    "유효하지 않은 사용자 인증 정보입니다."
-            );
-        }
     }
 }

@@ -1,6 +1,7 @@
 
 package com.project.sb13ootbsteam04.feed.service;
 
+import com.project.sb13ootbsteam04.clothes.repository.ClothesRepository;
 import com.project.sb13ootbsteam04.feed.dto.CreateFeedRequest;
 import com.project.sb13ootbsteam04.feed.dto.FeedPageResponse;
 import com.project.sb13ootbsteam04.feed.dto.FeedResponse;
@@ -35,6 +36,7 @@ public class FeedService {
     private final CommentRepository commentRepository;
     private final UserRepository userRepository;
     private final FeedResponseService feedResponseService;
+    private final ClothesRepository clothesRepository;
 
     // 피드 생성
     @Transactional
@@ -94,6 +96,21 @@ public class FeedService {
             );
         }
 
+        // 의상 ID 중복 제거
+        List<UUID> distinctClothesIds = request.clothesIds()
+                .stream()
+                .distinct()
+                .toList();
+
+        // 의상 ID가 실제 DB에 존재하는지 검증
+        if (clothesRepository.findAllById(distinctClothesIds).size()
+                != distinctClothesIds.size()) {
+            throw new IllegalArgumentException(
+                    "존재하지 않는 의상 ID가 포함되어 있습니다."
+            );
+        }
+
+        // 검증이 완료된 후 피드 저장
         Feed feed = new Feed(
                 currentUserId,
                 request.weatherId(),
@@ -102,9 +119,9 @@ public class FeedService {
 
         Feed savedFeed = feedRepository.save(feed);
 
-        List<FeedClothes> feedClothes = request.clothesIds()
+        // 피드와 의상 연결
+        List<FeedClothes> feedClothes = distinctClothesIds
                 .stream()
-                .distinct()
                 .map(clothesId ->
                         new FeedClothes(savedFeed, clothesId)
                 )

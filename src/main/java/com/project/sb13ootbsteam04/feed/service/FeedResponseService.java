@@ -22,8 +22,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.Objects;
+import java.util.Map;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -34,7 +36,6 @@ public class FeedResponseService {
     private final ProfileRepository profileRepository;
     private final FeedLikeRepository feedLikeRepository;
     private final CommentRepository commentRepository;
-
     private final WeatherRepository weatherRepository;
     private final FeedClothesRepository feedClothesRepository;
     private final ClothesRepository clothesRepository;
@@ -70,7 +71,7 @@ public class FeedResponseService {
                         profileImageUrl
                 );
 
-        // 3. 날씨 정보 조회 및 변환
+        // 3. 날씨 정보 조회
         FeedResponse.WeatherDto weatherDto = null;
 
         if (feed.getWeatherId() != null) {
@@ -80,28 +81,49 @@ public class FeedResponseService {
                     .orElse(null);
         }
 
-        // 4. 피드에 연결된 의상 정보 조회
-        List<FeedResponse.OotdDto> ootds =
+        // 4. 피드에 연결된 의상 ID 조회
+        List<UUID> clothesIds =
                 feedClothesRepository.findByFeed_Id(feed.getId())
                         .stream()
                         .map(FeedClothes::getClothesId)
-                        .map(clothesRepository::findById)
-                        .filter(java.util.Optional::isPresent)
-                        .map(java.util.Optional::get)
-                        .map(this::toOotdDto)
+                        .distinct()
                         .toList();
 
-        // 5. 좋아요 수 조회
+        // 5. 의상 정보 일괄 조회
+        List<FeedResponse.OotdDto> ootds;
+
+        if (clothesIds.isEmpty()) {
+            ootds = List.of();
+        } else {
+            List<Clothes> clothesList =
+                    clothesRepository.findAllById(clothesIds);
+
+            // 의상 ID를 기준으로 조회 결과 정리
+            Map<UUID, Clothes> clothesMap = clothesList.stream()
+                    .collect(Collectors.toMap(
+                            Clothes::getId,
+                            Function.identity()
+                    ));
+
+            // 기존 의상 연결 순서를 유지하면서 DTO 변환
+            ootds = clothesIds.stream()
+                    .map(clothesMap::get)
+                    .filter(clothes -> clothes != null)
+                    .map(this::toOotdDto)
+                    .toList();
+        }
+
+        // 6. 좋아요 수 조회
         long likeCount = feedLikeRepository.countByFeed_Id(
                 feed.getId()
         );
 
-        // 6. 댓글 수 조회
+        // 7. 댓글 수 조회
         long commentCount = commentRepository.countByFeed_Id(
                 feed.getId()
         );
 
-        // 7. 최종 응답 생성
+        // 8. 최종 응답 생성
         return new FeedResponse(
                 feed.getId(),
                 feed.getCreatedAt(),
