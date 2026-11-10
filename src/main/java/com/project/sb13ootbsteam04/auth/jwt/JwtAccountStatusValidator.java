@@ -51,7 +51,7 @@ public class JwtAccountStatusValidator
             return invalidToken();
         }
 
-        // 6. JWT의 역할과 DB에 저장된 현재 역할 비교
+        // 6. JWT의 역할과 DB의 현재 역할 비교
         String tokenRole = jwt.getClaimAsString("role");
 
         if (tokenRole == null
@@ -60,7 +60,22 @@ public class JwtAccountStatusValidator
             return invalidToken();
         }
 
-        // 7. 모든 검증을 통과하면 성공
+        // 7. JWT 로그인 버전과 DB 로그인 버전 비교
+        Object loginVersionClaim = jwt.getClaim("loginVersion");
+
+        // 숫자가 아니거나 클레임이 없으면 인증 실패
+        if (!(loginVersionClaim instanceof Number tokenLoginVersion)) {
+            return invalidToken();
+        }
+
+        // 정수가 아닌 값이나 버전 불일치는 인증 실패
+        if (tokenLoginVersion.longValue() != user.getLoginVersion()
+                || tokenLoginVersion.doubleValue()
+                != (double) tokenLoginVersion.longValue()) {
+            return invalidToken();
+        }
+
+        // 8. 모든 검증을 통과하면 성공
         return OAuth2TokenValidatorResult.success();
     }
 

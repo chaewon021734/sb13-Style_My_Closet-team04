@@ -24,16 +24,16 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
 
-    @Transactional(readOnly = true)
+    @Transactional
     public LoginResponse login(LoginRequest request) {
 
-        // 1. 이메일로 사용자 조회
-        User user = userRepository.findByEmail(request.email())
+        // 1. 사용자 조회 및 비관적 쓰기 락 획득
+        User user = userRepository.findByEmailForUpdate(request.email())
                 .orElseThrow(() ->
                         new BadCredentialsException(LOGIN_FAILURE_MESSAGE)
                 );
 
-        // 2. 비밀번호 먼저 검증
+        // 2. 비밀번호 검증
         if (!passwordEncoder.matches(
                 request.password(),
                 user.getPassword()
@@ -42,16 +42,18 @@ public class AuthService {
         }
 
         // 3. 계정 잠금 여부 확인
-        // 외부에 잠금 상태를 노출하지 않도록 동일한 인증 실패 예외 사용
         if (user.isLocked()) {
             throw new BadCredentialsException(LOGIN_FAILURE_MESSAGE);
         }
 
-        // 4. JWT Access Token 발급
+        // 4. 로그인 성공 시 버전 증가
+        user.increaseLoginVersion();
+
+        // 5. 새로운 로그인 버전이 포함된 JWT 발급
         String accessToken =
                 jwtTokenProvider.generateAccessToken(user);
 
-        // 5. 로그인 응답 반환
+        // 6. 로그인 응답 반환
         return new LoginResponse(accessToken, "Bearer");
     }
 }

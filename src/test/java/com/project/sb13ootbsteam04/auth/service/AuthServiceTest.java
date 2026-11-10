@@ -10,13 +10,13 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.Optional;
 
@@ -68,7 +68,7 @@ class AuthServiceTest {
     void shouldLoginSuccessfully() {
 
         // given
-        when(userRepository.findByEmail("test@example.com"))
+        when(userRepository.findByEmailForUpdate("test@example.com"))
                 .thenReturn(Optional.of(user));
 
         when(passwordEncoder.matches(
@@ -86,7 +86,11 @@ class AuthServiceTest {
         assertEquals("test.jwt.token", response.accessToken());
         assertEquals("Bearer", response.tokenType());
 
-        verify(userRepository).findByEmail("test@example.com");
+        // 로그인 성공 시 버전이 1 증가
+        assertEquals(1L, user.getLoginVersion());
+
+        verify(userRepository)
+                .findByEmailForUpdate("test@example.com");
 
         verify(passwordEncoder).matches(
                 "password123",
@@ -104,7 +108,7 @@ class AuthServiceTest {
     void shouldRejectUnknownEmail() {
 
         // given
-        when(userRepository.findByEmail("test@example.com"))
+        when(userRepository.findByEmailForUpdate("test@example.com"))
                 .thenReturn(Optional.empty());
 
         // when
@@ -116,11 +120,8 @@ class AuthServiceTest {
         // then
         assertEquals(LOGIN_FAILURE_MESSAGE, exception.getMessage());
 
-        // 사용자가 없으면 JWT를 발급하지 않음
+        // 버전 증가 대상이 없으므로 JWT 발급 없음
         verifyNoInteractions(jwtTokenProvider);
-
-        // 현재 구현에서는 존재하지 않는 이메일에 대해
-        // 비밀번호 비교를 수행하지 않음
         verifyNoInteractions(passwordEncoder);
     }
 
@@ -132,7 +133,7 @@ class AuthServiceTest {
     void shouldRejectWrongPassword() {
 
         // given
-        when(userRepository.findByEmail("test@example.com"))
+        when(userRepository.findByEmailForUpdate("test@example.com"))
                 .thenReturn(Optional.of(user));
 
         when(passwordEncoder.matches(
@@ -149,12 +150,14 @@ class AuthServiceTest {
         // then
         assertEquals(LOGIN_FAILURE_MESSAGE, exception.getMessage());
 
+        // 로그인 실패 시 버전 유지
+        assertEquals(0L, user.getLoginVersion());
+
         verify(passwordEncoder).matches(
                 "password123",
                 "encodedPassword"
         );
 
-        // 비밀번호가 틀리면 JWT를 발급하지 않음
         verify(jwtTokenProvider, never())
                 .generateAccessToken(any(User.class));
     }
@@ -167,12 +170,11 @@ class AuthServiceTest {
     void shouldRejectLoginWhenAccountIsLocked() {
 
         // given
-        ReflectionTestUtils.setField(user, "locked", true);
+        user.changeLocked(true);
 
-        when(userRepository.findByEmail("test@example.com"))
+        when(userRepository.findByEmailForUpdate("test@example.com"))
                 .thenReturn(Optional.of(user));
 
-        // 비밀번호 검증은 성공
         when(passwordEncoder.matches(
                 "password123",
                 "encodedPassword"
@@ -187,13 +189,14 @@ class AuthServiceTest {
         // then
         assertEquals(LOGIN_FAILURE_MESSAGE, exception.getMessage());
 
-        // 잠금 상태 확인 전에 비밀번호 검증을 수행했는지 확인
+        // 잠긴 계정은 로그인 버전이 증가하면 안 됨
+        assertEquals(0L, user.getLoginVersion());
+
         verify(passwordEncoder).matches(
                 "password123",
                 "encodedPassword"
         );
 
-        // 잠긴 계정에는 JWT를 발급하지 않음
         verifyNoInteractions(jwtTokenProvider);
     }
 
@@ -205,12 +208,11 @@ class AuthServiceTest {
     void shouldRejectLockedAccountWithWrongPassword() {
 
         // given
-        ReflectionTestUtils.setField(user, "locked", true);
+        user.changeLocked(true);
 
-        when(userRepository.findByEmail("test@example.com"))
+        when(userRepository.findByEmailForUpdate("test@example.com"))
                 .thenReturn(Optional.of(user));
 
-        // 비밀번호 검증 실패
         when(passwordEncoder.matches(
                 "password123",
                 "encodedPassword"
@@ -225,12 +227,101 @@ class AuthServiceTest {
         // then
         assertEquals(LOGIN_FAILURE_MESSAGE, exception.getMessage());
 
+        assertEquals(0L, user.getLoginVersion());
+
         verify(passwordEncoder).matches(
                 "password123",
                 "encodedPassword"
         );
 
-        // 잠긴 계정 + 잘못된 비밀번호에서도 JWT 발급 금지
         verifyNoInteractions(jwtTokenProvider);
+    }
+
+    // ========================================
+    // 6. 재로그인 시 로그인 버전 증가
+    // ========================================
+
+    @Test
+    void shouldIncreaseLoginVersionOnRelogin() {
+
+        // given
+        when(userRepository.findByEmailForUpdate("test@example.com"))
+                .thenReturn(Optional.of(user));
+
+        when(passwordEncoder.matches(
+                "password123",
+                "encodedPassword"
+        )).thenReturn(true);
+
+        when(jwtTokenProvider.generateAccessToken(user))
+                .thenReturn("test.jwt.token");
+
+        // 첫 번째 로그인
+        authService.login(loginRequest);
+
+        assertEquals(1L, user.getLoginVersion());
+
+        // 두 번째 로그인
+        authService.login(loginRequest);
+
+        // then
+        assertEquals(2L, user.getLoginVersion());
+
+        verify(userRepository, times(2))
+                .findByEmailForUpdate("test@example.com");
+
+        verify(jwtTokenProvider, times(2))
+                .generateAccessToken(user);
+    }
+
+    // ========================================
+    // 7. 로그인 버전 증가 후 JWT 발급
+    // ========================================
+
+    @Test
+    void shouldIncreaseVersionBeforeGeneratingToken() {
+
+        // given
+        when(userRepository.findByEmailForUpdate("test@example.com"))
+                .thenReturn(Optional.of(user));
+
+        when(passwordEncoder.matches(
+                "password123",
+                "encodedPassword"
+        )).thenReturn(true);
+
+        // JWT 생성 시 로그인 버전이 이미 증가했는지 확인
+        when(jwtTokenProvider.generateAccessToken(user))
+                .thenAnswer(invocation -> {
+
+                    User tokenUser = invocation.getArgument(0);
+
+                    assertEquals(1L, tokenUser.getLoginVersion());
+
+                    return "test.jwt.token";
+                });
+
+        // when
+        LoginResponse response = authService.login(loginRequest);
+
+        // then
+        assertEquals("test.jwt.token", response.accessToken());
+
+        assertEquals(1L, user.getLoginVersion());
+
+        InOrder inOrder = inOrder(
+                userRepository,
+                passwordEncoder,
+                jwtTokenProvider
+        );
+
+        inOrder.verify(userRepository)
+                .findByEmailForUpdate("test@example.com");
+
+        inOrder.verify(passwordEncoder)
+                .matches("password123", "encodedPassword");
+
+        inOrder.verify(jwtTokenProvider)
+                .generateAccessToken(user);
     }
 }

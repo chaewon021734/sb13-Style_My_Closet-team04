@@ -34,6 +34,10 @@ public class JwtTokenProvider {
                 .issuedAt(now)
                 .expiresAt(expiresAt)
                 .claim("role", user.getRole().name())
+
+                // 재로그인 시 기존 JWT 무효화를 위한 로그인 버전
+                .claim("loginVersion", user.getLoginVersion())
+
                 .build();
 
         // HS256 서명 알고리즘
