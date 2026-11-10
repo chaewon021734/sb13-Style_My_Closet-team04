@@ -2,6 +2,7 @@
 package com.project.sb13ootbsteam04.directmessage.entity;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.project.sb13ootbsteam04.user.entity.User;
 import org.junit.jupiter.api.DisplayName;
@@ -34,5 +35,22 @@ class DirectMessageTest {
     assertThat(directMessage.getSender()).isEqualTo(sender);
     assertThat(directMessage.getReceiver()).isEqualTo(receiver);
     assertThat(directMessage.getContent()).isEqualTo(content);
+  }
+
+  @Test
+  @DisplayName("발신자와 수신자가 동일하면 DM 메시지를 생성할 수 없다.")
+  void cannotSendMessageToSelf() {
+    // 사용자 생성
+    User user = new User(
+        "사용자",
+        "user@test.com",
+        "password123"
+    );
+
+    // 자기 자신에게 DM 메시지를 보내면 예외 발생
+    assertThatThrownBy(() ->
+        new DirectMessage(user, user, "안녕하세요!")
+    )
+        .isInstanceOf(IllegalArgumentException.class);
   }
 }
