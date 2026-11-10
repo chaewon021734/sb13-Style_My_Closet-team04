@@ -26,14 +26,19 @@ public class DirectMessage extends UpdatedAtEntity {
   private String content;
 
   public DirectMessage(User sender, User receiver, String content) {
-    if (sender == receiver ||
-        (sender.getId() != null &&
-            sender.getId().equals(receiver.getId()))) {
+    // 자기 자신에게 DM 전송 방지
+    if (sender == receiver || (sender.getId() != null && sender.getId().equals(receiver.getId()))) {
       throw new IllegalArgumentException("자기 자신에게는 DM을 보낼 수 없습니다.");
     }
 
+    // null 또는 빈 메시지 방지
     if (content == null || content.isBlank()) {
       throw new IllegalArgumentException("DM 메시지 내용은 비어 있을 수 없습니다.");
+    }
+
+    // 메시지 최대 길이 제한
+    if (content.length() > 300) {
+      throw new IllegalArgumentException("DM 메시지는 최대 300자까지 입력할 수 있습니다.");
     }
 
     this.sender = sender;
