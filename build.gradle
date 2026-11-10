@@ -1,3 +1,4 @@
+
 plugins {
     id 'java'
     id 'org.springframework.boot' version '4.1.1'
@@ -26,19 +27,43 @@ dependencies {
     // HTTP API 및 외부 위치 API 호출
     implementation 'org.springframework.boot:spring-boot-starter-webmvc'
 
+    // REST API 및 내장 Tomcat 웹 서버
+    implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+
     // Lombok
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
 
+    // =========================
     // 테스트
+    // =========================
+
+    // Spring Boot 기본 테스트
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
+
+    // JPA 테스트
     testImplementation 'org.springframework.boot:spring-boot-data-jpa-test'
+
+    // Spring MVC 테스트
+    testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+
+    // Spring Security 및 JWT 인증 테스트
+    testImplementation 'org.springframework.boot:spring-boot-starter-security-test'
+
+    // 테스트 전용 H2 데이터베이스
     testRuntimeOnly 'com.h2database:h2'
+
+    // Lombok 테스트
     testCompileOnly 'org.projectlombok:lombok'
-    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
     testAnnotationProcessor 'org.projectlombok:lombok'
 
-    // 시작 전 추가 내용
+    // JUnit
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
+    // =========================
+    // 애플리케이션 의존성
+    // =========================
+
     // 입력값 검증
     implementation 'org.springframework.boot:spring-boot-starter-validation'
 
@@ -55,11 +80,15 @@ dependencies {
     // 구조화된 PostgreSQL 오류 정보로 위반 제약조건을 식별한다.
     implementation 'org.postgresql:postgresql'
 
+    // Flyway 데이터베이스 마이그레이션
+    implementation 'org.springframework.boot:spring-boot-starter-flyway'
+    runtimeOnly 'org.flywaydb:flyway-database-postgresql'
+
     // Redis 캐시
     implementation 'org.springframework.boot:spring-boot-starter-cache'
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
 
-    // Kafka 이벤트·메시징 (Confluent Cloud 연결)
+    // Kafka 이벤트·메시징
     implementation 'org.springframework.boot:spring-boot-starter-kafka'
 
     // Elasticsearch 검색
@@ -87,6 +116,7 @@ tasks.named('test') {
 
 tasks.named('jacocoTestReport') {
     dependsOn tasks.named('test')
+
     reports {
         html.required = true
         xml.required = true

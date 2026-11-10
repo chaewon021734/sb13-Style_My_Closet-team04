@@ -6,6 +6,7 @@ import com.project.sb13ootbsteam04.user.dto.response.UserDto;
 import com.project.sb13ootbsteam04.user.dto.response.UserDtoCursorResponse;
 import com.project.sb13ootbsteam04.user.service.UserService;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
 import org.springframework.http.HttpStatus;
@@ -24,7 +25,7 @@ public class UserController {
     // 회원가입
     @PostMapping
     public ResponseEntity<UserDto> create(
-            @RequestBody UserCreateRequest request
+            @Valid @RequestBody UserCreateRequest request
     ) {
         UserDto response = userService.create(request);
 
