@@ -7,18 +7,23 @@ import com.project.sb13ootbsteam04.clothes.mapper.ClothesAttributeDefMapper;
 import com.project.sb13ootbsteam04.clothes.service.ClothesAttributeDefService;
 import com.project.sb13ootbsteam04.clothes.service.dto.ClothesAttributeDefCreateCommand;
 import com.project.sb13ootbsteam04.clothes.service.dto.ClothesAttributeDefResult;
+import com.project.sb13ootbsteam04.clothes.service.dto.ClothesAttributeDefSearchCommand;
 import com.project.sb13ootbsteam04.clothes.service.dto.ClothesAttributeDefUpdateCommand;
 import jakarta.validation.Valid;
+import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Sort.Direction;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -39,6 +44,27 @@ public class ClothesAttributeDefController implements ClothesAttributeDefApi {
     ClothesAttributeDefDto response = clothesAttributeDefMapper.toDto(result);
 
     return ResponseEntity.status(HttpStatus.CREATED).body(response);
+  }
+
+  @GetMapping
+  @Override
+  public ResponseEntity<List<ClothesAttributeDefDto>> findAll(
+      @RequestParam String sortBy,
+      @RequestParam String sortDirection,
+      @RequestParam(required = false) String keywordLike) {
+
+    Direction direction = switch (sortDirection) {
+      case "ASCENDING" -> Direction.ASC;
+      case "DESCENDING" -> Direction.DESC;
+      default -> throw new IllegalArgumentException("지원하지 않는 정렬 방향입니다: " + sortDirection);
+    };
+
+    // API 문자열을 검증된 서비스 조회 조건으로 변환한다.
+    ClothesAttributeDefSearchCommand searchCommand = new ClothesAttributeDefSearchCommand(sortBy, direction, keywordLike);
+    List<ClothesAttributeDefResult> results = clothesAttributeDefService.findAll(searchCommand);
+    List<ClothesAttributeDefDto> response = results.stream().map(clothesAttributeDefMapper::toDto).toList();
+
+    return ResponseEntity.ok(response);
   }
 
   @Override

@@ -7,6 +7,7 @@ import com.project.sb13ootbsteam04.clothes.repository.ClothesAttributeDefReposit
 import com.project.sb13ootbsteam04.clothes.service.ClothesAttributeDefService;
 import com.project.sb13ootbsteam04.clothes.service.dto.ClothesAttributeDefCreateCommand;
 import com.project.sb13ootbsteam04.clothes.service.dto.ClothesAttributeDefResult;
+import com.project.sb13ootbsteam04.clothes.service.dto.ClothesAttributeDefSearchCommand;
 import com.project.sb13ootbsteam04.clothes.service.dto.ClothesAttributeDefUpdateCommand;
 import java.sql.SQLException;
 import java.util.Arrays;
@@ -17,6 +18,7 @@ import org.hibernate.exception.ConstraintViolationException;
 import org.postgresql.util.PSQLException;
 import org.postgresql.util.ServerErrorMessage;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -39,6 +41,7 @@ public class ClothesAttributeDefServiceImpl implements ClothesAttributeDefServic
       // UNIQUE 제약을 즉시 확인해 추가 조회 없이 동시 등록까지 동일하게 처리한다.
       ClothesAttributeDef saved = clothesAttributeDefRepository.saveAndFlush(definition);
       return toResult(saved);
+
     } catch (DataIntegrityViolationException exception) {
       if (isNameUniqueViolation(exception)) {
         throw new DuplicateClothesAttributeDefNameException(normalizedName, exception);
@@ -46,6 +49,30 @@ public class ClothesAttributeDefServiceImpl implements ClothesAttributeDefServic
       throw exception;
     }
   }
+
+  @Override
+  @Transactional(readOnly = true)
+  public List<ClothesAttributeDefResult> findAll(ClothesAttributeDefSearchCommand command) {
+    if (command == null) {
+      throw new IllegalArgumentException("의상 속성 정의 조회 조건은 필수입니다");
+    }
+
+    Sort sort = Sort.by(command.sortDirection(), command.sortBy().property());
+    String keyword = normalizeKeyword(command.keywordLike());
+    List<ClothesAttributeDef> definitions = keyword == null
+        ? clothesAttributeDefRepository.findAll(sort)
+        : clothesAttributeDefRepository.findByNameContaining(keyword, sort);
+
+    return definitions.stream().map(this::toResult).toList();
+  }
+
+  private String normalizeKeyword(String keywordLike) {
+    if (keywordLike == null || keywordLike.isBlank()) {
+      return null;
+    }
+    return keywordLike.strip(); // 검색어의 유니코드 공백도 제거
+  }
+
 
   /** 이름 UNIQUE 제약 위반만 중복 이름 예외로 변환한다. */
   private boolean isNameUniqueViolation(DataIntegrityViolationException exception) {
