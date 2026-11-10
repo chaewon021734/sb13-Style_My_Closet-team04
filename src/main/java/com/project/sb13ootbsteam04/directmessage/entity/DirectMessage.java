@@ -26,7 +26,9 @@ public class DirectMessage extends UpdatedAtEntity {
   private String content;
 
   public DirectMessage(User sender, User receiver, String content) {
-    if (sender == receiver) {
+    if (sender == receiver ||
+        (sender.getId() != null &&
+            sender.getId().equals(receiver.getId()))) {
       throw new IllegalArgumentException("자기 자신에게는 DM을 보낼 수 없습니다.");
     }
 
