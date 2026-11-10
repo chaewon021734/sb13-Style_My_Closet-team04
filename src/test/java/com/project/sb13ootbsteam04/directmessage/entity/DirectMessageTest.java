@@ -48,8 +48,7 @@ class DirectMessageTest {
     );
 
     // 자기 자신에게 DM 메시지를 보내면 예외 발생
-    assertThatThrownBy(() ->
-        new DirectMessage(user, user, "안녕하세요!")
+    assertThatThrownBy(() -> new DirectMessage(user, user, "안녕하세요!")
     )
         .isInstanceOf(IllegalArgumentException.class);
   }
