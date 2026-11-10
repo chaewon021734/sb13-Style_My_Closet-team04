@@ -1,6 +1,7 @@
 package com.project.sb13ootbsteam04.auth.jwt;
 
 import com.project.sb13ootbsteam04.user.entity.User;
+import com.project.sb13ootbsteam04.user.entity.UserRole;
 import com.project.sb13ootbsteam04.user.repository.UserRepository;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -47,7 +48,6 @@ class JwtAccountStatusValidatorTest {
 
         // 사용자 UUID 설정
         userId = UUID.randomUUID();
-
         ReflectionTestUtils.setField(user, "id", userId);
 
         // 테스트용 JWT 생성
@@ -62,7 +62,10 @@ class JwtAccountStatusValidatorTest {
                 .build();
     }
 
+    // ========================================
     // 1. 정상 사용자 → JWT 검증 성공
+    // ========================================
+
     @Test
     void shouldAcceptActiveUser() {
 
@@ -79,7 +82,10 @@ class JwtAccountStatusValidatorTest {
         verify(userRepository).findById(userId);
     }
 
+    // ========================================
     // 2. 잠긴 사용자 → JWT 검증 실패
+    // ========================================
+
     @Test
     void shouldRejectLockedUser() {
 
@@ -103,7 +109,10 @@ class JwtAccountStatusValidatorTest {
         verify(userRepository).findById(userId);
     }
 
+    // ========================================
     // 3. 삭제된 사용자 → JWT 검증 실패
+    // ========================================
+
     @Test
     void shouldRejectDeletedUser() {
 
@@ -120,7 +129,10 @@ class JwtAccountStatusValidatorTest {
         verify(userRepository).findById(userId);
     }
 
-    // 4. 잘못된 사용자 UUID → JWT 검증 실패
+    // ========================================
+    // 4. 잘못된 UUID → JWT 검증 실패
+    // ========================================
+
     @Test
     void shouldRejectInvalidUserId() {
 
@@ -141,5 +153,114 @@ class JwtAccountStatusValidatorTest {
 
         // UUID 형식이 잘못되었으므로 DB 조회하지 않음
         verifyNoInteractions(userRepository);
+    }
+
+    // ========================================
+    // 5. JWT ADMIN 권한과 DB USER 권한 불일치
+    // ========================================
+
+    @Test
+    void shouldRejectTokenWhenAdminRoleChangedToUser() {
+
+        // given
+        // 사용자에게 ADMIN 권한을 부여
+        user.changeRole(UserRole.ADMIN);
+
+        // ADMIN 권한으로 JWT 발급된 상황
+        Jwt adminJwt = createJwt("ADMIN");
+
+        // 이후 관리자가 사용자 권한을 USER로 변경
+        user.changeRole(UserRole.USER);
+
+        when(userRepository.findById(userId))
+                .thenReturn(Optional.of(user));
+
+        // when
+        OAuth2TokenValidatorResult result =
+                validator.validate(adminJwt);
+
+        // then
+        assertTrue(result.hasErrors());
+
+        assertEquals(
+                "invalid_token",
+                result.getErrors().iterator().next().getErrorCode()
+        );
+
+        verify(userRepository).findById(userId);
+    }
+
+    // ========================================
+    // 6. JWT와 DB 역할 일치 → 검증 성공
+    // ========================================
+
+    @Test
+    void shouldAcceptTokenWhenRoleMatchesDatabase() {
+
+        // given
+        user.changeRole(UserRole.ADMIN);
+
+        Jwt adminJwt = createJwt("ADMIN");
+
+        when(userRepository.findById(userId))
+                .thenReturn(Optional.of(user));
+
+        // when
+        OAuth2TokenValidatorResult result =
+                validator.validate(adminJwt);
+
+        // then
+        assertFalse(result.hasErrors());
+
+        verify(userRepository).findById(userId);
+    }
+
+    // ========================================
+    // 7. JWT에 role 클레임 없음 → 검증 실패
+    // ========================================
+
+    @Test
+    void shouldRejectTokenWithoutRoleClaim() {
+
+        // given
+        Jwt tokenWithoutRole = createJwt(null);
+
+        when(userRepository.findById(userId))
+                .thenReturn(Optional.of(user));
+
+        // when
+        OAuth2TokenValidatorResult result =
+                validator.validate(tokenWithoutRole);
+
+        // then
+        assertTrue(result.hasErrors());
+
+        assertEquals(
+                "invalid_token",
+                result.getErrors().iterator().next().getErrorCode()
+        );
+
+        verify(userRepository).findById(userId);
+    }
+
+    // ========================================
+    // 테스트용 JWT 생성 메서드
+    // ========================================
+
+    private Jwt createJwt(String role) {
+
+        Instant now = Instant.now();
+
+        Jwt.Builder builder = Jwt.withTokenValue("test.jwt.token")
+                .header("alg", "HS256")
+                .subject(userId.toString())
+                .issuedAt(now)
+                .expiresAt(now.plusSeconds(3600));
+
+        if (role != null) {
+            builder.claim("role", role);
+        }
+
+        return builder.build();
     }
 }

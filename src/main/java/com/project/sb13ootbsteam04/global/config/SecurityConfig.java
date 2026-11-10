@@ -2,10 +2,14 @@ package com.project.sb13ootbsteam04.global.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+
 import org.springframework.http.HttpMethod;
+
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.web.SecurityFilterChain;
 
@@ -21,7 +25,7 @@ public class SecurityConfig {
     ) throws Exception {
 
         http
-                // JWT를 사용하는 REST API이므로 CSRF 비활성화
+                // JWT를 사용하는 REST API이므로 현재는 CSRF 비활성화
                 .csrf(csrf -> csrf.disable())
 
                 // HTTP 세션을 생성하지 않는 무상태 인증
@@ -46,6 +50,10 @@ public class SecurityConfig {
                                 HttpMethod.POST,
                                 "/api/auth/login"
                         ).permitAll()
+
+                        // 관리자 API는 ADMIN 권한만 접근 가능
+                        .requestMatchers("/api/admin/**")
+                        .hasRole("ADMIN")
 
                         // 나머지 API는 JWT 인증 필수
                         .anyRequest().authenticated()

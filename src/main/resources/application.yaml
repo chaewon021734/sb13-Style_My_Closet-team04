@@ -30,6 +30,13 @@ jwt:
   secret: ${JWT_SECRET}
   access-token-expiration: ${JWT_ACCESS_TOKEN_EXPIRATION:3600000}
 
+# 관리자 계정 자동 초기화 설정
+app:
+  admin:
+    bootstrap-enabled: ${ADMIN_BOOTSTRAP_ENABLED:false}
+    email: ${ADMIN_EMAIL:}
+    password: ${ADMIN_PASSWORD:}
+
 # 날씨 API 설정
 weather:
   kakao:
