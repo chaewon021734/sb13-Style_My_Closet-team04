@@ -24,4 +24,10 @@ public class DirectMessage extends UpdatedAtEntity {
 
   @Column(nullable = false, columnDefinition = "TEXT")
   private String content;
+
+  public DirectMessage(User sender, User receiver, String content) {
+    this.sender = sender;
+    this.receiver = receiver;
+    this.content = content;
+  }
 }
