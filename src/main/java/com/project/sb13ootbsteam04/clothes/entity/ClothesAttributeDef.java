@@ -108,8 +108,12 @@ public class ClothesAttributeDef extends UpdatedAtEntity {
   }
 
   public void update(String name, List<String> selectableValues) {
-    this.name = normalizeName(name);
-    this.selectableValues = normalizeValues(selectableValues);
+    String normalizedName = normalizeName(name);
+    List<String> normalizedValues = normalizeValues(selectableValues);
+
+    // 모든 검증을 통과한 후에만 필드를 업데이트한다.
+    this.name = normalizedName;
+    this.selectableValues = normalizedValues;
   }
 
 }
