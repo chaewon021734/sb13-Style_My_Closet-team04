@@ -1,0 +1,20 @@
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${OTBOO_DB_NAME:-otboo}
+      POSTGRES_USER: ${OTBOO_DB_USERNAME:-otboo}
+      POSTGRES_PASSWORD: ${OTBOO_DB_PASSWORD:-change-me}
+    ports:
+      - '${OTBOO_DB_PORT:-5432}:5432'
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${OTBOO_DB_USERNAME:-otboo} -d ${OTBOO_DB_NAME:-otboo}']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres-data:
