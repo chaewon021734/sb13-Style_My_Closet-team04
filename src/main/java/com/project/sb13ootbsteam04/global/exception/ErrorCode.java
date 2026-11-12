@@ -47,7 +47,11 @@ public enum ErrorCode {
   WEATHER_LOCATION_NOT_FOUND(
       "WTH_004", HttpStatus.BAD_REQUEST, "해당 좌표의 행정구역을 찾을 수 없습니다."),
   WEATHER_LOCATION_RESPONSE_INVALID(
-      "WTH_005", HttpStatus.BAD_GATEWAY, "행정구역 조회 응답이 올바르지 않습니다.");
+      "WTH_005", HttpStatus.BAD_GATEWAY, "행정구역 조회 응답이 올바르지 않습니다."),
+  WEATHER_FORECAST_RESPONSE_INVALID(
+      "WTH_006", HttpStatus.BAD_GATEWAY, "단기예보 응답이 올바르지 않습니다."),
+  WEATHER_FORECAST_LOCATION_NOT_FOUND(
+      "WTH_007", HttpStatus.NOT_FOUND, "단기예보를 저장할 날씨 위치가 없습니다.");
 
   private final String code;
   private final HttpStatus status;
