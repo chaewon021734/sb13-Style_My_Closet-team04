@@ -128,4 +128,22 @@ class ClothesAttributeDefTest {
         () -> assertEquals(100, definition.getSelectableValues().get(0).length())
     );
   }
+
+  @Test
+  @DisplayName("의상 속성 정의 수정값 검증에 실패하면 기존 엔티티 상태를 유지한다")
+  void 의상_속성_정의_수정값_검증_실패시_기존_상태_유지() {
+    // given
+    ClothesAttributeDef definition = ClothesAttributeDef.create("색상", List.of("블랙", "크림"));
+
+    // when
+    IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+        () -> definition.update("사이즈", List.of("M", "m")));
+
+    // then
+    assertAll(
+        () -> assertEquals("중복된 선택지입니다", exception.getMessage()),
+        () -> assertEquals("색상", definition.getName()),
+        () -> assertEquals(List.of("블랙", "크림"), definition.getSelectableValues())
+    );
+  }
 }

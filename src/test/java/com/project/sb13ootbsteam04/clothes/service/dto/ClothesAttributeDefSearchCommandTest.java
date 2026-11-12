@@ -14,8 +14,7 @@ class ClothesAttributeDefSearchCommandTest {
   @DisplayName("정렬 기준이 없으면 조회 조건을 생성할 수 없다")
   void 정렬_기준_누락() {
     // when & then
-    assertThatThrownBy(() -> new ClothesAttributeDefSearchCommand(
-        (ClothesAttributeDefSortBy) null, Direction.ASC, null))
+    assertThatThrownBy(() -> new ClothesAttributeDefSearchCommand((ClothesAttributeDefSortBy) null, Direction.ASC, null))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessage("정렬 기준은 필수입니다");
   }
@@ -24,8 +23,7 @@ class ClothesAttributeDefSearchCommandTest {
   @DisplayName("API 정렬 기준 문자열이 없으면 조회 조건을 생성할 수 없다")
   void API_정렬_기준_누락() {
     // when & then
-    assertThatThrownBy(() -> new ClothesAttributeDefSearchCommand(
-        (String) null, Direction.ASC, null))
+    assertThatThrownBy(() -> new ClothesAttributeDefSearchCommand((String) null, Direction.ASC, null))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessage("정렬 기준은 필수입니다");
   }
@@ -34,8 +32,7 @@ class ClothesAttributeDefSearchCommandTest {
   @DisplayName("정렬 방향이 없으면 조회 조건을 생성할 수 없다")
   void 정렬_방향_누락() {
     // when & then
-    assertThatThrownBy(() -> new ClothesAttributeDefSearchCommand(
-        ClothesAttributeDefSortBy.NAME, null, null))
+    assertThatThrownBy(() -> new ClothesAttributeDefSearchCommand(ClothesAttributeDefSortBy.NAME, null, null))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessage("정렬 방향은 필수입니다");
   }
