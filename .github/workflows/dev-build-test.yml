@@ -1,0 +1,71 @@
+name: dev-build-test
+
+on:
+  pull_request:
+    branches:
+      - dev
+      - main
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - ready_for_review
+  push:
+    branches:
+      - dev
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dev-build-test-${{ github.event.pull_request.number || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  build-test:
+    name: build-test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Reject main to dev PR
+        if: ${{ github.event_name == 'pull_request' }}
+        env:
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        shell: bash
+        run: |
+          if [ "$BASE_REF" = "dev" ] && [ "$HEAD_REF" = "main" ]; then
+            echo "::error::dev 브랜치 PR은 main 외의 작업 브랜치에서만 생성할 수 있습니다."
+            exit 1
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Test and build executable jar
+        run: ./gradlew clean test bootJar jacocoTestReport --no-daemon
+
+      # 현재 팀 전체 커버리지가 80%에 미달하므로 지표는 공개하되 PR을 즉시 차단하지 않습니다.
+      - name: Verify coverage threshold
+        continue-on-error: true
+        run: ./gradlew jacocoTestCoverageVerification --no-daemon
+
+      - name: Upload JaCoCo report
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacoco-report
+          path: build/reports/jacoco/test
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Validate Docker image build
+        run: docker build --tag otboo:${{ github.sha }} .
