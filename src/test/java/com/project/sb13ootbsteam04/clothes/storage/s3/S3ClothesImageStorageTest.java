@@ -39,8 +39,7 @@ class S3ClothesImageStorageTest {
     S3ClothesImageStorage storage = storage();
     ClothesImageCommand image = pngImage();
 
-    given(s3Client.putObject(any(PutObjectRequest.class), any(RequestBody.class)))
-        .willReturn(PutObjectResponse.builder().build());
+    given(s3Client.putObject(any(PutObjectRequest.class), any(RequestBody.class))).willReturn(PutObjectResponse.builder().build());
 
     StoredImage result = storage.upload(image);
 
@@ -66,8 +65,7 @@ class S3ClothesImageStorageTest {
 
     storage.delete("clothes/image.png");
 
-    ArgumentCaptor<DeleteObjectRequest> captor =
-        ArgumentCaptor.forClass(DeleteObjectRequest.class);
+    ArgumentCaptor<DeleteObjectRequest> captor = ArgumentCaptor.forClass(DeleteObjectRequest.class);
 
     then(s3Client).should().deleteObject(captor.capture());
     DeleteObjectRequest request = captor.getValue();
@@ -83,14 +81,12 @@ class S3ClothesImageStorageTest {
   void 업로드_실패() {
 
     S3ClothesImageStorage storage = storage();
-    given(s3Client.putObject(any(PutObjectRequest.class), any(RequestBody.class)))
-        .willThrow(S3Exception.builder().message("S3 실패").build());
+    given(s3Client.putObject(any(PutObjectRequest.class), any(RequestBody.class))).willThrow(S3Exception.builder().message("S3 실패").build());
 
     assertThatThrownBy(() -> storage.upload(pngImage()))
         .isInstanceOfSatisfying(ClothesImageStorageException.class, exception -> {
           assertAll(
-              () -> assertThat(exception.getErrorCode())
-                  .isEqualTo(ErrorCode.CLOTHES_IMAGE_UPLOAD_FAILED),
+              () -> assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.CLOTHES_IMAGE_UPLOAD_FAILED),
               () -> assertThat(exception.getDetails()).containsEntry("operation", "upload"),
               () -> assertThat(exception.getCause()).isInstanceOf(S3Exception.class)
           );
@@ -108,6 +104,7 @@ class S3ClothesImageStorageTest {
             "ap-northeast-2",
             null,
             null,
+            null,
             null
         )
     );
@@ -121,8 +118,7 @@ class S3ClothesImageStorageTest {
 
     assertAll(
         () -> assertThat(result.objectKey()).endsWith(".jpg"),
-        () -> assertThat(result.url()).isEqualTo("https://otboo-images.s3.ap-northeast-2.amazonaws.com/"
-                + result.objectKey())
+        () -> assertThat(result.url()).isEqualTo("https://otboo-images.s3.ap-northeast-2.amazonaws.com/" + result.objectKey())
     );
   }
 
@@ -131,8 +127,7 @@ class S3ClothesImageStorageTest {
   void 삭제_실패() {
 
     S3ClothesImageStorage storage = storage();
-    doThrow(S3Exception.builder().message("S3 실패").build())
-        .when(s3Client).deleteObject(any(DeleteObjectRequest.class));
+    doThrow(S3Exception.builder().message("S3 실패").build()).when(s3Client).deleteObject(any(DeleteObjectRequest.class));
 
     assertThatThrownBy(() -> storage.delete("clothes/image.png"))
         .isInstanceOfSatisfying(ClothesImageStorageException.class, exception -> {
@@ -159,6 +154,7 @@ class S3ClothesImageStorageTest {
         new S3ClothesImageProperties(
             "otboo-images",
             "ap-northeast-2",
+            null,
             "https://cdn.example.com/",
             null,
             null

@@ -7,6 +7,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public record S3ClothesImageProperties(
     String bucket,
     String region,
+    String endpoint,
     String publicBaseUrl,
     Duration apiCallTimeout,
     Duration apiCallAttemptTimeout
