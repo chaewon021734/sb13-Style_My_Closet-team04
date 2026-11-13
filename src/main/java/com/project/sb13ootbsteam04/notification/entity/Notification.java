@@ -12,6 +12,10 @@ public class Notification {
   private NotificationLevel level;
 
   public Notification(User receiver, String title, String content, NotificationLevel level) {
+    if (receiver == null) {
+      throw new IllegalArgumentException("수신자는 필수입니다.");
+    }
+
     this.receiver = receiver;
     this.title = title;
     this.content = content;
