@@ -16,6 +16,10 @@ public class Notification {
       throw new IllegalArgumentException("수신자는 필수입니다.");
     }
 
+    if (title == null) {
+      throw new IllegalArgumentException("알림 제목은 필수입니다.");
+    }
+
     this.receiver = receiver;
     this.title = title;
     this.content = content;
