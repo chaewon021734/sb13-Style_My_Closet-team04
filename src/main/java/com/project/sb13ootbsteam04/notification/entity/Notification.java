@@ -20,7 +20,7 @@ public class Notification {
       throw new IllegalArgumentException("알림 제목은 필수입니다.");
     }
 
-    if (content == null || content.isEmpty()) {
+    if (content == null || content.isBlank()) {
       throw new IllegalArgumentException("알림 내용은 필수입니다.");
     }
 
