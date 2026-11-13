@@ -37,4 +37,19 @@ class NotificationTest {
         new Notification(receiver, title, content, level)
     ).isInstanceOf(IllegalArgumentException.class);
   }
+
+  @Test
+  @DisplayName("내용이 null이면 알림을 생성할 수 없다.")
+  void createNotificationWithNullContent() {
+    // given
+    User receiver = new User("테스트 사용자", "test@test.com", "password");
+    String title = "새로운 알림";
+    String content = null;
+    NotificationLevel level = NotificationLevel.INFO;
+
+    // when & then
+    assertThatThrownBy(() ->
+        new Notification(receiver, title, content, level)
+    ).isInstanceOf(IllegalArgumentException.class);
+  }
 }
