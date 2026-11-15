@@ -6,16 +6,21 @@ import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
+import static org.mockito.BDDMockito.willThrow;
 
 import com.project.sb13ootbsteam04.clothes.entity.ClothesAttributeDef;
+import com.project.sb13ootbsteam04.clothes.exception.ClothesAttributeDefinitionNotFoundException;
 import com.project.sb13ootbsteam04.clothes.exception.DuplicateClothesAttributeDefNameException;
 import com.project.sb13ootbsteam04.clothes.repository.ClothesAttributeDefRepository;
 import com.project.sb13ootbsteam04.clothes.service.dto.ClothesAttributeDefCreateCommand;
 import com.project.sb13ootbsteam04.clothes.service.dto.ClothesAttributeDefResult;
+import com.project.sb13ootbsteam04.clothes.service.dto.ClothesAttributeDefSearchCommand;
+import com.project.sb13ootbsteam04.clothes.service.dto.ClothesAttributeDefUpdateCommand;
 import com.project.sb13ootbsteam04.clothes.service.impl.ClothesAttributeDefServiceImpl;
 import java.sql.SQLException;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.hibernate.exception.ConstraintViolationException;
 import org.junit.jupiter.api.DisplayName;
@@ -28,6 +33,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.postgresql.util.PSQLException;
 import org.postgresql.util.ServerErrorMessage;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.domain.Sort.Direction;
 import org.springframework.test.util.ReflectionTestUtils;
 
 @DisplayName("의상 속성 정의 서비스")
@@ -161,6 +168,241 @@ class ClothesAttributeDefServiceTest {
     // when & then
     assertThatThrownBy(() -> clothesAttributeDefService.create(command))
         .isSameAs(exception);
+  }
+
+  @Test
+  @DisplayName("생성일 기준 내림차순 정렬로 의상 속성 정의 목록을 조회한다")
+  void 생성일_내림차순_기준_의상_속성_정의_목록_조회() {
+    // given
+    ClothesAttributeDef older = definition(UUID.randomUUID(), "색상", Instant.parse("2026-11-04T00:00:00Z"));
+    ClothesAttributeDef newer = definition(UUID.randomUUID(), "사이즈", Instant.parse("2026-11-04T00:03:00Z"));
+    ClothesAttributeDefSearchCommand command = new ClothesAttributeDefSearchCommand("createdAt", Direction.DESC, null);
+    Sort sort = Sort.by(Direction.DESC, "createdAt");
+    given(clothesAttributeDefRepository.findAll(sort)).willReturn(List.of(newer, older));
+
+    // when
+    List<ClothesAttributeDefResult> result = clothesAttributeDefService.findAll(command);
+
+    // then
+    then(clothesAttributeDefRepository).should().findAll(sort);
+    assertThat(result).extracting(ClothesAttributeDefResult::name).containsExactly("사이즈", "색상");
+  }
+
+  @Test
+  @DisplayName("생성일 기준 오름차순 정렬로 의상 속성 정의 목록을 조회한다")
+  void 생성일_오름차순_기준_의상_속성_정의_목록_조회() {
+    // given
+    ClothesAttributeDef older = definition(UUID.randomUUID(), "색상", Instant.parse("2026-11-04T00:00:00Z"));
+    ClothesAttributeDef newer = definition(UUID.randomUUID(), "사이즈", Instant.parse("2026-11-04T00:03:00Z"));
+    ClothesAttributeDefSearchCommand command = new ClothesAttributeDefSearchCommand("createdAt", Direction.ASC, null);
+    Sort sort = Sort.by(Direction.ASC, "createdAt");
+    given(clothesAttributeDefRepository.findAll(sort)).willReturn(List.of(older, newer));
+
+    // when
+    List<ClothesAttributeDefResult> result = clothesAttributeDefService.findAll(command);
+
+    // then
+    then(clothesAttributeDefRepository).should().findAll(sort);
+    assertThat(result).extracting(ClothesAttributeDefResult::name).containsExactly("색상", "사이즈");
+  }
+
+  @Test
+  @DisplayName("속성 정의 이름 기준 내림차순 정렬로 의상 속성 정의 목록을 조회한다")
+  void 속성_정의_이름_내림차순_기준_의상_속성_정의_목록_조회() {
+    // given
+    Instant createdAt = Instant.parse("2026-11-04T00:00:00Z");
+    ClothesAttributeDef colorDefinition = definition(UUID.randomUUID(), "Color", createdAt);
+    ClothesAttributeDef sizeDefinition = definition(UUID.randomUUID(), "Size", createdAt);
+    ClothesAttributeDefSearchCommand command = new ClothesAttributeDefSearchCommand("name", Direction.DESC, null);
+    Sort sort = Sort.by(Direction.DESC, "name");
+    given(clothesAttributeDefRepository.findAll(sort)).willReturn(List.of(sizeDefinition, colorDefinition));
+
+    // when
+    List<ClothesAttributeDefResult> result = clothesAttributeDefService.findAll(command);
+
+    // then
+    then(clothesAttributeDefRepository).should().findAll(sort);
+    assertThat(result).extracting(ClothesAttributeDefResult::name).containsExactly("Size", "Color");
+  }
+
+  @Test
+  @DisplayName("속성 정의 이름 기준 오름차순 정렬로 의상 속성 정의 목록을 조회한다")
+  void 속성_정의_이름_오름차순_기준_의상_속성_정의_목록_조회() {
+    // given
+    Instant createdAt = Instant.parse("2026-11-04T00:00:00Z");
+    ClothesAttributeDef colorDefinition = definition(UUID.randomUUID(), "Color", createdAt);
+    ClothesAttributeDef sizeDefinition = definition(UUID.randomUUID(), "Size", createdAt);
+    ClothesAttributeDefSearchCommand command = new ClothesAttributeDefSearchCommand("name", Direction.ASC, null);
+    Sort sort = Sort.by(Direction.ASC, "name");
+    given(clothesAttributeDefRepository.findAll(sort)).willReturn(List.of(colorDefinition, sizeDefinition));
+
+    // when
+    List<ClothesAttributeDefResult> result = clothesAttributeDefService.findAll(command);
+
+    // then
+    then(clothesAttributeDefRepository).should().findAll(sort);
+    assertThat(result).extracting(ClothesAttributeDefResult::name).containsExactly("Color", "Size");
+  }
+
+  @Test
+  @DisplayName("검색어의 앞뒤 공백을 제거하고 이름 부분 일치로 속성 정의를 조회한다")
+  void 속성_정의_이름_부분_일치_검색() {
+    // given
+    ClothesAttributeDef definition = definition(UUID.randomUUID(), "BackgroundColor", Instant.parse("2026-11-04T00:00:00Z"));
+    ClothesAttributeDefSearchCommand command = new ClothesAttributeDefSearchCommand("name", Direction.ASC, " Color ");
+    Sort sort = Sort.by(Direction.ASC, "name");
+    given(clothesAttributeDefRepository.findByNameContaining("Color", sort)).willReturn(List.of(definition));
+
+    // when
+    List<ClothesAttributeDefResult> result = clothesAttributeDefService.findAll(command);
+
+    // then
+    then(clothesAttributeDefRepository).should().findByNameContaining("Color", sort);
+    assertThat(result).extracting(ClothesAttributeDefResult::name).containsExactly("BackgroundColor");
+  }
+
+  @Test
+  @DisplayName("검색어의 앞뒤 유니코드 공백을 제거하고 속성 정의를 조회한다")
+  void 속성_정의_이름_유니코드_공백_제거_검색() {
+    // given
+    String emSpace = Character.toString(0x2003);
+    ClothesAttributeDef definition = definition(
+        UUID.randomUUID(),
+        "BackgroundColor",
+        Instant.parse("2026-11-04T00:00:00Z")
+    );
+    ClothesAttributeDefSearchCommand command = new ClothesAttributeDefSearchCommand(
+        "name",
+        Direction.ASC,
+        emSpace + "Color" + emSpace
+    );
+    Sort sort = Sort.by(Direction.ASC, "name");
+    given(clothesAttributeDefRepository.findByNameContaining("Color", sort)).willReturn(List.of(definition));
+
+    // when
+    List<ClothesAttributeDefResult> result = clothesAttributeDefService.findAll(command);
+
+    // then
+    then(clothesAttributeDefRepository).should().findByNameContaining("Color", sort);
+    assertThat(result).extracting(ClothesAttributeDefResult::name).containsExactly("BackgroundColor");
+  }
+
+  @Test
+  @DisplayName("공백뿐인 검색어는 이름 필터 없이 전체 속성 정의를 조회한다")
+  void 속성_정의_공백_검색어_전체_조회() {
+    // given
+    ClothesAttributeDef definition = definition(UUID.randomUUID(), "Color", Instant.parse("2026-11-04T00:00:00Z"));
+    ClothesAttributeDefSearchCommand command = new ClothesAttributeDefSearchCommand("name", Direction.ASC, "   ");
+    Sort sort = Sort.by(Direction.ASC, "name");
+    given(clothesAttributeDefRepository.findAll(sort)).willReturn(List.of(definition));
+
+    // when
+    List<ClothesAttributeDefResult> result = clothesAttributeDefService.findAll(command);
+
+    // then
+    then(clothesAttributeDefRepository).should().findAll(sort);
+    then(clothesAttributeDefRepository).shouldHaveNoMoreInteractions();
+    assertThat(result).extracting(ClothesAttributeDefResult::name).containsExactly("Color");
+  }
+
+  @Test
+  @DisplayName("조회 조건이 없으면 속성 정의 목록을 조회하지 않는다")
+  void 의상_속성_정의_조회_조건_누락() {
+    // when & then
+    assertThatThrownBy(() -> clothesAttributeDefService.findAll(null))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("의상 속성 정의 조회 조건은 필수입니다");
+    then(clothesAttributeDefRepository).shouldHaveNoInteractions();
+  }
+
+  private ClothesAttributeDef definition(UUID id, String name, Instant createdAt) {
+    ClothesAttributeDef definition = ClothesAttributeDef.create(name, List.of("옵션"));
+    ReflectionTestUtils.setField(definition, "id", id);
+    ReflectionTestUtils.setField(definition, "createdAt", createdAt);
+    return definition;
+  }
+
+
+  @Test
+  @DisplayName("의상 속성 정의 ID로 의상 속성 정의를 수정한다")
+  void 의상_속성_정의_수정_성공() {
+    // given
+    UUID definitionId = UUID.randomUUID();
+    Instant createdAt = Instant.parse("2026-10-28T00:00:00Z");
+    ClothesAttributeDef clothesAttributeDef = ClothesAttributeDef.create("색상", List.of("블랙", "크림"));
+    ReflectionTestUtils.setField(clothesAttributeDef, "id", definitionId);
+    ReflectionTestUtils.setField(clothesAttributeDef, "createdAt", createdAt);
+
+    ClothesAttributeDefUpdateCommand command = new ClothesAttributeDefUpdateCommand(definitionId, "사이즈", List.of("S", "M", "L"));
+    given(clothesAttributeDefRepository.findById(definitionId)).willReturn(Optional.of(clothesAttributeDef));
+
+    // when
+    ClothesAttributeDefResult result = clothesAttributeDefService.update(command);
+
+    // then
+    assertAll(
+        () -> assertThat(clothesAttributeDef.getName()).isEqualTo("사이즈"),
+        () -> assertThat(clothesAttributeDef.getSelectableValues()).containsExactly("S", "M", "L"),
+        () -> assertThat(result.id()).isEqualTo(definitionId),
+        () -> assertThat(result.name()).isEqualTo("사이즈"),
+        () -> assertThat(result.selectableValues()).containsExactly("S", "M", "L"),
+        () -> assertThat(result.createdAt()).isEqualTo(createdAt)
+    );
+    then(clothesAttributeDefRepository).should().flush();
+  }
+
+  @Test
+  @DisplayName("존재하지 않는 ID로 수정하면 의상 속성 정의 미존재 예외를 던진다")
+  void 의상_속성_정의_수정_대상_없음() {
+    // given
+    UUID definitionId = UUID.randomUUID();
+    ClothesAttributeDefUpdateCommand command = new ClothesAttributeDefUpdateCommand(definitionId, "사이즈", List.of("S", "M", "L"));
+    given(clothesAttributeDefRepository.findById(definitionId)).willReturn(Optional.empty());
+
+    // when & then
+    assertThatThrownBy(() -> clothesAttributeDefService.update(command))
+        .isInstanceOf(ClothesAttributeDefinitionNotFoundException.class)
+        .satisfies(exception -> assertThat(((ClothesAttributeDefinitionNotFoundException) exception).getDetails())
+            .containsEntry("definitionIds", definitionId.toString()));
+    then(clothesAttributeDefRepository).should().findById(definitionId);
+    then(clothesAttributeDefRepository).shouldHaveNoMoreInteractions();
+  }
+
+  @Test
+  @DisplayName("수정 중 속성 정의 이름이 기존 속성 정의 이름과 중복될 때 UNIQUE 제약명이 대문자여도 중복 이름 예외로 변환한다")
+  void 의상_속성_정의_이름_중복_수정_UNIQUE_제약_대소문자_무관_판별() {
+    // given
+    UUID definitionId = UUID.randomUUID();
+    ClothesAttributeDef clothesAttributeDef = ClothesAttributeDef.create("색상", List.of("블랙", "크림"));
+    ClothesAttributeDefUpdateCommand command = new ClothesAttributeDefUpdateCommand(definitionId, "사이즈", List.of("S", "M", "L"));
+    DataIntegrityViolationException uniqueViolation = uniqueViolation("UK_CLOTHES_ATTRIBUTE_DEFS_NAME");
+    given(clothesAttributeDefRepository.findById(definitionId)).willReturn(Optional.of(clothesAttributeDef));
+    willThrow(uniqueViolation).given(clothesAttributeDefRepository).flush();
+
+    // when & then
+    assertThatThrownBy(() -> clothesAttributeDefService.update(command))
+        .isInstanceOf(DuplicateClothesAttributeDefNameException.class)
+        .hasMessageContaining("이미 존재하는 의상 속성 정의 이름입니다")
+        .satisfies(exception -> assertThat(((DuplicateClothesAttributeDefNameException) exception).getDetails()).containsEntry("name", "사이즈"));
+  }
+
+  @Test
+  @DisplayName("수정 중 다른 UNIQUE 제약을 위반하면 원래 무결성 예외를 유지한다")
+  void 의상_속성_정의_수정_다른_UNIQUE_제약_위반() {
+    // given
+    UUID definitionId = UUID.randomUUID();
+    ClothesAttributeDef clothesAttributeDef = ClothesAttributeDef.create("색상", List.of("블랙", "크림"));
+    ClothesAttributeDefUpdateCommand command = new ClothesAttributeDefUpdateCommand(
+        definitionId,
+        "사이즈",
+        List.of("S", "M", "L")
+    );
+    DataIntegrityViolationException exception = uniqueViolation("pk_clothes_attribute_defs");
+    given(clothesAttributeDefRepository.findById(definitionId)).willReturn(Optional.of(clothesAttributeDef));
+    willThrow(exception).given(clothesAttributeDefRepository).flush();
+
+    // when & then
+    assertThatThrownBy(() -> clothesAttributeDefService.update(command)).isSameAs(exception);
   }
 
   private DataIntegrityViolationException uniqueViolation(String constraintName) {
