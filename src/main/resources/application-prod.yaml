@@ -26,3 +26,10 @@ logging:
     org.hibernate.SQL: warn
     org.hibernate.orm.jdbc.batch: warn
     org.hibernate.orm.jdbc.bind: warn
+
+# 비공개 S3 객체는 CloudFront OAC 등 공개 전달 계층을 통해서만 노출합니다.
+otboo:
+  storage:
+    s3:
+      bucket: ${OTBOO_CLOTHES_S3_BUCKET}
+      public-base-url: ${OTBOO_CLOTHES_IMAGE_PUBLIC_BASE_URL}

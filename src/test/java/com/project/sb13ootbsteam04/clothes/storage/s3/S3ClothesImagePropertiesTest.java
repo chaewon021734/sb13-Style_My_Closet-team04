@@ -44,6 +44,46 @@ class S3ClothesImagePropertiesTest {
     );
   }
 
+  @Test
+  @DisplayName("문자열 설정의 앞뒤 공백과 빈 값을 정규화한다")
+  void 문자열_설정_정규화() {
+    // given & when
+    S3ClothesImageProperties normalized = new S3ClothesImageProperties(
+        " otboo-images ",
+        " ap-northeast-2 ",
+        " ",
+        " https://cdn.example.com ",
+        null,
+        null
+    );
+
+    // then
+    assertAll(
+        () -> assertThat(normalized.bucket()).isEqualTo("otboo-images"),
+        () -> assertThat(normalized.region()).isEqualTo("ap-northeast-2"),
+        () -> assertThat(normalized.endpoint()).isNull(),
+        () -> assertThat(normalized.publicBaseUrl()).isEqualTo("https://cdn.example.com")
+    );
+  }
+
+  @Test
+  @DisplayName("객체 URL을 깨뜨릴 수 있는 base URL 설정을 거부한다")
+  void 잘못된_URL_설정() {
+    // given & when & then
+    assertAll(
+        () -> assertInvalidPublicBaseUrl("cdn.example.com"),
+        () -> assertInvalidPublicBaseUrl("https://user:password@cdn.example.com"),
+        () -> assertInvalidPublicBaseUrl("https://cdn.example.com?version=1"),
+        () -> assertInvalidPublicBaseUrl("https://cdn.example.com#images")
+    );
+  }
+
+  private void assertInvalidPublicBaseUrl(String publicBaseUrl) {
+    assertThatThrownBy(() -> new S3ClothesImageProperties(
+        "otboo-images", "ap-northeast-2", null, publicBaseUrl, null, null
+    )).isInstanceOf(IllegalArgumentException.class);
+  }
+
   private S3ClothesImageProperties properties(Duration apiCallTimeout, Duration apiCallAttemptTimeout) {
     return new S3ClothesImageProperties(
         "otboo-images",

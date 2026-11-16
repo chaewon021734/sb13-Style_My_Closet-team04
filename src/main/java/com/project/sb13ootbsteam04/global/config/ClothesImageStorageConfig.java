@@ -45,7 +45,7 @@ public class ClothesImageStorageConfig {
 
   private void configureEndpointAndCredentials(S3ClientBuilder builder, S3ClothesImageProperties properties) {
     if (StringUtils.hasText(properties.endpoint())) {
-      // endpoint는 자격증명이 필요 없는 로컬 S3Mock 통합 테스트 전용이다.
+      // 로컬 S3 호환 저장소는 path-style 요청을 사용합니다.
       builder.endpointOverride(URI.create(properties.endpoint()))
           .serviceConfiguration(S3Configuration.builder()
               .pathStyleAccessEnabled(true)
