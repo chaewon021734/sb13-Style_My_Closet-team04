@@ -153,16 +153,13 @@ class ClothesAttributeDefRepositoryTest {
 
     // then
     assertAll(
-        () -> assertThat(matched)
-            .extracting(ClothesAttributeDef::getName)
-            .containsExactly("AccentColor", "BackgroundColor"),
+        () -> assertThat(matched).extracting(ClothesAttributeDef::getName).containsExactly("AccentColor", "BackgroundColor"),
         () -> assertThat(caseMismatch).isEmpty()
     );
   }
 
   private void updateClothesAttributeDefCreatedAt(UUID definitionId, Instant createdAt) {
-    entityManager.createNativeQuery(
-            "UPDATE clothes_attribute_defs SET created_at = :createdAt WHERE id = :definitionId")
+    entityManager.createNativeQuery("UPDATE clothes_attribute_defs SET created_at = :createdAt WHERE id = :definitionId")
         .setParameter("createdAt", createdAt)
         .setParameter("definitionId", definitionId)
         .executeUpdate();

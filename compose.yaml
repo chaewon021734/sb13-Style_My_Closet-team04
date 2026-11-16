@@ -1,6 +1,7 @@
 services:
   postgres:
     image: postgres:16
+    container_name: ootbs-postgres
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${OTBOO_DB_NAME:-otboo}
@@ -9,7 +10,15 @@ services:
     ports:
       - '${OTBOO_DB_PORT:-5432}:5432'
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:8
+    container_name: ootbs-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U ${OTBOO_DB_USERNAME:-otboo} -d ${OTBOO_DB_NAME:-otboo}']
       interval: 10s
@@ -17,4 +26,4 @@ services:
       retries: 5
 
 volumes:
-  postgres-data:
+  postgres_data:
