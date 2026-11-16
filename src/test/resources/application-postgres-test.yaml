@@ -6,3 +6,6 @@ spring:
     username: ${OTBOO_DB_USERNAME:otboo}
     password: ${OTBOO_DB_PASSWORD:change-me}
     driver-class-name: org.postgresql.Driver
+  flyway:
+    # 이 프로필은 JPA의 PostgreSQL 호환성을 검증하며, migration은 별도 테스트에서 검증합니다.
+    enabled: false

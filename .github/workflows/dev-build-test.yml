@@ -26,6 +26,20 @@ jobs:
   build-test:
     name: build-test
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: otboo
+          POSTGRES_USER: otboo
+          POSTGRES_PASSWORD: otboo-ci-test-only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U otboo -d otboo"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - name: Reject main to dev PR
         if: ${{ github.event_name == 'pull_request' }}
@@ -51,8 +65,15 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Test and build executable jar
-        run: ./gradlew clean test bootJar jacocoTestReport --no-daemon
+      - name: Test application and generate coverage report
+        env:
+          OTBOO_POSTGRES_TEST: "true"
+          OTBOO_DB_HOST: localhost
+          OTBOO_DB_PORT: "5432"
+          OTBOO_DB_NAME: otboo
+          OTBOO_DB_USERNAME: otboo
+          OTBOO_DB_PASSWORD: otboo-ci-test-only
+        run: ./gradlew clean test jacocoTestReport --no-daemon
 
       # 현재 팀 전체 커버리지가 80%에 미달하므로 지표는 공개하되 PR을 즉시 차단하지 않습니다.
       - name: Verify coverage threshold
@@ -67,5 +88,15 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Validate Docker image build
-        run: docker build --tag otboo:${{ github.sha }} .
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          platforms: linux/amd64
+          tags: otboo:${{ github.sha }}
+          cache-from: type=gha,scope=otboo-api
+          cache-to: type=gha,mode=max,scope=otboo-api
