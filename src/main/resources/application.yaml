@@ -19,6 +19,23 @@ spring:
 server:
   shutdown: graceful
 
+# ECS/ALB의 상태 확인에 필요한 endpoint만 노출합니다.
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
+  health:
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true
+
 weather:
   kakao:
     api-key: ${KAKAO_REST_API_KEY:}
