@@ -78,6 +78,22 @@ class S3ClothesImagePropertiesTest {
     );
   }
 
+  @Test
+  @DisplayName("로컬 endpoint를 사용하면 브라우저용 공개 URL이 필요하다")
+  void endpoint_공개_URL_필수() {
+    // given & when & then
+    assertThatThrownBy(() -> new S3ClothesImageProperties(
+        "otboo-images",
+        "us-east-1",
+        "http://s3mock:9090",
+        null,
+        null,
+        null
+    ))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("이미지 공개 URL");
+  }
+
   private void assertInvalidPublicBaseUrl(String publicBaseUrl) {
     assertThatThrownBy(() -> new S3ClothesImageProperties(
         "otboo-images", "ap-northeast-2", null, publicBaseUrl, null, null

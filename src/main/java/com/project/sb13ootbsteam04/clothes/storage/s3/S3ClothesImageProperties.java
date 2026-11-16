@@ -31,6 +31,10 @@ public record S3ClothesImageProperties(
     if (apiCallAttemptTimeout.compareTo(apiCallTimeout) > 0) {
       throw new IllegalArgumentException("S3 시도별 제한 시간은 전체 API 제한 시간보다 길 수 없습니다");
     }
+    // 저장소 endpoint와 브라우저가 접근할 공개 URL은 다를 수 있으므로 명시적으로 분리합니다.
+    if (endpoint != null && publicBaseUrl == null) {
+      throw new IllegalArgumentException("S3 endpoint를 사용하면 이미지 공개 URL 설정이 필요합니다");
+    }
   }
 
   public boolean isConfigured() {

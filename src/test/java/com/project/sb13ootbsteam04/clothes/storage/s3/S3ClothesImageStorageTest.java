@@ -123,6 +123,29 @@ class S3ClothesImageStorageTest {
   }
 
   @Test
+  @DisplayName("로컬 endpoint 사용 시 별도로 지정한 브라우저 공개 URL을 반환한다")
+  void 로컬_endpoint_공개_URL() {
+    // given
+    S3ClothesImageStorage storage = new S3ClothesImageStorage(
+        s3Client,
+        new S3ClothesImageProperties(
+            "otboo-images",
+            "us-east-1",
+            "http://s3mock:9090",
+            "http://localhost:9090/otboo-images",
+            null,
+            null
+        )
+    );
+
+    // when
+    StoredImage result = storage.upload(pngImage());
+
+    // then
+    assertThat(result.url()).isEqualTo("http://localhost:9090/otboo-images/" + result.objectKey());
+  }
+
+  @Test
   @DisplayName("S3 삭제 실패를 저장소 예외로 변환한다")
   void 삭제_실패() {
 

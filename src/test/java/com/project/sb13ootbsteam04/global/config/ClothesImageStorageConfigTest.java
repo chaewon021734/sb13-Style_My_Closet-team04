@@ -55,12 +55,14 @@ class ClothesImageStorageConfigTest {
         .withPropertyValues(
             "otboo.storage.s3.bucket=otboo-images",
             "otboo.storage.s3.region=us-east-1",
-            "otboo.storage.s3.endpoint=http://localhost:9090"
+            "otboo.storage.s3.endpoint=http://s3mock:9090",
+            "otboo.storage.s3.public-base-url=http://localhost:9090/otboo-images"
         )
         .run(context -> {
           S3ClothesImageProperties properties = context.getBean(S3ClothesImageProperties.class);
 
-          assertThat(properties.endpoint()).isEqualTo("http://localhost:9090");
+          assertThat(properties.endpoint()).isEqualTo("http://s3mock:9090");
+          assertThat(properties.publicBaseUrl()).isEqualTo("http://localhost:9090/otboo-images");
           assertThat(context.getBean(ClothesImageStorage.class)).isInstanceOf(S3ClothesImageStorage.class);
         });
   }

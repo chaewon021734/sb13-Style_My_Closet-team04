@@ -2,9 +2,9 @@ spring:
   config:
     import: optional:file:.env[.properties]
   datasource:
-    url: jdbc:postgresql://${OTBOO_DB_HOST:localhost}:${OTBOO_DB_PORT:5432}/${OTBOO_DB_NAME:otboo}
-    username: ${OTBOO_DB_USERNAME:otboo}
-    password: ${OTBOO_DB_PASSWORD:change-me}
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:ootb}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:change-me}
     driver-class-name: org.postgresql.Driver
   flyway:
     # 이 프로필은 JPA의 PostgreSQL 호환성을 검증하며, migration은 별도 테스트에서 검증합니다.
