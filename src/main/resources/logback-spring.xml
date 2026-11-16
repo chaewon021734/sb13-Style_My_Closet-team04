@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+  <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+
+  <springProperty scope="context" name="ROOT_LOG_LEVEL" source="logging.level.root" defaultValue="INFO"/>
+  <property name="LOG_PATTERN"
+      value="%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %-5level [%thread] %logger{36} [requestId=%X{requestId:-N/A} method=%X{requestMethod:-N/A} uri=%X{requestUri:-N/A}] - %msg%n"/>
+
+  <!-- ECS에서 CloudWatch Logs로 전송하도록 파일이 아닌 stdout에만 기록합니다. -->
+  <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+    <encoder>
+      <pattern>${LOG_PATTERN}</pattern>
+      <charset>UTF-8</charset>
+    </encoder>
+  </appender>
+
+  <root level="${ROOT_LOG_LEVEL}">
+    <appender-ref ref="CONSOLE"/>
+  </root>
+</configuration>
