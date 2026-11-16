@@ -12,19 +12,18 @@ concurrency:
   group: deploy-ecs-prod
   cancel-in-progress: false
 
-env:
-  AWS_REGION: ${{ vars.AWS_REGION }}
-  ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
-  ECS_CLUSTER: ${{ vars.ECS_CLUSTER }}
-  ECS_SERVICE: ${{ vars.ECS_SERVICE }}
-  ECS_TASK_DEFINITION: ${{ vars.ECS_TASK_DEFINITION }}
-  ECS_CONTAINER_NAME: ${{ vars.ECS_CONTAINER_NAME }}
-
 jobs:
   deploy:
     name: build-and-deploy-to-ecs
     runs-on: ubuntu-latest
     environment: production
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
+      ECS_CLUSTER: ${{ vars.ECS_CLUSTER }}
+      ECS_SERVICE: ${{ vars.ECS_SERVICE }}
+      ECS_TASK_DEFINITION: ${{ vars.ECS_TASK_DEFINITION }}
+      ECS_CONTAINER_NAME: ${{ vars.ECS_CONTAINER_NAME }}
     steps:
       - name: Validate deployment variables
         env:
@@ -74,20 +73,34 @@ jobs:
           ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
         shell: bash
         run: |
-          IMAGE_URI="${ECR_REGISTRY}/${ECR_REPOSITORY}:${GITHUB_SHA}"
-          EXISTING_TAG="$(aws ecr list-images \
-            --repository-name "$ECR_REPOSITORY" \
-            --filter tagStatus=TAGGED \
-            --query "imageIds[?imageTag=='${GITHUB_SHA}'].imageTag | [0]" \
-            --output text)"
+          set -euo pipefail
 
-          # Immutable SHA 태그가 이미 있으면 덮어쓰지 않고 같은 이미지를 재사용합니다.
-          if [ "$EXISTING_TAG" = "$GITHUB_SHA" ]; then
+          IMAGE_URI="${ECR_REGISTRY}/${ECR_REPOSITORY}:${GITHUB_SHA}"
+
+          # 태그를 직접 조회해 페이지네이션 오판을 피하고, 미존재와 AWS 오류를 구분합니다.
+          set +e
+          DESCRIBE_ERROR="$(mktemp)"
+          aws ecr describe-images \
+            --repository-name "$ECR_REPOSITORY" \
+            --image-ids "imageTag=${GITHUB_SHA}" \
+            > /dev/null 2> "$DESCRIBE_ERROR"
+          DESCRIBE_STATUS=$?
+          set -e
+
+          if [ "$DESCRIBE_STATUS" -eq 0 ]; then
             echo "Immutable image already exists: ${IMAGE_URI}"
             echo "exists=true" >> "$GITHUB_OUTPUT"
-          else
+          elif grep -q "ImageNotFoundException" "$DESCRIBE_ERROR"; then
+            echo "Immutable image does not exist yet: ${IMAGE_URI}"
             echo "exists=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "::error::ECR 이미지 확인 중 권한 또는 통신 오류가 발생했습니다."
+            cat "$DESCRIBE_ERROR" >&2
+            rm -f "$DESCRIBE_ERROR"
+            exit "$DESCRIBE_STATUS"
           fi
+
+          rm -f "$DESCRIBE_ERROR"
           echo "uri=$IMAGE_URI" >> "$GITHUB_OUTPUT"
 
       - name: Set up Docker Buildx

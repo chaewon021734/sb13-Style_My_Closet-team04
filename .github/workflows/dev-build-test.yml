@@ -26,17 +26,25 @@ jobs:
   build-test:
     name: build-test
     runs-on: ubuntu-latest
+    env:
+      # 두 Gradle 단계가 같은 입력으로 동일한 PostgreSQL 테스트 결과를 재사용합니다.
+      OTBOO_POSTGRES_TEST: "true"
+      DB_HOST: localhost
+      DB_PORT: "5432"
+      DB_NAME: ootb
+      DB_USERNAME: postgres
+      DB_PASSWORD: postgres-ci-test-only
     services:
       postgres:
         image: postgres:16
         env:
-          POSTGRES_DB: otboo
-          POSTGRES_USER: otboo
-          POSTGRES_PASSWORD: otboo-ci-test-only
+          POSTGRES_DB: ootb
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres-ci-test-only
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U otboo -d otboo"
+          --health-cmd "pg_isready -U postgres -d ootb"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -66,13 +74,6 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
 
       - name: Test application and generate coverage report
-        env:
-          OTBOO_POSTGRES_TEST: "true"
-          OTBOO_DB_HOST: localhost
-          OTBOO_DB_PORT: "5432"
-          OTBOO_DB_NAME: otboo
-          OTBOO_DB_USERNAME: otboo
-          OTBOO_DB_PASSWORD: otboo-ci-test-only
         run: ./gradlew clean test jacocoTestReport --no-daemon
 
       # 현재 팀 전체 커버리지가 80%에 미달하므로 지표는 공개하되 PR을 즉시 차단하지 않습니다.
