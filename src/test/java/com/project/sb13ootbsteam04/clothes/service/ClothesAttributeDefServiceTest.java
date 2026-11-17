@@ -405,6 +405,39 @@ class ClothesAttributeDefServiceTest {
     assertThatThrownBy(() -> clothesAttributeDefService.update(command)).isSameAs(exception);
   }
 
+  @Test
+  @DisplayName("존재하는 ID로 의상 속성 정의를 삭제한다")
+  void 의상_속성_정의_삭제_성공() {
+    // given
+    UUID definitionId = UUID.randomUUID();
+    ClothesAttributeDef clothesAttributeDef = ClothesAttributeDef.create("색상", List.of("블랙", "크림"));
+    ReflectionTestUtils.setField(clothesAttributeDef, "id", definitionId);
+    given(clothesAttributeDefRepository.findById(definitionId)).willReturn(Optional.of(clothesAttributeDef));
+
+    // when
+    clothesAttributeDefService.delete(definitionId);
+
+    // then
+    then(clothesAttributeDefRepository).should().findById(definitionId);
+    then(clothesAttributeDefRepository).should().delete(clothesAttributeDef);
+  }
+
+  @Test
+  @DisplayName("존재하지 않는 ID로 삭제하면 의상 속성 정의 미존재 예외를 던진다")
+  void 의상_속성_정의_삭제_대상_없음() {
+    // given
+    UUID definitionId = UUID.randomUUID();
+    given(clothesAttributeDefRepository.findById(definitionId)).willReturn(Optional.empty());
+
+    // when & then
+    assertThatThrownBy(() -> clothesAttributeDefService.delete(definitionId))
+        .isInstanceOf(ClothesAttributeDefinitionNotFoundException.class)
+        .satisfies(exception -> assertThat(((ClothesAttributeDefinitionNotFoundException) exception).getDetails())
+            .containsEntry("definitionIds", definitionId.toString()));
+    then(clothesAttributeDefRepository).should().findById(definitionId);
+    then(clothesAttributeDefRepository).shouldHaveNoMoreInteractions();
+  }
+
   private DataIntegrityViolationException uniqueViolation(String constraintName) {
     SQLException sqlException = new SQLException("duplicate key", "23505");
     ConstraintViolationException constraintViolation = new ConstraintViolationException(
