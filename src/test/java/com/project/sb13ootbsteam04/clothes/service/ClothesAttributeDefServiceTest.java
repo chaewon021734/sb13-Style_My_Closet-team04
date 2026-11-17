@@ -7,11 +7,13 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.BDDMockito.willThrow;
+import static org.mockito.Mockito.inOrder;
 
 import com.project.sb13ootbsteam04.clothes.entity.ClothesAttributeDef;
 import com.project.sb13ootbsteam04.clothes.exception.ClothesAttributeDefinitionNotFoundException;
 import com.project.sb13ootbsteam04.clothes.exception.DuplicateClothesAttributeDefNameException;
 import com.project.sb13ootbsteam04.clothes.repository.ClothesAttributeDefRepository;
+import com.project.sb13ootbsteam04.clothes.repository.ClothesAttributeRepository;
 import com.project.sb13ootbsteam04.clothes.service.dto.ClothesAttributeDefCreateCommand;
 import com.project.sb13ootbsteam04.clothes.service.dto.ClothesAttributeDefResult;
 import com.project.sb13ootbsteam04.clothes.service.dto.ClothesAttributeDefSearchCommand;
@@ -28,6 +30,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.postgresql.util.PSQLException;
@@ -43,6 +46,9 @@ class ClothesAttributeDefServiceTest {
 
   @Mock
   private ClothesAttributeDefRepository clothesAttributeDefRepository;
+
+  @Mock
+  private ClothesAttributeRepository clothesAttributeRepository;
 
   @InjectMocks
   private ClothesAttributeDefServiceImpl clothesAttributeDefService;
@@ -406,20 +412,24 @@ class ClothesAttributeDefServiceTest {
   }
 
   @Test
-  @DisplayName("존재하는 ID로 의상 속성 정의를 삭제한다")
+  @DisplayName("의상 속성 정의 삭제 시 참조 속성을 먼저 삭제한다")
   void 의상_속성_정의_삭제_성공() {
     // given
     UUID definitionId = UUID.randomUUID();
     ClothesAttributeDef clothesAttributeDef = ClothesAttributeDef.create("색상", List.of("블랙", "크림"));
     ReflectionTestUtils.setField(clothesAttributeDef, "id", definitionId);
-    given(clothesAttributeDefRepository.findById(definitionId)).willReturn(Optional.of(clothesAttributeDef));
+    given(clothesAttributeRepository.deleteAllByDefinitionId(definitionId)).willReturn(2);
+    given(clothesAttributeDefRepository.findByIdForUpdate(definitionId)).willReturn(Optional.of(clothesAttributeDef));
 
     // when
     clothesAttributeDefService.delete(definitionId);
 
     // then
-    then(clothesAttributeDefRepository).should().findById(definitionId);
-    then(clothesAttributeDefRepository).should().delete(clothesAttributeDef);
+    InOrder inOrder = inOrder(clothesAttributeDefRepository, clothesAttributeRepository);
+    inOrder.verify(clothesAttributeDefRepository).findByIdForUpdate(definitionId);
+    inOrder.verify(clothesAttributeRepository).deleteAllByDefinitionId(definitionId);
+    inOrder.verify(clothesAttributeDefRepository).delete(clothesAttributeDef);
+    inOrder.verifyNoMoreInteractions();
   }
 
   @Test
@@ -427,14 +437,15 @@ class ClothesAttributeDefServiceTest {
   void 의상_속성_정의_삭제_대상_없음() {
     // given
     UUID definitionId = UUID.randomUUID();
-    given(clothesAttributeDefRepository.findById(definitionId)).willReturn(Optional.empty());
+    given(clothesAttributeDefRepository.findByIdForUpdate(definitionId)).willReturn(Optional.empty());
 
     // when & then
     assertThatThrownBy(() -> clothesAttributeDefService.delete(definitionId))
         .isInstanceOf(ClothesAttributeDefinitionNotFoundException.class)
         .satisfies(exception -> assertThat(((ClothesAttributeDefinitionNotFoundException) exception).getDetails())
             .containsEntry("definitionIds", definitionId.toString()));
-    then(clothesAttributeDefRepository).should().findById(definitionId);
+    then(clothesAttributeRepository).shouldHaveNoInteractions();
+    then(clothesAttributeDefRepository).should().findByIdForUpdate(definitionId);
     then(clothesAttributeDefRepository).shouldHaveNoMoreInteractions();
   }
 
