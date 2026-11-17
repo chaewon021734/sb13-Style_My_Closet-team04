@@ -13,6 +13,7 @@ import java.sql.SQLException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.hibernate.exception.ConstraintViolationException;
 import org.postgresql.util.PSQLException;
@@ -130,6 +131,14 @@ public class ClothesAttributeDefServiceImpl implements ClothesAttributeDefServic
       }
       throw exception;
     }
+  }
+
+  @Override
+  @Transactional
+  public void delete(UUID definitionId) {
+    ClothesAttributeDef definition = clothesAttributeDefRepository.findById(definitionId)
+        .orElseThrow(() -> new ClothesAttributeDefinitionNotFoundException(List.of(definitionId)));
+    clothesAttributeDefRepository.delete(definition);
   }
 
   private ClothesAttributeDefResult toResult(ClothesAttributeDef definition) {
