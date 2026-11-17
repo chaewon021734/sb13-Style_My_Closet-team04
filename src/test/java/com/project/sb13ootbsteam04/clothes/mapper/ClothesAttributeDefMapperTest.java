@@ -5,8 +5,10 @@ import static org.junit.jupiter.api.Assertions.assertAll;
 
 import com.project.sb13ootbsteam04.clothes.controller.dto.ClothesAttributeDefCreateRequest;
 import com.project.sb13ootbsteam04.clothes.controller.dto.ClothesAttributeDefDto;
+import com.project.sb13ootbsteam04.clothes.controller.dto.ClothesAttributeDefUpdateRequest;
 import com.project.sb13ootbsteam04.clothes.service.dto.ClothesAttributeDefCreateCommand;
 import com.project.sb13ootbsteam04.clothes.service.dto.ClothesAttributeDefResult;
+import com.project.sb13ootbsteam04.clothes.service.dto.ClothesAttributeDefUpdateCommand;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -57,6 +59,24 @@ class ClothesAttributeDefMapperTest {
         () -> assertThat(dto.name()).isEqualTo("색상"),
         () -> assertThat(dto.selectableValues()).containsExactly("블랙", "크림"),
         () -> assertThat(dto.createdAt()).isEqualTo(createdAt)
+    );
+  }
+
+  @Test
+  @DisplayName("수정 요청과 의상 속성 정의 ID를 서비스 Command로 변환한다")
+  void 수정_요청_Command_변환() {
+    // given
+    UUID definitionId = UUID.randomUUID();
+    ClothesAttributeDefUpdateRequest request = new ClothesAttributeDefUpdateRequest("색상", List.of("블랙", "크림"));
+
+    // when
+    ClothesAttributeDefUpdateCommand command = mapper.toCommand(definitionId, request);
+
+    // then
+    assertAll(
+        () -> assertThat(command.definitionId()).isEqualTo(definitionId),
+        () -> assertThat(command.name()).isEqualTo("색상"),
+        () -> assertThat(command.selectableValues()).containsExactly("블랙", "크림")
     );
   }
 }

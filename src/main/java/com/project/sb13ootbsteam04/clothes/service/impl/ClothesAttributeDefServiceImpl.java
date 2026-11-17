@@ -1,19 +1,24 @@
 package com.project.sb13ootbsteam04.clothes.service.impl;
 
 import com.project.sb13ootbsteam04.clothes.entity.ClothesAttributeDef;
+import com.project.sb13ootbsteam04.clothes.exception.ClothesAttributeDefinitionNotFoundException;
 import com.project.sb13ootbsteam04.clothes.exception.DuplicateClothesAttributeDefNameException;
 import com.project.sb13ootbsteam04.clothes.repository.ClothesAttributeDefRepository;
 import com.project.sb13ootbsteam04.clothes.service.ClothesAttributeDefService;
 import com.project.sb13ootbsteam04.clothes.service.dto.ClothesAttributeDefCreateCommand;
 import com.project.sb13ootbsteam04.clothes.service.dto.ClothesAttributeDefResult;
+import com.project.sb13ootbsteam04.clothes.service.dto.ClothesAttributeDefSearchCommand;
+import com.project.sb13ootbsteam04.clothes.service.dto.ClothesAttributeDefUpdateCommand;
 import java.sql.SQLException;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Locale;
 import lombok.RequiredArgsConstructor;
 import org.hibernate.exception.ConstraintViolationException;
 import org.postgresql.util.PSQLException;
 import org.postgresql.util.ServerErrorMessage;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,12 +40,7 @@ public class ClothesAttributeDefServiceImpl implements ClothesAttributeDefServic
     try {
       // UNIQUE 제약을 즉시 확인해 추가 조회 없이 동시 등록까지 동일하게 처리한다.
       ClothesAttributeDef saved = clothesAttributeDefRepository.saveAndFlush(definition);
-      return new ClothesAttributeDefResult(
-          saved.getId(),
-          saved.getName(),
-          saved.getSelectableValues(),
-          saved.getCreatedAt()
-      );
+      return toResult(saved);
 
     } catch (DataIntegrityViolationException exception) {
       if (isNameUniqueViolation(exception)) {
@@ -49,6 +49,30 @@ public class ClothesAttributeDefServiceImpl implements ClothesAttributeDefServic
       throw exception;
     }
   }
+
+  @Override
+  @Transactional(readOnly = true)
+  public List<ClothesAttributeDefResult> findAll(ClothesAttributeDefSearchCommand command) {
+    if (command == null) {
+      throw new IllegalArgumentException("의상 속성 정의 조회 조건은 필수입니다");
+    }
+
+    Sort sort = Sort.by(command.sortDirection(), command.sortBy().property());
+    String keyword = normalizeKeyword(command.keywordLike());
+    List<ClothesAttributeDef> definitions = keyword == null
+        ? clothesAttributeDefRepository.findAll(sort)
+        : clothesAttributeDefRepository.findByNameContaining(keyword, sort);
+
+    return definitions.stream().map(this::toResult).toList();
+  }
+
+  private String normalizeKeyword(String keywordLike) {
+    if (keywordLike == null || keywordLike.isBlank()) {
+      return null;
+    }
+    return keywordLike.strip(); // 검색어의 유니코드 공백도 제거
+  }
+
 
   /** 이름 UNIQUE 제약 위반만 중복 이름 예외로 변환한다. */
   private boolean isNameUniqueViolation(DataIntegrityViolationException exception) {
@@ -87,5 +111,33 @@ public class ClothesAttributeDefServiceImpl implements ClothesAttributeDefServic
     // H2는 스키마·인덱스 정보까지 포함할 수 있어 제약 이름을 토큰 단위로 비교한다.
     return Arrays.stream(constraintName.toLowerCase(Locale.ROOT).split("[^a-z0-9_]+"))
         .anyMatch(NAME_UNIQUE_CONSTRAINT::equals);
+  }
+
+  @Override
+  @Transactional
+  public ClothesAttributeDefResult update(ClothesAttributeDefUpdateCommand command) {
+    ClothesAttributeDef definition = clothesAttributeDefRepository.findById(command.definitionId())
+        .orElseThrow(() -> new ClothesAttributeDefinitionNotFoundException(List.of(command.definitionId())));
+
+    try {
+      definition.update(command.name(), command.selectableValues());
+      clothesAttributeDefRepository.flush(); // 명시적 flush로 UNIQUE 제약 위반을 즉시 확인한다.
+      return toResult(definition);
+
+    } catch (DataIntegrityViolationException exception) {
+      if (isNameUniqueViolation(exception)) { // uk_clothes_attribute_defs_name 위반이면 중복 이름 예외로 변환한다.
+        throw new DuplicateClothesAttributeDefNameException(definition.getName(), exception);
+      }
+      throw exception;
+    }
+  }
+
+  private ClothesAttributeDefResult toResult(ClothesAttributeDef definition) {
+    return new ClothesAttributeDefResult(
+        definition.getId(),
+        definition.getName(),
+        definition.getSelectableValues(),
+        definition.getCreatedAt()
+    );
   }
 }
