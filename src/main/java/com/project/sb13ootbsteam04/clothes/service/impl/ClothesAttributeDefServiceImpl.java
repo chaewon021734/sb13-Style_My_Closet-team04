@@ -4,6 +4,7 @@ import com.project.sb13ootbsteam04.clothes.entity.ClothesAttributeDef;
 import com.project.sb13ootbsteam04.clothes.exception.ClothesAttributeDefinitionNotFoundException;
 import com.project.sb13ootbsteam04.clothes.exception.DuplicateClothesAttributeDefNameException;
 import com.project.sb13ootbsteam04.clothes.repository.ClothesAttributeDefRepository;
+import com.project.sb13ootbsteam04.clothes.repository.ClothesAttributeRepository;
 import com.project.sb13ootbsteam04.clothes.service.ClothesAttributeDefService;
 import com.project.sb13ootbsteam04.clothes.service.dto.ClothesAttributeDefCreateCommand;
 import com.project.sb13ootbsteam04.clothes.service.dto.ClothesAttributeDefResult;
@@ -31,6 +32,7 @@ public class ClothesAttributeDefServiceImpl implements ClothesAttributeDefServic
   private static final String NAME_UNIQUE_CONSTRAINT = "uk_clothes_attribute_defs_name";
 
   private final ClothesAttributeDefRepository clothesAttributeDefRepository;
+  private final ClothesAttributeRepository clothesAttributeRepository;
 
   @Override
   @Transactional
@@ -136,8 +138,11 @@ public class ClothesAttributeDefServiceImpl implements ClothesAttributeDefServic
   @Override
   @Transactional
   public void delete(UUID definitionId) {
-    ClothesAttributeDef definition = clothesAttributeDefRepository.findById(definitionId)
+    // 관리자 삭제와 동일한 정의를 사용하는 의상 등록을 직렬화한다.
+    ClothesAttributeDef definition = clothesAttributeDefRepository.findByIdForUpdate(definitionId)
         .orElseThrow(() -> new ClothesAttributeDefinitionNotFoundException(List.of(definitionId)));
+    // 참조 속성을 먼저 제거해 FK 무결성을 유지한다.
+    clothesAttributeRepository.deleteAllByDefinitionId(definitionId);
     clothesAttributeDefRepository.delete(definition);
   }
 
