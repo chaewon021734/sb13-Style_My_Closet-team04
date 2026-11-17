@@ -1,0 +1,142 @@
+name: deploy-ecs
+
+# ECS/ECR와 GitHub OIDC 연결이 완료되기 전에 운영 배포가 자동 실행되지 않도록 수동 트리거만 활성화합니다.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: deploy-ecs-prod
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: build-and-deploy-to-ecs
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
+      ECS_CLUSTER: ${{ vars.ECS_CLUSTER }}
+      ECS_SERVICE: ${{ vars.ECS_SERVICE }}
+      ECS_TASK_DEFINITION: ${{ vars.ECS_TASK_DEFINITION }}
+      ECS_CONTAINER_NAME: ${{ vars.ECS_CONTAINER_NAME }}
+    steps:
+      - name: Validate deployment variables
+        env:
+          AWS_DEPLOY_ROLE_ARN: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+        shell: bash
+        run: |
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "::error::production 배포는 main 브랜치에서만 실행할 수 있습니다. current: ${GITHUB_REF}"
+            exit 1
+          fi
+
+          for name in AWS_REGION AWS_DEPLOY_ROLE_ARN ECR_REPOSITORY ECS_CLUSTER ECS_SERVICE ECS_TASK_DEFINITION ECS_CONTAINER_NAME; do
+            if [ -z "${!name}" ]; then
+              echo "::error::GitHub Environment production에 ${name} 변수를 설정해야 합니다."
+              exit 1
+            fi
+          done
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Test application
+        run: ./gradlew clean test --no-daemon
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Log in to Amazon ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Resolve immutable image
+        id: image
+        env:
+          ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          IMAGE_URI="${ECR_REGISTRY}/${ECR_REPOSITORY}:${GITHUB_SHA}"
+
+          # 태그를 직접 조회해 페이지네이션 오판을 피하고, 미존재와 AWS 오류를 구분합니다.
+          set +e
+          DESCRIBE_ERROR="$(mktemp)"
+          aws ecr describe-images \
+            --repository-name "$ECR_REPOSITORY" \
+            --image-ids "imageTag=${GITHUB_SHA}" \
+            > /dev/null 2> "$DESCRIBE_ERROR"
+          DESCRIBE_STATUS=$?
+          set -e
+
+          if [ "$DESCRIBE_STATUS" -eq 0 ]; then
+            echo "Immutable image already exists: ${IMAGE_URI}"
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          elif grep -q "ImageNotFoundException" "$DESCRIBE_ERROR"; then
+            echo "Immutable image does not exist yet: ${IMAGE_URI}"
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "::error::ECR 이미지 확인 중 권한 또는 통신 오류가 발생했습니다."
+            cat "$DESCRIBE_ERROR" >&2
+            rm -f "$DESCRIBE_ERROR"
+            exit "$DESCRIBE_STATUS"
+          fi
+
+          rm -f "$DESCRIBE_ERROR"
+          echo "uri=$IMAGE_URI" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        if: steps.image.outputs.exists != 'true'
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push immutable image
+        if: steps.image.outputs.exists != 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          platforms: linux/amd64
+          tags: ${{ steps.image.outputs.uri }}
+          cache-from: type=gha,scope=otboo-api
+          cache-to: type=gha,mode=max,scope=otboo-api
+
+      - name: Download current ECS task definition
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition "$ECS_TASK_DEFINITION" \
+            --query taskDefinition \
+            > task-definition.json
+
+      - name: Render image into task definition
+        id: render-task-definition
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: task-definition.json
+          container-name: ${{ env.ECS_CONTAINER_NAME }}
+          image: ${{ steps.image.outputs.uri }}
+
+      - name: Deploy task definition to ECS
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.render-task-definition.outputs.task-definition }}
+          service: ${{ env.ECS_SERVICE }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          wait-for-service-stability: true
