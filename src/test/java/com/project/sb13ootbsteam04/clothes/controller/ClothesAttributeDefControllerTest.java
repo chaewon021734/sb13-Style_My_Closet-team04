@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.same;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -411,5 +412,21 @@ class ClothesAttributeDefControllerTest {
 
     then(clothesAttributeDefMapper).shouldHaveNoInteractions();
     then(clothesAttributeDefService).shouldHaveNoInteractions();
+  }
+
+  @Test
+  @DisplayName("의상 속성 정의를 삭제하면 빈 본문과 204를 반환한다")
+  void 의상_속성_정의_삭제_성공() throws Exception {
+    // given
+    UUID definitionId = UUID.randomUUID();
+
+    // when & then
+    mockMvc.perform(delete("/api/clothes/attribute-defs/{definitionId}", definitionId))
+        .andExpect(status().isNoContent())
+        .andExpect(content().string(""));
+
+    then(clothesAttributeDefService).should().delete(definitionId);
+    then(clothesAttributeDefService).shouldHaveNoMoreInteractions();
+    then(clothesAttributeDefMapper).shouldHaveNoInteractions();
   }
 }
