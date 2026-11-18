@@ -138,7 +138,7 @@ public class ClothesAttributeDefServiceImpl implements ClothesAttributeDefServic
   @Override
   @Transactional
   public void delete(UUID definitionId) {
-    // 관리자 삭제와 동일한 정의를 사용하는 의상 등록을 직렬화한다.
+    // 삭제 대상 행을 잠금해 PostgreSQL FK 검사와 삭제 경합을 직렬화한다.
     ClothesAttributeDef definition = clothesAttributeDefRepository.findByIdForUpdate(definitionId)
         .orElseThrow(() -> new ClothesAttributeDefinitionNotFoundException(List.of(definitionId)));
     // 참조 속성을 먼저 제거해 FK 무결성을 유지한다.

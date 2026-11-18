@@ -15,7 +15,7 @@ public interface ClothesAttributeDefRepository extends JpaRepository<ClothesAttr
   // keywordLike 계약에 맞춰 대소문자를 구분하는 부분 일치 검색을 수행한다.
   List<ClothesAttributeDef> findByNameContaining(String keyword, Sort sort);
 
-  // 삭제 대상인 행을 잠금해 삭제 도중 다른 트랜잭션에서 동일한 정의를 참조하는 속성이 추가되지 못하도록 한다.
+  // 삭제 대상 행을 잠금해 PostgreSQL FK 검사와 삭제 경합을 직렬화한다.
   @Lock(LockModeType.PESSIMISTIC_WRITE)
   @Query("""
       select definition

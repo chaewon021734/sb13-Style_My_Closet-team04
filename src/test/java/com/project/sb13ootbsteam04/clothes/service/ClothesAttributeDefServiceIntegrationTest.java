@@ -95,16 +95,19 @@ class ClothesAttributeDefServiceIntegrationTest {
   }
 
   @Test
-  @DisplayName("속성 정의를 삭제하면 참조 속성은 제거하고 기존 의상은 유지한다")
+  @DisplayName("속성 정의를 삭제하면 해당 참조만 제거하고 의상과 다른 속성은 유지한다")
   void 삭제_참조_속성_정리() {
     // given
     User owner = userRepository.saveAndFlush(new User("테스터", "clothes-delete-" + UUID.randomUUID() + "@example.com", "encoded-password"));
+    ClothesAttributeDef sizeDefinition = clothesAttributeDefRepository.saveAndFlush(ClothesAttributeDef.create("사이즈", List.of("S", "M", "L")));
     Clothes clothes = Clothes.create(owner, "재킷", ClothesType.OUTER, null);
-    ClothesAttribute attribute = ClothesAttribute.create(clothes, existingDefinition, "블랙");
+    ClothesAttribute deletedAttribute = ClothesAttribute.create(clothes, existingDefinition, "블랙");
+    ClothesAttribute retainedAttribute = ClothesAttribute.create(clothes, sizeDefinition, "M");
     clothesRepository.saveAndFlush(clothes);
     UUID definitionId = existingDefinition.getId();
     UUID clothesId = clothes.getId();
-    UUID attributeId = attribute.getId();
+    UUID deletedAttributeId = deletedAttribute.getId();
+    UUID retainedAttributeId = retainedAttribute.getId();
     entityManager.clear();
 
     // when
@@ -115,8 +118,16 @@ class ClothesAttributeDefServiceIntegrationTest {
     // then
     assertAll(
         () -> assertThat(clothesAttributeDefRepository.existsById(definitionId)).isFalse(),
-        () -> assertThat(clothesAttributeRepository.existsById(attributeId)).isFalse(),
-        () -> assertThat(clothesRepository.existsById(clothesId)).isTrue()
+        () -> assertThat(clothesAttributeRepository.existsById(deletedAttributeId)).isFalse(),
+        () -> assertThat(clothesAttributeDefRepository.existsById(sizeDefinition.getId())).isTrue(),
+        () -> assertThat(clothesAttributeRepository.existsById(retainedAttributeId)).isTrue(),
+        () -> assertThat(clothesRepository.findById(clothesId))
+            .hasValueSatisfying(saved -> {
+              assertThat(saved.getName()).isEqualTo("재킷");
+              assertThat(saved.getType()).isEqualTo(ClothesType.OUTER);
+              assertThat(saved.getOwner().getId()).isEqualTo(owner.getId());
+              assertThat(saved.getAttributes()).extracting(ClothesAttribute::getId).containsExactly(retainedAttributeId);
+            })
     );
   }
 }
