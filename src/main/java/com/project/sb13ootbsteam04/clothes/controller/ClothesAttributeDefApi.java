@@ -119,4 +119,33 @@ public interface ClothesAttributeDefApi {
           content = @Content(schema = @Schema(implementation = ClothesAttributeDefUpdateRequest.class)))
       ClothesAttributeDefUpdateRequest request
   );
+
+  @Operation(
+      summary = "의상 속성 정의 삭제",
+      description = "의상 속성 정의 삭제 API")
+  @ApiResponses({
+      @ApiResponse(
+          responseCode = "204",
+          description = "의상 속성 정의 삭제 성공"),
+      @ApiResponse(
+          responseCode = "400",
+          description = "의상 속성 정의 삭제 실패",
+          content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
+      @ApiResponse(
+          responseCode = "404",
+          description = "존재하지 않는 의상 속성 정의",
+          content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
+      @ApiResponse(
+          responseCode = "500",
+          description = "서버 처리 실패",
+          content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
+  })
+  ResponseEntity<Void> delete(
+      @PathVariable
+      @Parameter(
+          description = "삭제할 의상 속성 정의 ID",
+          required = true,
+          schema = @Schema(type = "string", format = "uuid")
+      ) UUID definitionId
+  );
 }
