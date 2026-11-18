@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
+import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.same;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -424,6 +425,26 @@ class ClothesAttributeDefControllerTest {
     mockMvc.perform(delete("/api/clothes/attribute-defs/{definitionId}", definitionId))
         .andExpect(status().isNoContent())
         .andExpect(content().string(""));
+
+    then(clothesAttributeDefService).should().delete(definitionId);
+    then(clothesAttributeDefService).shouldHaveNoMoreInteractions();
+    then(clothesAttributeDefMapper).shouldHaveNoInteractions();
+  }
+
+  @Test
+  @DisplayName("존재하지 않는 의상 속성 정의를 삭제하면 오류 구조와 404를 반환한다")
+  void 의상_속성_정의_삭제_대상_없음() throws Exception {
+    // given
+    UUID definitionId = UUID.randomUUID();
+    willThrow(new ClothesAttributeDefinitionNotFoundException(List.of(definitionId)))
+        .given(clothesAttributeDefService).delete(definitionId);
+
+    // when & then
+    mockMvc.perform(delete("/api/clothes/attribute-defs/{definitionId}", definitionId))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.exceptionName").value("ClothesAttributeDefinitionNotFoundException"))
+        .andExpect(jsonPath("$.message").value("존재하지 않는 의상 속성 정의가 있습니다"))
+        .andExpect(jsonPath("$.details.definitionIds").value(definitionId.toString()));
 
     then(clothesAttributeDefService).should().delete(definitionId);
     then(clothesAttributeDefService).shouldHaveNoMoreInteractions();
