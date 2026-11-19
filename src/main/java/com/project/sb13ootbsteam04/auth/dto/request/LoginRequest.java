@@ -1,4 +1,4 @@
-package com.project.sb13ootbsteam04.auth.dto;
+package com.project.sb13ootbsteam04.auth.dto.request;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;

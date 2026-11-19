@@ -1,7 +1,7 @@
 package com.project.sb13ootbsteam04.auth.service;
 
-import com.project.sb13ootbsteam04.auth.dto.LoginRequest;
-import com.project.sb13ootbsteam04.auth.dto.LoginResponse;
+import com.project.sb13ootbsteam04.auth.dto.request.LoginRequest;
+import com.project.sb13ootbsteam04.auth.dto.response.LoginResponse;
 import com.project.sb13ootbsteam04.auth.jwt.JwtTokenProvider;
 import com.project.sb13ootbsteam04.user.entity.User;
 import com.project.sb13ootbsteam04.user.repository.UserRepository;

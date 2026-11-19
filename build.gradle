@@ -20,13 +20,13 @@ repositories {
 }
 
 dependencies {
+    // =========================
     // Spring Boot 기본
+    // =========================
+
     implementation 'org.springframework.boot:spring-boot-starter'
 
-    // HTTP API 및 외부 위치 API 호출
-    implementation 'org.springframework.boot:spring-boot-starter-webmvc'
-
-    // REST API 및 내장 Tomcat 웹 서버
+    // HTTP API 및 내장 Tomcat 웹 서버
     implementation 'org.springframework.boot:spring-boot-starter-webmvc'
 
     // Lombok
@@ -74,14 +74,26 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-security'
     implementation 'org.springframework.boot:spring-boot-starter-oauth2-resource-server'
 
+    // 임시 비밀번호 이메일 발송
+    implementation 'org.springframework.boot:spring-boot-starter-mail'
+
+    // =========================
+    // 데이터베이스
+    // =========================
+
     // PostgreSQL 데이터베이스
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
-    // 구조화된 PostgreSQL 오류 정보로 위반 제약조건을 식별한다.
+
+    // 구조화된 PostgreSQL 오류 정보로 위반 제약조건을 식별
     implementation 'org.postgresql:postgresql'
 
     // Flyway 데이터베이스 마이그레이션
     implementation 'org.springframework.boot:spring-boot-starter-flyway'
     runtimeOnly 'org.flywaydb:flyway-database-postgresql'
+
+    // =========================
+    // 캐시 및 메시징
+    // =========================
 
     // Redis 캐시
     implementation 'org.springframework.boot:spring-boot-starter-cache'
@@ -93,25 +105,46 @@ dependencies {
     // Elasticsearch 검색
     implementation 'org.springframework.boot:spring-boot-starter-data-elasticsearch'
 
+    // =========================
+    // 객체 매핑
+    // =========================
+
     // MapStruct
     implementation 'org.mapstruct:mapstruct:1.6.3'
     annotationProcessor 'org.mapstruct:mapstruct-processor:1.6.3'
     annotationProcessor 'org.projectlombok:lombok-mapstruct-binding:0.2.0'
 
+    // =========================
+    // 외부 서비스
+    // =========================
+
     // AWS S3 이미지 저장
     implementation platform('software.amazon.awssdk:bom:2.57.3')
     implementation 'software.amazon.awssdk:s3'
 
-    // Swagger
+    // Swagger API 문서
     implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.1.0'
 }
 
+// =========================
+// 테스트 설정
+// =========================
+
 tasks.named('test') {
     useJUnitPlatform()
-    inputs.property('postgresIntegrationTest',
-            providers.environmentVariable('OTBOO_POSTGRES_TEST').orElse('false'))
+
+    inputs.property(
+            'postgresIntegrationTest',
+            providers.environmentVariable('OTBOO_POSTGRES_TEST')
+                    .orElse('false')
+    )
+
     finalizedBy tasks.named('jacocoTestReport')
 }
+
+// =========================
+// JaCoCo 테스트 리포트
+// =========================
 
 tasks.named('jacocoTestReport') {
     dependsOn tasks.named('test')
@@ -123,8 +156,13 @@ tasks.named('jacocoTestReport') {
     }
 }
 
+// =========================
+// JaCoCo 커버리지 검증
+// =========================
+
 tasks.named('jacocoTestCoverageVerification') {
     dependsOn tasks.named('test')
+
     violationRules {
         rule {
             limit {

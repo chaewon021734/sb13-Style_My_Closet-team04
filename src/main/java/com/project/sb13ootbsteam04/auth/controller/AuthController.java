@@ -1,7 +1,7 @@
 package com.project.sb13ootbsteam04.auth.controller;
 
-import com.project.sb13ootbsteam04.auth.dto.LoginRequest;
-import com.project.sb13ootbsteam04.auth.dto.LoginResponse;
+import com.project.sb13ootbsteam04.auth.dto.request.LoginRequest;
+import com.project.sb13ootbsteam04.auth.dto.response.LoginResponse;
 import com.project.sb13ootbsteam04.auth.service.AuthService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
