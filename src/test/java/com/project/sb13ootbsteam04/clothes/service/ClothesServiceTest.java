@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.inOrder;
@@ -18,16 +19,22 @@ import com.project.sb13ootbsteam04.clothes.exception.InvalidClothesAttributeValu
 import com.project.sb13ootbsteam04.clothes.mapper.ClothesMapper;
 import com.project.sb13ootbsteam04.clothes.repository.ClothesAttributeDefRepository;
 import com.project.sb13ootbsteam04.clothes.repository.ClothesRepository;
+import com.project.sb13ootbsteam04.clothes.repository.dto.ClothesSearchCondition;
+import com.project.sb13ootbsteam04.clothes.repository.dto.ClothesSearchResult;
 import com.project.sb13ootbsteam04.clothes.service.dto.ClothesAttributeCommand;
+import com.project.sb13ootbsteam04.clothes.service.dto.ClothesAttributeResult;
 import com.project.sb13ootbsteam04.clothes.service.dto.ClothesCreateCommand;
+import com.project.sb13ootbsteam04.clothes.service.dto.ClothesCursorResult;
 import com.project.sb13ootbsteam04.clothes.service.dto.ClothesImageCommand;
 import com.project.sb13ootbsteam04.clothes.service.dto.ClothesResult;
+import com.project.sb13ootbsteam04.clothes.service.dto.ClothesSearchCommand;
 import com.project.sb13ootbsteam04.clothes.service.impl.ClothesServiceImpl;
 import com.project.sb13ootbsteam04.clothes.storage.ClothesImageStorage;
 import com.project.sb13ootbsteam04.clothes.storage.StoredImage;
 import com.project.sb13ootbsteam04.global.exception.ErrorCode;
 import com.project.sb13ootbsteam04.user.entity.User;
 import com.project.sb13ootbsteam04.user.repository.UserRepository;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -309,6 +316,81 @@ class ClothesServiceTest {
         () -> then(clothesImageStorage).should().upload(image),
         () -> then(clothesImageStorage).should().delete(storedImage.objectKey()),
         () -> then(clothesMapper).shouldHaveNoInteractions()
+    );
+  }
+
+
+  @Test
+  @DisplayName("커서 기반 페이징으로 의상을 조회할 수 있다")
+  void 의상_목록_조회_성공() {
+    // given
+    int limit = 2;
+    UUID firstClothesId = UUID.randomUUID();
+    UUID secondClothesId = UUID.randomUUID();
+    Instant firstCreatedAt = Instant.parse("2026-11-19T02:00:00Z");
+    Instant secondCreatedAt = Instant.parse("2026-11-19T01:00:00Z");
+    ClothesSearchCommand command = new ClothesSearchCommand(
+        null,
+        null,
+        limit,
+        ClothesType.DRESS,
+        ownerId
+    );
+    Clothes firstClothes = clothes(firstClothesId, "첫 번째 의상", firstCreatedAt);
+    Clothes secondClothes = clothes(secondClothesId, "두 번째 의상", secondCreatedAt);
+    ClothesAttributeResult attributeResult = new ClothesAttributeResult(
+        UUID.randomUUID(),
+        "색상",
+        List.of("블랙", "크림"),
+        "블랙"
+    );
+    ClothesResult firstResult = clothesResult(firstClothesId, "첫 번째 의상", attributeResult);
+    ClothesResult secondResult = clothesResult(secondClothesId, "두 번째 의상", attributeResult);
+    ClothesSearchResult searchResult = new ClothesSearchResult(
+        List.of(firstClothes, secondClothes),
+        true,
+        3
+    );
+    given(clothesRepository.search(any(ClothesSearchCondition.class))).willReturn(searchResult);
+    given(clothesMapper.toResult(firstClothes)).willReturn(firstResult);
+    given(clothesMapper.toResult(secondClothes)).willReturn(secondResult);
+
+    // when
+    ClothesCursorResult result = clothesService.search(command);
+
+    // then
+    then(clothesRepository).should()
+        .search(argThat(condition -> condition.cursor() == null
+                && condition.idAfter() == null
+                && condition.limit() == limit
+                && condition.typeEqual() == ClothesType.DRESS
+                && condition.ownerId().equals(ownerId)));
+    assertAll(
+        () -> assertThat(result.data()).containsExactly(firstResult, secondResult),
+        () -> assertThat(result.nextCursor()).isEqualTo(secondCreatedAt.toString()),
+        () -> assertThat(result.nextIdAfter()).isEqualTo(secondClothesId),
+        () -> assertThat(result.hasNext()).isTrue(),
+        () -> assertThat(result.totalCount()).isEqualTo(3),
+        () -> assertThat(result.sortBy()).isEqualTo("createdAt"),
+        () -> assertThat(result.sortDirection()).isEqualTo("DESCENDING")
+    );
+  }
+
+  private Clothes clothes(UUID id, String name, Instant createdAt) {
+    Clothes clothes = Clothes.create(owner, name, ClothesType.DRESS, null);
+    ReflectionTestUtils.setField(clothes, "id", id);
+    ReflectionTestUtils.setField(clothes, "createdAt", createdAt);
+    return clothes;
+  }
+
+  private ClothesResult clothesResult(UUID id, String name, ClothesAttributeResult attribute) {
+    return new ClothesResult(
+        id,
+        ownerId,
+        name,
+        null,
+        ClothesType.DRESS,
+        List.of(attribute)
     );
   }
 

@@ -13,7 +13,9 @@ import com.project.sb13ootbsteam04.clothes.repository.ClothesRepository;
 import com.project.sb13ootbsteam04.clothes.service.ClothesService;
 import com.project.sb13ootbsteam04.clothes.service.dto.ClothesAttributeCommand;
 import com.project.sb13ootbsteam04.clothes.service.dto.ClothesCreateCommand;
+import com.project.sb13ootbsteam04.clothes.service.dto.ClothesCursorResult;
 import com.project.sb13ootbsteam04.clothes.service.dto.ClothesResult;
+import com.project.sb13ootbsteam04.clothes.service.dto.ClothesSearchCommand;
 import com.project.sb13ootbsteam04.clothes.storage.ClothesImageStorage;
 import com.project.sb13ootbsteam04.clothes.storage.StoredImage;
 import com.project.sb13ootbsteam04.user.entity.User;
@@ -79,6 +81,11 @@ public class ClothesServiceImpl implements ClothesService {
       }
       throw exception;
     }
+  }
+
+  @Override
+  public ClothesCursorResult search(ClothesSearchCommand command) {
+    throw new UnsupportedOperationException("옷 목록 조회 기능은 아직 구현되지 않았습니다.");
   }
 
   private User findOwner(UUID ownerId) {
