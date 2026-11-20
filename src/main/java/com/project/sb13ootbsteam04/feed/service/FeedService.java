@@ -1,6 +1,7 @@
 
 package com.project.sb13ootbsteam04.feed.service;
 
+import com.project.sb13ootbsteam04.clothes.repository.ClothesRepository;
 import com.project.sb13ootbsteam04.feed.dto.CreateFeedRequest;
 import com.project.sb13ootbsteam04.feed.dto.FeedPageResponse;
 import com.project.sb13ootbsteam04.feed.dto.FeedResponse;
@@ -15,6 +16,7 @@ import com.project.sb13ootbsteam04.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,10 +36,16 @@ public class FeedService {
     private final CommentRepository commentRepository;
     private final UserRepository userRepository;
     private final FeedResponseService feedResponseService;
+    private final ClothesRepository clothesRepository;
 
-    // 피드 등록
+    // 피드 생성
     @Transactional
-    public UUID createFeed(CreateFeedRequest request) {
+    public UUID createFeed(
+            CreateFeedRequest request,
+            UUID currentUserId
+    ) {
+
+        validateCurrentUser(currentUserId);
 
         if (request == null) {
             throw new IllegalArgumentException(
@@ -48,6 +56,13 @@ public class FeedService {
         if (request.authorId() == null) {
             throw new IllegalArgumentException(
                     "작성자 ID는 필수입니다."
+            );
+        }
+
+        // 로그인 사용자와 작성자 일치 여부 확인
+        if (!currentUserId.equals(request.authorId())) {
+            throw new AccessDeniedException(
+                    "본인의 계정으로만 피드를 등록할 수 있습니다."
             );
         }
 
@@ -75,24 +90,41 @@ public class FeedService {
             );
         }
 
-        if (!userRepository.existsById(request.authorId())) {
+        if (!userRepository.existsById(currentUserId)) {
             throw new IllegalArgumentException(
-                    "존재하지 않는 사용자입니다: " + request.authorId()
+                    "존재하지 않는 사용자입니다: " + currentUserId
             );
         }
 
+        // 의상 ID 중복 제거
+        List<UUID> distinctClothesIds = request.clothesIds()
+                .stream()
+                .distinct()
+                .toList();
+
+        // 의상 ID가 실제 DB에 존재하는지 검증
+        if (clothesRepository.findAllById(distinctClothesIds).size()
+                != distinctClothesIds.size()) {
+            throw new IllegalArgumentException(
+                    "존재하지 않는 의상 ID가 포함되어 있습니다."
+            );
+        }
+
+        // 검증이 완료된 후 피드 저장
         Feed feed = new Feed(
-                request.authorId(),
+                currentUserId,
                 request.weatherId(),
                 request.content()
         );
 
         Feed savedFeed = feedRepository.save(feed);
 
-        List<FeedClothes> feedClothes = request.clothesIds()
+        // 피드와 의상 연결
+        List<FeedClothes> feedClothes = distinctClothesIds
                 .stream()
-                .distinct()
-                .map(clothesId -> new FeedClothes(savedFeed, clothesId))
+                .map(clothesId ->
+                        new FeedClothes(savedFeed, clothesId)
+                )
                 .toList();
 
         feedClothesRepository.saveAll(feedClothes);
@@ -104,8 +136,11 @@ public class FeedService {
     @Transactional
     public void updateFeed(
             UUID feedId,
-            UpdateFeedRequest request
+            UpdateFeedRequest request,
+            UUID currentUserId
     ) {
+
+        validateCurrentUser(currentUserId);
 
         Feed feed = feedRepository.findById(feedId)
                 .orElseThrow(() ->
@@ -113,6 +148,9 @@ public class FeedService {
                                 "존재하지 않는 피드입니다."
                         )
                 );
+
+        // 작성자 권한 검증
+        validateFeedOwner(feed, currentUserId);
 
         if (request == null
                 || request.content() == null
@@ -127,7 +165,12 @@ public class FeedService {
 
     // 피드 삭제
     @Transactional
-    public void deleteFeed(UUID feedId) {
+    public void deleteFeed(
+            UUID feedId,
+            UUID currentUserId
+    ) {
+
+        validateCurrentUser(currentUserId);
 
         Feed feed = feedRepository.findById(feedId)
                 .orElseThrow(() ->
@@ -136,6 +179,9 @@ public class FeedService {
                         )
                 );
 
+        // 작성자 권한 검증
+        validateFeedOwner(feed, currentUserId);
+
         feedClothesRepository.deleteByFeed_Id(feedId);
         feedLikeRepository.deleteAllByFeedId(feedId);
         commentRepository.deleteAllByFeedId(feedId);
@@ -143,7 +189,7 @@ public class FeedService {
         feedRepository.delete(feed);
     }
 
-    // 피드 목록 조회 - 오름차순 / 내림차순 지원
+    // 피드 목록 조회
     public FeedPageResponse getFeedPage(
             String cursor,
             UUID idAfter,
@@ -161,7 +207,7 @@ public class FeedService {
             );
         }
 
-        // 현재 지원하는 정렬 기준
+        // 정렬 기준 검증
         if (!"createdAt".equals(sortBy)) {
             throw new IllegalArgumentException(
                     "현재 지원하는 정렬 기준은 createdAt입니다."
@@ -187,13 +233,13 @@ public class FeedService {
             );
         }
 
-        // 키워드 검색 조건 정리
+        // 검색 키워드 정리
         String normalizedKeyword =
                 keywordLike == null || keywordLike.isBlank()
                         ? null
                         : keywordLike.trim();
 
-        // 다음 페이지 존재 여부 확인을 위해 limit + 1개 조회
+        // 다음 페이지 확인을 위해 limit + 1개 조회
         Pageable pageable = PageRequest.of(0, limit + 1);
 
         List<Feed> feeds;
@@ -217,7 +263,6 @@ public class FeedService {
 
         } else {
 
-            // 커서 문자열을 Instant로 변환
             Instant cursorTime;
 
             try {
@@ -229,7 +274,7 @@ public class FeedService {
                 );
             }
 
-            // 정렬 방향에 따라 다음 페이지 조회
+            // 다음 페이지 조회
             if (ascending) {
                 feeds = feedRepository.findNextFeedPageAscending(
                         authorIdEqual,
@@ -268,7 +313,7 @@ public class FeedService {
             nextIdAfter = lastFeed.getId();
         }
 
-        // 전체 피드 수 조회
+        // 전체 피드 개수
         long totalCount = feedRepository.countFeeds(
                 authorIdEqual,
                 normalizedKeyword
@@ -290,7 +335,7 @@ public class FeedService {
         );
     }
 
-    // 피드 ID로 응답 조회
+    // 피드 단건 조회
     public FeedResponse getFeedResponse(UUID feedId) {
 
         Feed feed = feedRepository.findById(feedId)
@@ -301,5 +346,28 @@ public class FeedService {
                 );
 
         return feedResponseService.toResponse(feed);
+    }
+
+    // 로그인 사용자 검증
+    private void validateCurrentUser(UUID currentUserId) {
+
+        if (currentUserId == null) {
+            throw new AccessDeniedException(
+                    "로그인이 필요합니다."
+            );
+        }
+    }
+
+    // 피드 작성자 권한 검증
+    private void validateFeedOwner(
+            Feed feed,
+            UUID currentUserId
+    ) {
+
+        if (!feed.getUserId().equals(currentUserId)) {
+            throw new AccessDeniedException(
+                    "본인이 작성한 피드만 수정하거나 삭제할 수 있습니다."
+            );
+        }
     }
 }
