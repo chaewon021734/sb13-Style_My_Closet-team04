@@ -10,6 +10,8 @@ import com.project.sb13ootbsteam04.clothes.exception.ClothesOwnerNotFoundExcepti
 import com.project.sb13ootbsteam04.clothes.mapper.ClothesMapper;
 import com.project.sb13ootbsteam04.clothes.repository.ClothesAttributeDefRepository;
 import com.project.sb13ootbsteam04.clothes.repository.ClothesRepository;
+import com.project.sb13ootbsteam04.clothes.repository.dto.ClothesSearchCondition;
+import com.project.sb13ootbsteam04.clothes.repository.dto.ClothesSearchResult;
 import com.project.sb13ootbsteam04.clothes.service.ClothesService;
 import com.project.sb13ootbsteam04.clothes.service.dto.ClothesAttributeCommand;
 import com.project.sb13ootbsteam04.clothes.service.dto.ClothesCreateCommand;
@@ -20,6 +22,8 @@ import com.project.sb13ootbsteam04.clothes.storage.ClothesImageStorage;
 import com.project.sb13ootbsteam04.clothes.storage.StoredImage;
 import com.project.sb13ootbsteam04.user.entity.User;
 import com.project.sb13ootbsteam04.user.repository.UserRepository;
+import java.time.Instant;
+import java.time.format.DateTimeParseException;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -29,12 +33,17 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionOperations;
 
 @Slf4j
 @RequiredArgsConstructor
 @Service
 public class ClothesServiceImpl implements ClothesService {
+
+  // 옷 목록 조회 API에 정렬 요청 파라미터가 없으므로 서비스가 고정된 조회 정책을 반환한다.
+  private static final String CLOTHES_SORT_BY = "createdAt";
+  private static final String CLOTHES_SORT_DIRECTION = "DESCENDING";
 
   private final UserRepository userRepository;
   private final ClothesRepository clothesRepository;
@@ -84,8 +93,46 @@ public class ClothesServiceImpl implements ClothesService {
   }
 
   @Override
+  @Transactional(readOnly = true)
   public ClothesCursorResult search(ClothesSearchCommand command) {
-    throw new UnsupportedOperationException("옷 목록 조회 기능은 아직 구현되지 않았습니다.");
+    ClothesSearchCondition condition = new ClothesSearchCondition(
+        parseCursor(command.cursor()),
+        command.idAfter(),
+        command.limit(),
+        command.typeEqual(),
+        command.ownerId()
+    );
+    ClothesSearchResult page = clothesRepository.search(condition);
+
+    List<ClothesResult> data = page.content().stream().map(clothesMapper::toResult).toList();
+
+    // 다음 페이지가 있을 때만 현재 페이지의 마지막 의상을 커서로 노출한다.
+    Clothes lastClothes = page.hasNext() && !page.content().isEmpty() ? page.content().get(page.content().size() - 1) : null;
+    String nextCursor = lastClothes == null ? null : lastClothes.getCreatedAt().toString();
+    UUID nextIdAfter = lastClothes == null ? null : lastClothes.getId();
+
+    return new ClothesCursorResult(
+        data,
+        nextCursor,
+        nextIdAfter,
+        page.hasNext(),
+        page.totalCount(),
+        CLOTHES_SORT_BY,
+        CLOTHES_SORT_DIRECTION
+    );
+  }
+
+  private Instant parseCursor(String cursor) {
+    // 첫 페이지 조회 시에는 커서가 없으므로 null을 반환한다.
+    if (cursor == null) {
+      return null;
+    }
+
+    try {
+      return Instant.parse(cursor);
+    } catch (DateTimeParseException exception) {
+      throw new IllegalArgumentException("cursor는 ISO-8601 날짜 형식이어야 합니다.", exception);
+    }
   }
 
   private User findOwner(UUID ownerId) {

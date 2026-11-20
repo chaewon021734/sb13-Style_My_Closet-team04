@@ -376,6 +376,57 @@ class ClothesServiceTest {
     );
   }
 
+  @Test
+  @DisplayName("마지막 옷 목록 페이지에는 다음 커서를 노출하지 않는다")
+  void 의상_목록_마지막_페이지_조회() {
+    // given
+    UUID clothesId = UUID.randomUUID();
+    ClothesSearchCommand command = new ClothesSearchCommand(
+        null,
+        null,
+        20,
+        null,
+        ownerId
+    );
+    Clothes clothes = clothes(clothesId, "마지막 의상", Instant.parse("2026-11-19T01:00:00Z"));
+    ClothesResult clothesResult = clothesResult(
+        clothesId,
+        "마지막 의상",
+        new ClothesAttributeResult(UUID.randomUUID(), "색상", List.of("블랙"), "블랙")
+    );
+    given(clothesRepository.search(any(ClothesSearchCondition.class))).willReturn(new ClothesSearchResult(List.of(clothes), false, 1));
+    given(clothesMapper.toResult(clothes)).willReturn(clothesResult);
+
+    // when
+    ClothesCursorResult result = clothesService.search(command);
+
+    // then
+    assertAll(
+        () -> assertThat(result.data()).containsExactly(clothesResult),
+        () -> assertThat(result.nextCursor()).isNull(),
+        () -> assertThat(result.nextIdAfter()).isNull(),
+        () -> assertThat(result.hasNext()).isFalse(),
+        () -> assertThat(result.totalCount()).isEqualTo(1)
+    );
+  }
+
+  @Test
+  @DisplayName("옷 목록 조회 커서 형식이 올바르지 않으면 저장소를 호출하지 않는다")
+  void 의상_목록_조회_커서_형식_오류() {
+    // given
+    ClothesSearchCommand command = new ClothesSearchCommand(
+        "invalid-cursor",
+        UUID.randomUUID(),
+        20,
+        null,
+        ownerId
+    );
+
+    // when & then
+    assertThatThrownBy(() -> clothesService.search(command)).isInstanceOf(IllegalArgumentException.class).hasMessage("cursor는 ISO-8601 날짜 형식이어야 합니다.");
+    then(clothesRepository).shouldHaveNoInteractions();
+  }
+
   private Clothes clothes(UUID id, String name, Instant createdAt) {
     Clothes clothes = Clothes.create(owner, name, ClothesType.DRESS, null);
     ReflectionTestUtils.setField(clothes, "id", id);
