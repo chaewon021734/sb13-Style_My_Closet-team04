@@ -14,6 +14,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.LockedException;
 
@@ -38,8 +39,6 @@ public class GlobalExceptionHandler {
     // ========================================
 
     // 이메일 중복 요청 → 409 Conflict
-
-    // 이메일 중복 요청 → 409 Conflict
     @ExceptionHandler(DuplicateEmailException.class)
     public ResponseEntity<ApiErrorResponse> handleDuplicateEmail(
             DuplicateEmailException exception
@@ -54,7 +53,6 @@ public class GlobalExceptionHandler {
                         Map.of()
                 ));
     }
-
 
     // ========================================
     // JWT 로그인 예외 처리
@@ -88,6 +86,26 @@ public class GlobalExceptionHandler {
                 .body(new ApiErrorResponse(
                         exception.getClass().getSimpleName(),
                         "잠긴 계정입니다.",
+                        Map.of()
+                ));
+    }
+
+    // ========================================
+    // 접근 권한 예외 처리
+    // ========================================
+
+    // 접근 권한 부족 → 403 Forbidden
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ApiErrorResponse> handleAccessDenied(
+            AccessDeniedException exception
+    ) {
+        log.warn("접근 권한이 없는 요청이 발생했습니다.");
+
+        return ResponseEntity
+                .status(HttpStatus.FORBIDDEN)
+                .body(new ApiErrorResponse(
+                        exception.getClass().getSimpleName(),
+                        "접근 권한이 없습니다.",
                         Map.of()
                 ));
     }
