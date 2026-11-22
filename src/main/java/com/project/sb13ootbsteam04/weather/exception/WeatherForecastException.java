@@ -8,6 +8,10 @@ import java.util.Map;
 public final class WeatherForecastException extends OtbooException {
 
     public WeatherForecastException(ErrorCode errorCode, String reason) {
-        super(errorCode, Map.of("reason", reason));
+        this(errorCode, reason, null);
+    }
+
+    public WeatherForecastException(ErrorCode errorCode, String reason, Throwable cause) {
+        super(errorCode, Map.of("reason", reason), cause);
     }
 }

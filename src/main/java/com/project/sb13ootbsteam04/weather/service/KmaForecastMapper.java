@@ -100,7 +100,8 @@ class KmaForecastMapper {
         try {
             return LocalDateTime.parse(date + time, TIMESTAMP);
         } catch (DateTimeException exception) {
-            throw invalid("예보 날짜 또는 시각이 올바르지 않습니다.");
+            throw new WeatherForecastException(WEATHER_FORECAST_RESPONSE_INVALID,
+                    "예보 날짜 또는 시각이 올바르지 않습니다.", exception);
         }
     }
 
@@ -124,7 +125,8 @@ class KmaForecastMapper {
                 return value;
             }
         } catch (NumberFormatException exception) {
-            throw invalid("예보 항목이 숫자가 아닙니다. 항목: " + category);
+            throw new WeatherForecastException(WEATHER_FORECAST_RESPONSE_INVALID,
+                    "예보 항목이 숫자가 아닙니다. 항목: " + category, exception);
         }
         throw invalid("예보 항목의 값이 범위를 벗어났습니다. 항목: " + category);
     }
