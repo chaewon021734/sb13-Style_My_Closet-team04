@@ -9,7 +9,6 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
-
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.web.SecurityFilterChain;
 
@@ -40,34 +39,30 @@ public class SecurityConfig {
                         .requestMatchers("/error")
                         .permitAll()
 
-                        // 회원가입 허용
+                        // 회원가입은 인증 없이 허용
                         .requestMatchers(
                                 HttpMethod.POST,
                                 "/api/users"
                         ).permitAll()
 
-                        // 로그인 허용
+                        // 로그인은 인증 없이 허용
                         .requestMatchers(
                                 HttpMethod.POST,
                                 "/api/auth/login"
                         ).permitAll()
 
-                        // 비밀번호 재설정 API
-                        // 임시 비밀번호 인증 및 일반 인증 사용자 허용
+                        // 임시 비밀번호 인증 사용자만
+                        // 비밀번호 재설정 API 접근 가능
                         .requestMatchers(
                                 HttpMethod.PATCH,
                                 "/api/auth/password"
-                        ).hasAnyRole(
-                                "PASSWORD_RESET",
-                                "USER",
-                                "ADMIN"
-                        )
+                        ).hasRole("PASSWORD_RESET")
 
-                        // 관리자 API는 ADMIN만 접근
+                        // 관리자 API는 ADMIN 권한만 허용
                         .requestMatchers("/api/admin/**")
                         .hasRole("ADMIN")
 
-                        // 그 외 API는 일반 로그인 사용자만 접근
+                        // 그 외 API는 일반 로그인 사용자만 접근 가능
                         // 임시 비밀번호 인증 사용자는 접근 불가
                         .anyRequest()
                         .hasAnyRole("USER", "ADMIN")
@@ -85,7 +80,8 @@ public class SecurityConfig {
         return http.build();
     }
 
-    // JWT 정보를 Spring Security 권한으로 변환
+    // JWT의 인증 유형과 사용자 역할을
+    // Spring Security 권한으로 변환
     @Bean
     public JwtAuthenticationConverter jwtAuthenticationConverter() {
 
@@ -96,7 +92,7 @@ public class SecurityConfig {
 
             String authType = jwt.getClaimAsString("authType");
 
-            // 임시 비밀번호로 인증한 사용자는
+            // 임시 비밀번호 로그인
             // 비밀번호 재설정 권한만 부여
             if ("TEMPORARY".equals(authType)) {
 
@@ -107,13 +103,13 @@ public class SecurityConfig {
                 );
             }
 
-            // 알 수 없는 인증 유형은 권한 부여하지 않음
+            // 허용되지 않은 인증 유형은 권한 부여하지 않음
             if (authType != null
                     && !"NORMAL".equals(authType)) {
                 return List.of();
             }
 
-            // 일반 로그인 JWT의 사용자 권한 확인
+            // 일반 로그인 사용자 역할 확인
             String role = jwt.getClaimAsString("role");
 
             if ("USER".equals(role)) {

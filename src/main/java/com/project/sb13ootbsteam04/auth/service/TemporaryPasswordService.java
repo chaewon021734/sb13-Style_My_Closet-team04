@@ -11,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -22,38 +23,53 @@ public class TemporaryPasswordService {
     private final PasswordEncoder passwordEncoder;
     private final TemporaryPasswordGenerator passwordGenerator;
 
+    // 이메일 발송 Service 추가
+    private final TemporaryPasswordMailService mailService;
+
     @Transactional
-    public String issueTemporaryPassword(String email) {
+    public void issueTemporaryPassword(String email) {
 
         // 1. 사용자 조회 및 비관적 쓰기 락 획득
-        User user = userRepository.findByEmailForUpdate(email)
-                .orElseThrow(() ->
-                        new IllegalArgumentException(
-                                "존재하지 않는 사용자입니다."
-                        )
-                );
+        Optional<User> userOptional =
+                userRepository.findByEmailForUpdate(email);
 
-        // 2. 임시 비밀번호 생성
-        String temporaryPassword =
-                passwordGenerator.generate();
+        // 2. 등록되지 않은 이메일은 발급하지 않음
+        // 외부 API에서는 등록 여부와 관계없이 동일하게 응답 예정
+        if (userOptional.isEmpty()) {
+            return;
+        }
 
-        // 3. 임시 비밀번호 암호화
+        User user = userOptional.get();
+
+        // 3. 잠긴 계정은 발급하지 않음
+        if (user.isLocked()) {
+            return;
+        }
+
+        // 4. 임시 비밀번호 생성
+        String temporaryPassword = passwordGenerator.generate();
+
+        // 5. 임시 비밀번호 암호화
         String encodedPassword =
                 passwordEncoder.encode(temporaryPassword);
 
-        // 4. 만료 시간 설정 (현재 시각 + 3분)
+        // 6. 만료 시간 설정
         Instant expiresAt = Instant.now()
                 .plus(EXPIRATION_MINUTES, ChronoUnit.MINUTES);
 
-        // 5. 암호화된 임시 비밀번호 및 만료 시간 저장
-        // User 내부에서 loginVersion도 1 증가
+        // 7. 암호화된 비밀번호와 만료 시간 저장
+        // 기존 JWT 무효화를 위해 loginVersion 증가
         user.issueTemporaryPassword(
                 encodedPassword,
                 expiresAt
         );
 
-        // 6. 현재는 내부 테스트용으로 평문 반환
-        // 실제 API 응답에는 노출하지 않아야 함
-        return temporaryPassword;
+        // 8. 등록된 이메일로 임시 비밀번호 발송
+        mailService.sendTemporaryPassword(
+                user.getEmail(),
+                temporaryPassword
+        );
+
+        // 평문 임시 비밀번호는 반환하지 않음
     }
 }

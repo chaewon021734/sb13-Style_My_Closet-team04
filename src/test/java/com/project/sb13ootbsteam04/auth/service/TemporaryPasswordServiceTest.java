@@ -11,6 +11,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import org.springframework.mail.MailSendException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.Instant;
@@ -31,88 +32,92 @@ class TemporaryPasswordServiceTest {
     @Mock
     private TemporaryPasswordGenerator passwordGenerator;
 
+    @Mock
+    private TemporaryPasswordMailService mailService;
+
     @InjectMocks
     private TemporaryPasswordService temporaryPasswordService;
 
     private User user;
 
+    private static final String EMAIL = "test@example.com";
+    private static final String TEMP_PASSWORD = "Temp1234!abc";
+    private static final String ENCODED_PASSWORD =
+            "encodedTemporaryPassword";
+
     @BeforeEach
     void setUp() {
-
         user = new User(
                 "테스트사용자",
-                "test@example.com",
+                EMAIL,
                 "encodedOriginalPassword"
         );
     }
 
     // ========================================
-    // 1. 정상 사용자에게 임시 비밀번호 발급
+    // 공통 Mock 설정
     // ========================================
 
-    @Test
-    void shouldIssueTemporaryPassword() {
+    private void mockSuccessfulIssue() {
 
-        // given
-        when(userRepository.findByEmailForUpdate("test@example.com"))
+        when(userRepository.findByEmailForUpdate(EMAIL))
                 .thenReturn(Optional.of(user));
 
         when(passwordGenerator.generate())
-                .thenReturn("Temp1234!abc");
+                .thenReturn(TEMP_PASSWORD);
 
-        when(passwordEncoder.encode("Temp1234!abc"))
-                .thenReturn("encodedTemporaryPassword");
+        when(passwordEncoder.encode(TEMP_PASSWORD))
+                .thenReturn(ENCODED_PASSWORD);
+    }
+
+    // ========================================
+    // 1. 정상 발급 및 이메일 전송
+    // ========================================
+
+    @Test
+    void shouldIssueTemporaryPasswordAndSendEmail() {
+
+        // given
+        mockSuccessfulIssue();
 
         // when
-        String result = temporaryPasswordService
-                .issueTemporaryPassword("test@example.com");
+        temporaryPasswordService.issueTemporaryPassword(EMAIL);
 
         // then
-        assertEquals("Temp1234!abc", result);
-
         assertEquals(
-                "encodedTemporaryPassword",
+                ENCODED_PASSWORD,
                 user.getTemporaryPasswordHash()
         );
 
-        // 기존 비밀번호는 변경되지 않아야 함
+        // 기존 비밀번호는 유지
         assertEquals(
                 "encodedOriginalPassword",
                 user.getPassword()
         );
 
-        verify(userRepository)
-                .findByEmailForUpdate("test@example.com");
+        // 최초 발급 시 로그인 버전 증가
+        assertEquals(1L, user.getLoginVersion());
 
-        verify(passwordGenerator).generate();
-
-        verify(passwordEncoder)
-                .encode("Temp1234!abc");
+        verify(mailService).sendTemporaryPassword(
+                EMAIL,
+                TEMP_PASSWORD
+        );
     }
 
     // ========================================
-    // 2. 임시 비밀번호 만료 시간이 3분인지 확인
+    // 2. 임시 비밀번호 3분 만료 시간 확인
     // ========================================
 
     @Test
     void shouldExpireTemporaryPasswordAfterThreeMinutes() {
 
         // given
-        when(userRepository.findByEmailForUpdate("test@example.com"))
-                .thenReturn(Optional.of(user));
-
-        when(passwordGenerator.generate())
-                .thenReturn("Temp1234!abc");
-
-        when(passwordEncoder.encode("Temp1234!abc"))
-                .thenReturn("encodedTemporaryPassword");
+        mockSuccessfulIssue();
 
         Instant before = Instant.now();
 
         // when
-        temporaryPasswordService.issueTemporaryPassword(
-                "test@example.com"
-        );
+        temporaryPasswordService.issueTemporaryPassword(EMAIL);
 
         Instant after = Instant.now();
 
@@ -122,62 +127,82 @@ class TemporaryPasswordServiceTest {
 
         assertNotNull(expiresAt);
 
-        // 서비스 호출 시작 시각 + 180초 이상
         assertFalse(
                 expiresAt.isBefore(before.plusSeconds(180))
         );
 
-        // 서비스 호출 종료 시각 + 180초 이하
         assertFalse(
                 expiresAt.isAfter(after.plusSeconds(180))
         );
 
-        // 발급 직후에는 임시 비밀번호가 유효해야 함
-        assertTrue(
-                user.isTemporaryPasswordActive(Instant.now())
+        verify(mailService).sendTemporaryPassword(
+                EMAIL,
+                TEMP_PASSWORD
         );
     }
 
     // ========================================
-    // 3. 존재하지 않는 사용자 발급 차단
+    // 3. 존재하지 않는 사용자에게 발급하지 않음
     // ========================================
 
     @Test
-    void shouldRejectUnknownUser() {
+    void shouldNotIssuePasswordForUnknownEmail() {
 
         // given
         when(userRepository.findByEmailForUpdate("unknown@example.com"))
                 .thenReturn(Optional.empty());
 
         // when
-        IllegalArgumentException exception = assertThrows(
-                IllegalArgumentException.class,
-                () -> temporaryPasswordService
-                        .issueTemporaryPassword("unknown@example.com")
+        assertDoesNotThrow(() ->
+                temporaryPasswordService.issueTemporaryPassword(
+                        "unknown@example.com"
+                )
         );
 
         // then
-        assertEquals(
-                "존재하지 않는 사용자입니다.",
-                exception.getMessage()
-        );
-
-        // 사용자가 없으므로 비밀번호 생성 및 암호화를 수행하지 않음
         verifyNoInteractions(
+                passwordGenerator,
                 passwordEncoder,
-                passwordGenerator
+                mailService
         );
-
-        verify(userRepository)
-                .findByEmailForUpdate("unknown@example.com");
     }
 
     // ========================================
-    // 4. 재발급 시 이전 임시 비밀번호 교체
+    // 4. 잠긴 계정에 발급하지 않음
     // ========================================
 
     @Test
-    void shouldReplacePreviousTemporaryPassword() {
+    void shouldNotIssuePasswordForLockedAccount() {
+
+        // given
+        user.changeLocked(true);
+
+        when(userRepository.findByEmailForUpdate(EMAIL))
+                .thenReturn(Optional.of(user));
+
+        // when
+        assertDoesNotThrow(() ->
+                temporaryPasswordService.issueTemporaryPassword(EMAIL)
+        );
+
+        // then
+        assertNull(user.getTemporaryPasswordHash());
+
+        assertEquals(0L, user.getLoginVersion());
+
+        verifyNoInteractions(
+                passwordGenerator,
+                passwordEncoder,
+                mailService
+        );
+    }
+
+    // ========================================
+    // 5. 재발급 시 이전 비밀번호 교체 및 JWT 무효화
+    // ========================================
+
+    @Test
+    void shouldReplacePreviousPasswordAndIncreaseVersion() {
 
         // given
         user.issueTemporaryPassword(
@@ -185,96 +210,58 @@ class TemporaryPasswordServiceTest {
                 Instant.now().plusSeconds(60)
         );
 
-        // 최초 발급으로 로그인 버전 1
         assertEquals(1L, user.getLoginVersion());
 
-        when(userRepository.findByEmailForUpdate("test@example.com"))
-                .thenReturn(Optional.of(user));
-
-        when(passwordGenerator.generate())
-                .thenReturn("NewTemp123!");
-
-        when(passwordEncoder.encode("NewTemp123!"))
-                .thenReturn("newEncodedPassword");
+        mockSuccessfulIssue();
 
         // when
-        temporaryPasswordService.issueTemporaryPassword(
-                "test@example.com"
-        );
+        temporaryPasswordService.issueTemporaryPassword(EMAIL);
 
         // then
         assertEquals(
-                "newEncodedPassword",
+                ENCODED_PASSWORD,
                 user.getTemporaryPasswordHash()
         );
 
-        assertNotNull(
-                user.getTemporaryPasswordExpiresAt()
-        );
-
-        // 기존 비밀번호는 그대로 유지
-        assertEquals(
-                "encodedOriginalPassword",
-                user.getPassword()
-        );
-
-        // 재발급 시 로그인 버전이 한 번 더 증가해야 함
+        // 재발급 시 버전 추가 증가
         assertEquals(2L, user.getLoginVersion());
 
-        verify(userRepository)
-                .findByEmailForUpdate("test@example.com");
-
-        verify(passwordEncoder)
-                .encode("NewTemp123!");
+        verify(mailService).sendTemporaryPassword(
+                EMAIL,
+                TEMP_PASSWORD
+        );
     }
 
     // ========================================
-    // 5. 최초 발급 시 로그인 버전 증가
+    // 6. 이메일 발송 실패 시 예외 전달
     // ========================================
 
     @Test
-    void shouldIncreaseLoginVersionWhenTemporaryPasswordIssued() {
+    void shouldPropagateMailSendException() {
 
         // given
-        when(userRepository.findByEmailForUpdate("test@example.com"))
-                .thenReturn(Optional.of(user));
+        mockSuccessfulIssue();
 
-        when(passwordGenerator.generate())
-                .thenReturn("Temp1234!abc");
-
-        when(passwordEncoder.encode("Temp1234!abc"))
-                .thenReturn("encodedTemporaryPassword");
-
-        long previousVersion = user.getLoginVersion();
-
-        assertEquals(0L, previousVersion);
+        doThrow(new MailSendException("SMTP 발송 실패"))
+                .when(mailService)
+                .sendTemporaryPassword(EMAIL, TEMP_PASSWORD);
 
         // when
-        temporaryPasswordService.issueTemporaryPassword(
-                "test@example.com"
+        MailSendException exception = assertThrows(
+                MailSendException.class,
+                () -> temporaryPasswordService
+                        .issueTemporaryPassword(EMAIL)
         );
 
         // then
         assertEquals(
-                previousVersion + 1,
-                user.getLoginVersion()
+                "SMTP 발송 실패",
+                exception.getMessage()
         );
 
-        assertEquals(
-                "encodedTemporaryPassword",
-                user.getTemporaryPasswordHash()
+        verify(mailService).sendTemporaryPassword(
+                EMAIL,
+                TEMP_PASSWORD
         );
-
-        assertNotNull(
-                user.getTemporaryPasswordExpiresAt()
-        );
-
-        verify(userRepository)
-                .findByEmailForUpdate("test@example.com");
-
-        verify(passwordGenerator).generate();
-
-        verify(passwordEncoder)
-                .encode("Temp1234!abc");
     }
 }
