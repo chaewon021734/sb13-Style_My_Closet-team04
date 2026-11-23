@@ -25,10 +25,10 @@ public class SecurityConfig {
     ) throws Exception {
 
         http
-                // JWT를 사용하는 REST API이므로 현재는 CSRF 비활성화
+                // JWT REST API - 현재 CSRF 비활성화
                 .csrf(csrf -> csrf.disable())
 
-                // HTTP 세션을 생성하지 않는 무상태 인증
+                // 세션을 생성하지 않는 JWT 인증
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
@@ -37,29 +37,43 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
 
                         // 오류 경로 허용
-                        .requestMatchers("/error").permitAll()
+                        .requestMatchers("/error")
+                        .permitAll()
 
-                        // 회원가입은 인증 없이 허용
+                        // 회원가입 허용
                         .requestMatchers(
                                 HttpMethod.POST,
                                 "/api/users"
                         ).permitAll()
 
-                        // 로그인은 인증 없이 허용
+                        // 로그인 허용
                         .requestMatchers(
                                 HttpMethod.POST,
                                 "/api/auth/login"
                         ).permitAll()
 
-                        // 관리자 API는 ADMIN 권한만 접근 가능
+                        // 비밀번호 재설정 API
+                        // 임시 비밀번호 인증 및 일반 인증 사용자 허용
+                        .requestMatchers(
+                                HttpMethod.PATCH,
+                                "/api/auth/password"
+                        ).hasAnyRole(
+                                "PASSWORD_RESET",
+                                "USER",
+                                "ADMIN"
+                        )
+
+                        // 관리자 API는 ADMIN만 접근
                         .requestMatchers("/api/admin/**")
                         .hasRole("ADMIN")
 
-                        // 나머지 API는 JWT 인증 필수
-                        .anyRequest().authenticated()
+                        // 그 외 API는 일반 로그인 사용자만 접근
+                        // 임시 비밀번호 인증 사용자는 접근 불가
+                        .anyRequest()
+                        .hasAnyRole("USER", "ADMIN")
                 )
 
-                // JWT Bearer Token 인증 활성화
+                // JWT Bearer Token 인증
                 .oauth2ResourceServer(oauth2 -> oauth2
                         .jwt(jwt -> jwt
                                 .jwtAuthenticationConverter(
@@ -71,7 +85,7 @@ public class SecurityConfig {
         return http.build();
     }
 
-    // JWT의 role 클레임을 Spring Security 권한으로 변환
+    // JWT 정보를 Spring Security 권한으로 변환
     @Bean
     public JwtAuthenticationConverter jwtAuthenticationConverter() {
 
@@ -80,19 +94,42 @@ public class SecurityConfig {
 
         converter.setJwtGrantedAuthoritiesConverter(jwt -> {
 
-            // JWT에서 role 값 가져오기
-            String role = jwt.getClaimAsString("role");
+            String authType = jwt.getClaimAsString("authType");
 
-            // role이 없거나 비어 있으면 권한 부여하지 않음
-            if (role == null || role.isBlank()) {
+            // 임시 비밀번호로 인증한 사용자는
+            // 비밀번호 재설정 권한만 부여
+            if ("TEMPORARY".equals(authType)) {
+
+                return List.of(
+                        new SimpleGrantedAuthority(
+                                "ROLE_PASSWORD_RESET"
+                        )
+                );
+            }
+
+            // 알 수 없는 인증 유형은 권한 부여하지 않음
+            if (authType != null
+                    && !"NORMAL".equals(authType)) {
                 return List.of();
             }
 
-            // USER -> ROLE_USER
-            // ADMIN -> ROLE_ADMIN
-            return List.of(
-                    new SimpleGrantedAuthority("ROLE_" + role)
-            );
+            // 일반 로그인 JWT의 사용자 권한 확인
+            String role = jwt.getClaimAsString("role");
+
+            if ("USER".equals(role)) {
+                return List.of(
+                        new SimpleGrantedAuthority("ROLE_USER")
+                );
+            }
+
+            if ("ADMIN".equals(role)) {
+                return List.of(
+                        new SimpleGrantedAuthority("ROLE_ADMIN")
+                );
+            }
+
+            // 유효하지 않은 역할은 권한 없음
+            return List.of();
         });
 
         return converter;

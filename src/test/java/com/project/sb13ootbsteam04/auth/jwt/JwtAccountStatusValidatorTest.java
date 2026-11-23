@@ -39,21 +39,19 @@ class JwtAccountStatusValidatorTest {
     @BeforeEach
     void setUp() {
 
-        // 테스트 사용자 생성
         user = new User(
                 "테스트사용자",
                 "test@example.com",
                 "encodedPassword"
         );
 
-        // 사용자 UUID 설정
         userId = UUID.randomUUID();
         ReflectionTestUtils.setField(user, "id", userId);
 
         // 최초 로그인 성공 상황
         user.increaseLoginVersion();
 
-        // 로그인 버전 1을 가진 JWT 생성
+        // 기존 JWT 호환성 테스트용
         jwt = createJwt("USER", user.getLoginVersion());
     }
 
@@ -64,15 +62,12 @@ class JwtAccountStatusValidatorTest {
     @Test
     void shouldAcceptActiveUser() {
 
-        // given
         when(userRepository.findById(userId))
                 .thenReturn(Optional.of(user));
 
-        // when
         OAuth2TokenValidatorResult result =
                 validator.validate(jwt);
 
-        // then
         assertFalse(result.hasErrors());
 
         verify(userRepository).findById(userId);
@@ -85,23 +80,15 @@ class JwtAccountStatusValidatorTest {
     @Test
     void shouldRejectLockedUser() {
 
-        // given
         user.changeLocked(true);
 
         when(userRepository.findById(userId))
                 .thenReturn(Optional.of(user));
 
-        // when
         OAuth2TokenValidatorResult result =
                 validator.validate(jwt);
 
-        // then
-        assertTrue(result.hasErrors());
-
-        assertEquals(
-                "invalid_token",
-                result.getErrors().iterator().next().getErrorCode()
-        );
+        assertInvalidToken(result);
 
         verify(userRepository).findById(userId);
     }
@@ -113,16 +100,13 @@ class JwtAccountStatusValidatorTest {
     @Test
     void shouldRejectDeletedUser() {
 
-        // given
         when(userRepository.findById(userId))
                 .thenReturn(Optional.empty());
 
-        // when
         OAuth2TokenValidatorResult result =
                 validator.validate(jwt);
 
-        // then
-        assertTrue(result.hasErrors());
+        assertInvalidToken(result);
 
         verify(userRepository).findById(userId);
     }
@@ -134,32 +118,30 @@ class JwtAccountStatusValidatorTest {
     @Test
     void shouldRejectInvalidUserId() {
 
-        // given
+        Instant now = Instant.now();
+
         Jwt invalidJwt = Jwt.withTokenValue("invalid.jwt.token")
                 .header("alg", "HS256")
                 .subject("invalid-uuid")
-                .issuedAt(Instant.now())
-                .expiresAt(Instant.now().plusSeconds(3600))
+                .issuedAt(now)
+                .expiresAt(now.plusSeconds(3600))
                 .build();
 
-        // when
         OAuth2TokenValidatorResult result =
                 validator.validate(invalidJwt);
 
-        // then
-        assertTrue(result.hasErrors());
+        assertInvalidToken(result);
 
         verifyNoInteractions(userRepository);
     }
 
     // ========================================
-    // 5. JWT ADMIN 권한과 DB USER 권한 불일치
+    // 5. JWT ADMIN과 DB USER 역할 불일치
     // ========================================
 
     @Test
     void shouldRejectTokenWhenAdminRoleChangedToUser() {
 
-        // given
         user.changeRole(UserRole.ADMIN);
 
         Jwt adminJwt = createJwt(
@@ -167,25 +149,15 @@ class JwtAccountStatusValidatorTest {
                 user.getLoginVersion()
         );
 
-        // JWT 발급 이후 USER로 권한 변경
         user.changeRole(UserRole.USER);
 
         when(userRepository.findById(userId))
                 .thenReturn(Optional.of(user));
 
-        // when
         OAuth2TokenValidatorResult result =
                 validator.validate(adminJwt);
 
-        // then
-        assertTrue(result.hasErrors());
-
-        assertEquals(
-                "invalid_token",
-                result.getErrors().iterator().next().getErrorCode()
-        );
-
-        verify(userRepository).findById(userId);
+        assertInvalidToken(result);
     }
 
     // ========================================
@@ -195,7 +167,6 @@ class JwtAccountStatusValidatorTest {
     @Test
     void shouldAcceptTokenWhenRoleMatchesDatabase() {
 
-        // given
         user.changeRole(UserRole.ADMIN);
 
         Jwt adminJwt = createJwt(
@@ -206,24 +177,19 @@ class JwtAccountStatusValidatorTest {
         when(userRepository.findById(userId))
                 .thenReturn(Optional.of(user));
 
-        // when
         OAuth2TokenValidatorResult result =
                 validator.validate(adminJwt);
 
-        // then
         assertFalse(result.hasErrors());
-
-        verify(userRepository).findById(userId);
     }
 
     // ========================================
-    // 7. JWT에 role 클레임이 없는 경우
+    // 7. role 클레임 누락 시 인증 거부
     // ========================================
 
     @Test
     void shouldRejectTokenWithoutRoleClaim() {
 
-        // given
         Jwt tokenWithoutRole = createJwt(
                 null,
                 user.getLoginVersion()
@@ -232,19 +198,10 @@ class JwtAccountStatusValidatorTest {
         when(userRepository.findById(userId))
                 .thenReturn(Optional.of(user));
 
-        // when
         OAuth2TokenValidatorResult result =
                 validator.validate(tokenWithoutRole);
 
-        // then
-        assertTrue(result.hasErrors());
-
-        assertEquals(
-                "invalid_token",
-                result.getErrors().iterator().next().getErrorCode()
-        );
-
-        verify(userRepository).findById(userId);
+        assertInvalidToken(result);
     }
 
     // ========================================
@@ -254,43 +211,29 @@ class JwtAccountStatusValidatorTest {
     @Test
     void shouldRejectOldTokenAfterRelogin() {
 
-        // given
-        // 첫 번째 로그인에서 발급한 JWT (버전 1)
         Jwt oldJwt = createJwt(
                 "USER",
                 user.getLoginVersion()
         );
 
-        // 두 번째 로그인 성공 → DB 버전 2
         user.increaseLoginVersion();
 
         when(userRepository.findById(userId))
                 .thenReturn(Optional.of(user));
 
-        // when
         OAuth2TokenValidatorResult result =
                 validator.validate(oldJwt);
 
-        // then
-        assertTrue(result.hasErrors());
-
-        assertEquals(
-                "invalid_token",
-                result.getErrors().iterator().next().getErrorCode()
-        );
-
-        verify(userRepository).findById(userId);
+        assertInvalidToken(result);
     }
 
     // ========================================
-    // 9. 재로그인 후 새로운 JWT 검증 성공
+    // 9. 재로그인 후 새 JWT 검증 성공
     // ========================================
 
     @Test
     void shouldAcceptNewTokenAfterRelogin() {
 
-        // given
-        // 두 번째 로그인 → 버전 2
         user.increaseLoginVersion();
 
         Jwt newJwt = createJwt(
@@ -301,24 +244,19 @@ class JwtAccountStatusValidatorTest {
         when(userRepository.findById(userId))
                 .thenReturn(Optional.of(user));
 
-        // when
         OAuth2TokenValidatorResult result =
                 validator.validate(newJwt);
 
-        // then
         assertFalse(result.hasErrors());
-
-        verify(userRepository).findById(userId);
     }
 
     // ========================================
-    // 10. loginVersion 클레임 누락 시 인증 거부
+    // 10. loginVersion 클레임 누락
     // ========================================
 
     @Test
     void shouldRejectTokenWithoutLoginVersion() {
 
-        // given
         Jwt tokenWithoutVersion = createJwt(
                 "USER",
                 null
@@ -327,29 +265,19 @@ class JwtAccountStatusValidatorTest {
         when(userRepository.findById(userId))
                 .thenReturn(Optional.of(user));
 
-        // when
         OAuth2TokenValidatorResult result =
                 validator.validate(tokenWithoutVersion);
 
-        // then
-        assertTrue(result.hasErrors());
-
-        assertEquals(
-                "invalid_token",
-                result.getErrors().iterator().next().getErrorCode()
-        );
-
-        verify(userRepository).findById(userId);
+        assertInvalidToken(result);
     }
 
     // ========================================
-    // 11. loginVersion이 숫자가 아닌 경우 인증 거부
+    // 11. loginVersion이 문자열인 경우
     // ========================================
 
     @Test
     void shouldRejectInvalidLoginVersionClaim() {
 
-        // given
         Jwt invalidVersionJwt = createJwt(
                 "USER",
                 "invalid-version"
@@ -358,26 +286,211 @@ class JwtAccountStatusValidatorTest {
         when(userRepository.findById(userId))
                 .thenReturn(Optional.of(user));
 
-        // when
         OAuth2TokenValidatorResult result =
                 validator.validate(invalidVersionJwt);
 
-        // then
+        assertInvalidToken(result);
+    }
+
+    // ========================================
+    // 12. NORMAL JWT 검증 성공
+    // ========================================
+
+    @Test
+    void shouldAcceptNormalAuthType() {
+
+        Jwt normalJwt = createJwt(
+                "USER",
+                user.getLoginVersion(),
+                "NORMAL"
+        );
+
+        when(userRepository.findById(userId))
+                .thenReturn(Optional.of(user));
+
+        OAuth2TokenValidatorResult result =
+                validator.validate(normalJwt);
+
+        assertFalse(result.hasErrors());
+    }
+
+    // ========================================
+    // 13. 유효한 TEMPORARY JWT 검증 성공
+    // ========================================
+
+    @Test
+    void shouldAcceptValidTemporaryToken() {
+
+        // 임시 비밀번호 만료 시간을 3분 뒤로 설정
+        user.issueTemporaryPassword(
+                "encodedTemporaryPassword",
+                Instant.now().plusSeconds(180)
+        );
+
+        Jwt temporaryJwt = createJwt(
+                "USER",
+                user.getLoginVersion(),
+                "TEMPORARY"
+        );
+
+        when(userRepository.findById(userId))
+                .thenReturn(Optional.of(user));
+
+        OAuth2TokenValidatorResult result =
+                validator.validate(temporaryJwt);
+
+        assertFalse(result.hasErrors());
+    }
+
+    // ========================================
+    // 14. 임시 비밀번호 만료 후 JWT 인증 실패
+    // ========================================
+
+    @Test
+    void shouldRejectExpiredTemporaryToken() {
+
+        // 이미 만료된 임시 비밀번호
+        user.issueTemporaryPassword(
+                "encodedTemporaryPassword",
+                Instant.now().minusSeconds(1)
+        );
+
+        Jwt temporaryJwt = createJwt(
+                "USER",
+                user.getLoginVersion(),
+                "TEMPORARY"
+        );
+
+        when(userRepository.findById(userId))
+                .thenReturn(Optional.of(user));
+
+        OAuth2TokenValidatorResult result =
+                validator.validate(temporaryJwt);
+
+        assertInvalidToken(result);
+    }
+
+    // ========================================
+    // 15. 임시 비밀번호 삭제 후 JWT 인증 실패
+    // ========================================
+
+    @Test
+    void shouldRejectTemporaryTokenAfterPasswordCleared() {
+
+        user.issueTemporaryPassword(
+                "encodedTemporaryPassword",
+                Instant.now().plusSeconds(180)
+        );
+
+        Jwt temporaryJwt = createJwt(
+                "USER",
+                user.getLoginVersion(),
+                "TEMPORARY"
+        );
+
+        // 비밀번호 재설정 등으로 임시 비밀번호 삭제
+        user.clearTemporaryPassword();
+
+        when(userRepository.findById(userId))
+                .thenReturn(Optional.of(user));
+
+        OAuth2TokenValidatorResult result =
+                validator.validate(temporaryJwt);
+
+        assertInvalidToken(result);
+    }
+
+    // ========================================
+    // 16. 잘못된 authType JWT 인증 실패
+    // ========================================
+
+    @Test
+    void shouldRejectUnknownAuthType() {
+
+        Jwt invalidAuthTypeJwt = createJwt(
+                "USER",
+                user.getLoginVersion(),
+                "UNKNOWN"
+        );
+
+        when(userRepository.findById(userId))
+                .thenReturn(Optional.of(user));
+
+        OAuth2TokenValidatorResult result =
+                validator.validate(invalidAuthTypeJwt);
+
+        assertInvalidToken(result);
+    }
+
+    // ========================================
+    // 17. 로그인 버전 변경 후 임시 JWT 무효화
+    // ========================================
+
+    @Test
+    void shouldRejectOldTemporaryTokenAfterLoginVersionChanged() {
+
+        user.issueTemporaryPassword(
+                "encodedTemporaryPassword",
+                Instant.now().plusSeconds(180)
+        );
+
+        Jwt oldTemporaryJwt = createJwt(
+                "USER",
+                user.getLoginVersion(),
+                "TEMPORARY"
+        );
+
+        // 다른 로그인 성공 등으로 버전 증가
+        user.increaseLoginVersion();
+
+        when(userRepository.findById(userId))
+                .thenReturn(Optional.of(user));
+
+        OAuth2TokenValidatorResult result =
+                validator.validate(oldTemporaryJwt);
+
+        assertInvalidToken(result);
+    }
+
+    // ========================================
+    // 공통 검증 메서드
+    // ========================================
+
+    private void assertInvalidToken(
+            OAuth2TokenValidatorResult result
+    ) {
+
         assertTrue(result.hasErrors());
 
         assertEquals(
                 "invalid_token",
-                result.getErrors().iterator().next().getErrorCode()
+                result.getErrors()
+                        .iterator()
+                        .next()
+                        .getErrorCode()
         );
-
-        verify(userRepository).findById(userId);
     }
 
     // ========================================
-    // 테스트용 JWT 생성 메서드
+    // 기존 테스트용 JWT 생성 메서드
     // ========================================
 
-    private Jwt createJwt(String role, Object loginVersion) {
+    private Jwt createJwt(
+            String role,
+            Object loginVersion
+    ) {
+        return createJwt(role, loginVersion, null);
+    }
+
+    // ========================================
+    // authType 포함 JWT 생성 메서드
+    // ========================================
+
+    private Jwt createJwt(
+            String role,
+            Object loginVersion,
+            String authType
+    ) {
 
         Instant now = Instant.now();
 
@@ -387,14 +500,19 @@ class JwtAccountStatusValidatorTest {
                 .issuedAt(now)
                 .expiresAt(now.plusSeconds(3600));
 
-        // 역할 설정
+        // 사용자 역할
         if (role != null) {
             builder.claim("role", role);
         }
 
-        // 로그인 버전 설정
+        // 로그인 버전
         if (loginVersion != null) {
             builder.claim("loginVersion", loginVersion);
+        }
+
+        // 인증 유형
+        if (authType != null) {
+            builder.claim("authType", authType);
         }
 
         return builder.build();

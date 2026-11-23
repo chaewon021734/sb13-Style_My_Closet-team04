@@ -13,6 +13,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
+
 @Service
 @RequiredArgsConstructor
 public class AuthService {
@@ -33,27 +35,56 @@ public class AuthService {
                         new BadCredentialsException(LOGIN_FAILURE_MESSAGE)
                 );
 
-        // 2. 비밀번호 검증
-        if (!passwordEncoder.matches(
+        // 2. 일반 비밀번호 검증
+        boolean normalPasswordMatches = passwordEncoder.matches(
                 request.password(),
                 user.getPassword()
-        )) {
+        );
+
+        // 3. 일반 비밀번호가 일치하지 않으면 임시 비밀번호 검증
+        boolean temporaryPasswordMatches = false;
+
+        if (!normalPasswordMatches
+                && user.isTemporaryPasswordActive(Instant.now())) {
+
+            temporaryPasswordMatches = passwordEncoder.matches(
+                    request.password(),
+                    user.getTemporaryPasswordHash()
+            );
+        }
+
+        // 4. 두 비밀번호 모두 불일치하면 로그인 실패
+        if (!normalPasswordMatches && !temporaryPasswordMatches) {
             throw new BadCredentialsException(LOGIN_FAILURE_MESSAGE);
         }
 
-        // 3. 계정 잠금 여부 확인
+        // 5. 계정 잠금 상태 확인
         if (user.isLocked()) {
             throw new BadCredentialsException(LOGIN_FAILURE_MESSAGE);
         }
 
-        // 4. 로그인 성공 시 버전 증가
+        // 6. 로그인 버전 증가
         user.increaseLoginVersion();
 
-        // 5. 새로운 로그인 버전이 포함된 JWT 발급
-        String accessToken =
-                jwtTokenProvider.generateAccessToken(user);
+        // 7. 인증 방식에 따라 서로 다른 JWT 발급
+        String accessToken;
 
-        // 6. 로그인 응답 반환
+        if (temporaryPasswordMatches) {
+
+            // 임시 비밀번호 로그인
+            // authType = TEMPORARY
+            accessToken =
+                    jwtTokenProvider.generateTemporaryAccessToken(user);
+
+        } else {
+
+            // 일반 비밀번호 로그인
+            // authType = NORMAL
+            accessToken =
+                    jwtTokenProvider.generateAccessToken(user);
+        }
+
+        // 8. 로그인 응답
         return new LoginResponse(accessToken, "Bearer");
     }
 }
