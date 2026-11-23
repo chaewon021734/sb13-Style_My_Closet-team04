@@ -381,20 +381,18 @@ class ClothesServiceTest {
   void 의상_목록_마지막_페이지_조회() {
     // given
     UUID clothesId = UUID.randomUUID();
-    ClothesSearchCommand command = new ClothesSearchCommand(
-        null,
-        null,
-        20,
-        null,
-        ownerId
-    );
+    Instant cursor = Instant.parse("2026-11-19T02:00:00.123456Z");
+    UUID idAfter = UUID.randomUUID();
+    ClothesSearchCommand command = new ClothesSearchCommand(cursor.toString(), idAfter, 1, ClothesType.DRESS, ownerId);
+    // 직전 페이지의 커서 정밀도, ID, 필터가 모두 저장소에 전달되어야 한다.
+    ClothesSearchCondition condition = new ClothesSearchCondition(cursor, idAfter, 1, ClothesType.DRESS, ownerId);
     Clothes clothes = clothes(clothesId, "마지막 의상", Instant.parse("2026-11-19T01:00:00Z"));
     ClothesResult clothesResult = clothesResult(
         clothesId,
         "마지막 의상",
         new ClothesAttributeResult(UUID.randomUUID(), "색상", List.of("블랙"), "블랙")
     );
-    given(clothesRepository.search(any(ClothesSearchCondition.class))).willReturn(new ClothesSearchResult(List.of(clothes), false, 1));
+    given(clothesRepository.search(condition)).willReturn(new ClothesSearchResult(List.of(clothes), false, 2));
     given(clothesMapper.toResult(clothes)).willReturn(clothesResult);
 
     // when
@@ -406,7 +404,7 @@ class ClothesServiceTest {
         () -> assertThat(result.nextCursor()).isNull(),
         () -> assertThat(result.nextIdAfter()).isNull(),
         () -> assertThat(result.hasNext()).isFalse(),
-        () -> assertThat(result.totalCount()).isEqualTo(1)
+        () -> assertThat(result.totalCount()).isEqualTo(2)
     );
   }
 

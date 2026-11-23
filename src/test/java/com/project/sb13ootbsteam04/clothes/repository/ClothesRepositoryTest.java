@@ -14,6 +14,7 @@ import com.project.sb13ootbsteam04.user.entity.User;
 import com.project.sb13ootbsteam04.user.repository.UserRepository;
 import jakarta.persistence.EntityManager;
 import java.time.Instant;
+import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Stream;
@@ -118,15 +119,40 @@ class ClothesRepositoryTest {
     List<UUID> firstPageIds = firstPage.content().stream().map(Clothes::getId).toList();
     List<UUID> secondPageIds = secondPage.content().stream().map(Clothes::getId).toList();
     List<UUID> allPageIds = Stream.concat(firstPageIds.stream(), secondPageIds.stream()).toList();
+    // PostgreSQL UUID 정렬은 표준 UUID 문자열의 16진수 순서와 같다.
+    List<UUID> expectedOrder = Stream.of(first.getId(), second.getId(), third.getId())
+        .sorted(Comparator.comparing(UUID::toString).reversed()).toList();
     assertAll(
         () -> assertThat(firstPageIds).hasSize(2),
         () -> assertThat(secondPageIds).hasSize(1),
-        () -> assertThat(firstPageIds).doesNotContainAnyElementsOf(secondPageIds),
-        () -> assertThat(allPageIds).containsExactlyInAnyOrder(first.getId(), second.getId(), third.getId()).doesNotHaveDuplicates(),
+        () -> assertThat(allPageIds).containsExactlyElementsOf(expectedOrder),
         () -> assertThat(firstPage.hasNext()).isTrue(),
         () -> assertThat(secondPage.hasNext()).isFalse(),
         () -> assertThat(firstPage.totalCount()).isEqualTo(3),
         () -> assertThat(secondPage.totalCount()).isEqualTo(3)
+    );
+  }
+
+  @Test
+  @DisplayName("마지막 의상 이후에는 빈 목록과 필터에 맞는 전체 건수를 반환한다")
+  void 마지막_커서_이후_전체_건수_보존() {
+    // given
+    User owner = userRepository.saveAndFlush(new User("테스트 사용자", "end@test.com", "Test1234!@"));
+    Clothes onlyTop = saveClothes(owner, "상의", ClothesType.TOP);
+    saveClothes(owner, "하의", ClothesType.BOTTOM);
+    Instant createdAt = Instant.parse("2026-11-04T00:00:00Z");
+    updateCreatedAt(onlyTop.getId(), createdAt);
+    entityManager.clear();
+
+    // when
+    ClothesSearchResult page = clothesRepository.search(
+        new ClothesSearchCondition(createdAt, onlyTop.getId(), 1, ClothesType.TOP, owner.getId()));
+
+    // then
+    assertAll(
+        () -> assertThat(page.content()).isEmpty(),
+        () -> assertThat(page.hasNext()).isFalse(),
+        () -> assertThat(page.totalCount()).isEqualTo(1)
     );
   }
 
@@ -156,6 +182,8 @@ class ClothesRepositoryTest {
     // then
     Clothes found = result.content().get(0);
     assertAll(
+        () -> assertThat(found.getOwner().getId()).isEqualTo(owner.getId()),
+        () -> assertThat(result.totalCount()).isEqualTo(1),
         () -> assertThat(found.getAttributes()).hasSize(1),
         () -> assertThat(found.getAttributes().get(0).getValue()).isEqualTo("블랙"),
         () -> assertThat(found.getAttributes().get(0).getDefinition().getId()).isEqualTo(definition.getId()),
