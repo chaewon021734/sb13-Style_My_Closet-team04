@@ -13,7 +13,10 @@ import com.project.sb13ootbsteam04.feed.repository.FeedClothesRepository;
 import com.project.sb13ootbsteam04.feed.repository.FeedLikeRepository;
 import com.project.sb13ootbsteam04.feed.repository.FeedRepository;
 import com.project.sb13ootbsteam04.user.repository.UserRepository;
+import com.project.sb13ootbsteam04.weather.repository.WeatherRepository;
+
 import lombok.RequiredArgsConstructor;
+
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.AccessDeniedException;
@@ -37,8 +40,12 @@ public class FeedService {
     private final UserRepository userRepository;
     private final FeedResponseService feedResponseService;
     private final ClothesRepository clothesRepository;
+    private final WeatherRepository weatherRepository;
 
+    // ========================================
     // 피드 생성
+    // ========================================
+
     @Transactional
     public UUID createFeed(
             CreateFeedRequest request,
@@ -59,7 +66,6 @@ public class FeedService {
             );
         }
 
-        // 로그인 사용자와 작성자 일치 여부 확인
         if (!currentUserId.equals(request.authorId())) {
             throw new AccessDeniedException(
                     "본인의 계정으로만 피드를 등록할 수 있습니다."
@@ -69,6 +75,12 @@ public class FeedService {
         if (request.weatherId() == null) {
             throw new IllegalArgumentException(
                     "날씨 ID는 필수입니다."
+            );
+        }
+
+        if (!weatherRepository.existsById(request.weatherId())) {
+            throw new IllegalArgumentException(
+                    "존재하지 않는 날씨 ID입니다: " + request.weatherId()
             );
         }
 
@@ -96,13 +108,11 @@ public class FeedService {
             );
         }
 
-        // 의상 ID 중복 제거
         List<UUID> distinctClothesIds = request.clothesIds()
                 .stream()
                 .distinct()
                 .toList();
 
-        // 의상 ID가 실제 DB에 존재하는지 검증
         if (clothesRepository.findAllById(distinctClothesIds).size()
                 != distinctClothesIds.size()) {
             throw new IllegalArgumentException(
@@ -110,7 +120,6 @@ public class FeedService {
             );
         }
 
-        // 검증이 완료된 후 피드 저장
         Feed feed = new Feed(
                 currentUserId,
                 request.weatherId(),
@@ -119,7 +128,6 @@ public class FeedService {
 
         Feed savedFeed = feedRepository.save(feed);
 
-        // 피드와 의상 연결
         List<FeedClothes> feedClothes = distinctClothesIds
                 .stream()
                 .map(clothesId ->
@@ -132,7 +140,10 @@ public class FeedService {
         return savedFeed.getId();
     }
 
+    // ========================================
     // 피드 수정
+    // ========================================
+
     @Transactional
     public void updateFeed(
             UUID feedId,
@@ -149,7 +160,6 @@ public class FeedService {
                         )
                 );
 
-        // 작성자 권한 검증
         validateFeedOwner(feed, currentUserId);
 
         if (request == null
@@ -163,7 +173,10 @@ public class FeedService {
         feed.updateContent(request.content());
     }
 
+    // ========================================
     // 피드 삭제
+    // ========================================
+
     @Transactional
     public void deleteFeed(
             UUID feedId,
@@ -179,7 +192,6 @@ public class FeedService {
                         )
                 );
 
-        // 작성자 권한 검증
         validateFeedOwner(feed, currentUserId);
 
         feedClothesRepository.deleteByFeed_Id(feedId);
@@ -189,7 +201,11 @@ public class FeedService {
         feedRepository.delete(feed);
     }
 
+    // ========================================
     // 피드 목록 조회
+    // ========================================
+
+    // 기존 호출부 호환용
     public FeedPageResponse getFeedPage(
             String cursor,
             UUID idAfter,
@@ -199,22 +215,42 @@ public class FeedService {
             String keywordLike,
             UUID authorIdEqual
     ) {
+        return getFeedPage(
+                cursor,
+                idAfter,
+                limit,
+                sortBy,
+                sortDirection,
+                keywordLike,
+                authorIdEqual,
+                null
+        );
+    }
 
-        // 페이지 크기 검증
+    // 로그인 사용자 ID를 전달받는 피드 목록 조회
+    public FeedPageResponse getFeedPage(
+            String cursor,
+            UUID idAfter,
+            int limit,
+            String sortBy,
+            String sortDirection,
+            String keywordLike,
+            UUID authorIdEqual,
+            UUID currentUserId
+    ) {
+
         if (limit < 1 || limit > 100) {
             throw new IllegalArgumentException(
                     "limit은 1 이상 100 이하여야 합니다."
             );
         }
 
-        // 정렬 기준 검증
         if (!"createdAt".equals(sortBy)) {
             throw new IllegalArgumentException(
                     "현재 지원하는 정렬 기준은 createdAt입니다."
             );
         }
 
-        // 정렬 방향 검증
         boolean ascending = "ASCENDING".equals(sortDirection);
         boolean descending = "DESCENDING".equals(sortDirection);
 
@@ -224,7 +260,6 @@ public class FeedService {
             );
         }
 
-        // 커서 검증
         boolean hasCursor = cursor != null && !cursor.isBlank();
 
         if (hasCursor != (idAfter != null)) {
@@ -233,20 +268,17 @@ public class FeedService {
             );
         }
 
-        // 검색 키워드 정리
         String normalizedKeyword =
                 keywordLike == null || keywordLike.isBlank()
                         ? null
                         : keywordLike.trim();
 
-        // 다음 페이지 확인을 위해 limit + 1개 조회
         Pageable pageable = PageRequest.of(0, limit + 1);
 
         List<Feed> feeds;
 
         if (!hasCursor) {
 
-            // 첫 페이지 조회
             if (ascending) {
                 feeds = feedRepository.findFirstFeedPageAscending(
                         authorIdEqual,
@@ -274,7 +306,6 @@ public class FeedService {
                 );
             }
 
-            // 다음 페이지 조회
             if (ascending) {
                 feeds = feedRepository.findNextFeedPageAscending(
                         authorIdEqual,
@@ -294,14 +325,12 @@ public class FeedService {
             }
         }
 
-        // 다음 페이지 존재 여부
         boolean hasNext = feeds.size() > limit;
 
         List<Feed> pageFeeds = feeds.stream()
                 .limit(limit)
                 .toList();
 
-        // 다음 페이지 커서 생성
         String nextCursor = null;
         UUID nextIdAfter = null;
 
@@ -313,15 +342,19 @@ public class FeedService {
             nextIdAfter = lastFeed.getId();
         }
 
-        // 전체 피드 개수
         long totalCount = feedRepository.countFeeds(
                 authorIdEqual,
                 normalizedKeyword
         );
 
-        // 응답 DTO 변환
+        // 로그인 사용자의 실제 좋아요 여부 반영
         List<FeedResponse> data = pageFeeds.stream()
-                .map(feedResponseService::toResponse)
+                .map(feed ->
+                        feedResponseService.toResponse(
+                                feed,
+                                currentUserId
+                        )
+                )
                 .toList();
 
         return new FeedPageResponse(
@@ -335,8 +368,20 @@ public class FeedService {
         );
     }
 
+    // ========================================
     // 피드 단건 조회
+    // ========================================
+
+    // 기존 호출부 호환용
     public FeedResponse getFeedResponse(UUID feedId) {
+        return getFeedResponse(feedId, null);
+    }
+
+    // 로그인 사용자 ID를 전달받는 피드 단건 조회
+    public FeedResponse getFeedResponse(
+            UUID feedId,
+            UUID currentUserId
+    ) {
 
         Feed feed = feedRepository.findById(feedId)
                 .orElseThrow(() ->
@@ -345,10 +390,16 @@ public class FeedService {
                         )
                 );
 
-        return feedResponseService.toResponse(feed);
+        return feedResponseService.toResponse(
+                feed,
+                currentUserId
+        );
     }
 
+    // ========================================
     // 로그인 사용자 검증
+    // ========================================
+
     private void validateCurrentUser(UUID currentUserId) {
 
         if (currentUserId == null) {
@@ -358,7 +409,10 @@ public class FeedService {
         }
     }
 
+    // ========================================
     // 피드 작성자 권한 검증
+    // ========================================
+
     private void validateFeedOwner(
             Feed feed,
             UUID currentUserId

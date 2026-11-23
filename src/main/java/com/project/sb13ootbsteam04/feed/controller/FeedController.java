@@ -40,7 +40,8 @@ public class FeedController {
             @RequestParam(required = false) String keywordLike,
             @RequestParam(required = false) String skyStatusEqual,
             @RequestParam(required = false) String precipitationTypeEqual,
-            @RequestParam(required = false) UUID authorIdEqual
+            @RequestParam(required = false) UUID authorIdEqual,
+            Authentication authentication
     ) {
 
         if (skyStatusEqual != null && !skyStatusEqual.isBlank()) {
@@ -56,6 +57,8 @@ public class FeedController {
             );
         }
 
+        UUID currentUserId = jwtUserIdResolver.resolve(authentication);
+
         FeedPageResponse response = feedService.getFeedPage(
                 cursor,
                 idAfter,
@@ -63,7 +66,8 @@ public class FeedController {
                 sortBy,
                 sortDirection,
                 keywordLike,
-                authorIdEqual
+                authorIdEqual,
+                currentUserId
         );
 
         return ResponseEntity.ok(response);
@@ -83,7 +87,10 @@ public class FeedController {
                 currentUserId
         );
 
-        FeedResponse response = feedService.getFeedResponse(feedId);
+        FeedResponse response = feedService.getFeedResponse(
+                feedId,
+                currentUserId
+        );
 
         URI location = URI.create("/api/feeds/" + feedId);
 
@@ -109,7 +116,10 @@ public class FeedController {
                 currentUserId
         );
 
-        FeedResponse response = feedService.getFeedResponse(feedId);
+        FeedResponse response = feedService.getFeedResponse(
+                feedId,
+                currentUserId
+        );
 
         return ResponseEntity.ok(response);
     }
