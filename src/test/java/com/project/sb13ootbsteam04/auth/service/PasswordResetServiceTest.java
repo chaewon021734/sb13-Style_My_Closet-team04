@@ -68,7 +68,7 @@ class PasswordResetServiceTest {
                 Instant.now().plusSeconds(180)
         );
 
-        when(userRepository.findById(userId))
+        when(userRepository.findByIdForUpdate(userId))
                 .thenReturn(Optional.of(user));
 
         when(passwordEncoder.encode("NewPassword123!"))
@@ -85,6 +85,11 @@ class PasswordResetServiceTest {
                 "encodedNewPassword",
                 user.getPassword()
         );
+
+        // 발급 시 +1, 재설정 시 +1
+        assertEquals(2L, user.getLoginVersion());
+
+        verify(userRepository).findByIdForUpdate(userId);
 
         verify(passwordEncoder)
                 .encode("NewPassword123!");
@@ -103,7 +108,7 @@ class PasswordResetServiceTest {
                 Instant.now().plusSeconds(180)
         );
 
-        when(userRepository.findById(userId))
+        when(userRepository.findByIdForUpdate(userId))
                 .thenReturn(Optional.of(user));
 
         when(passwordEncoder.encode("NewPassword123!"))
@@ -123,6 +128,13 @@ class PasswordResetServiceTest {
         assertFalse(
                 user.isTemporaryPasswordActive(Instant.now())
         );
+
+        assertEquals(
+                "encodedNewPassword",
+                user.getPassword()
+        );
+
+        verify(userRepository).findByIdForUpdate(userId);
     }
 
     // ========================================
@@ -138,12 +150,17 @@ class PasswordResetServiceTest {
                 Instant.now().plusSeconds(180)
         );
 
+        // 임시 비밀번호 발급 시 버전 1
+        assertEquals(1L, user.getLoginVersion());
+
         // 임시 비밀번호 로그인 성공 상황
         user.increaseLoginVersion();
 
+        // 로그인 후 버전 2
         long previousVersion = user.getLoginVersion();
+        assertEquals(2L, previousVersion);
 
-        when(userRepository.findById(userId))
+        when(userRepository.findByIdForUpdate(userId))
                 .thenReturn(Optional.of(user));
 
         when(passwordEncoder.encode("NewPassword123!"))
@@ -160,6 +177,11 @@ class PasswordResetServiceTest {
                 previousVersion + 1,
                 user.getLoginVersion()
         );
+
+        // 발급 1 + 로그인 1 + 재설정 1
+        assertEquals(3L, user.getLoginVersion());
+
+        verify(userRepository).findByIdForUpdate(userId);
     }
 
     // ========================================
@@ -175,7 +197,11 @@ class PasswordResetServiceTest {
                 Instant.now().minusSeconds(1)
         );
 
-        when(userRepository.findById(userId))
+        // 발급 자체는 성공했으므로 버전은 1
+        long versionBeforeReset = user.getLoginVersion();
+        assertEquals(1L, versionBeforeReset);
+
+        when(userRepository.findByIdForUpdate(userId))
                 .thenReturn(Optional.of(user));
 
         // when
@@ -193,14 +219,20 @@ class PasswordResetServiceTest {
                 exception.getMessage()
         );
 
+        // 기존 비밀번호 유지
         assertEquals(
                 "encodedOriginalPassword",
                 user.getPassword()
         );
 
-        assertEquals(0L, user.getLoginVersion());
+        // 재설정 실패 시 버전 추가 증가 없음
+        assertEquals(
+                versionBeforeReset,
+                user.getLoginVersion()
+        );
 
         verifyNoInteractions(passwordEncoder);
+        verify(userRepository).findByIdForUpdate(userId);
     }
 
     // ========================================
@@ -218,7 +250,10 @@ class PasswordResetServiceTest {
                 Instant.now().plusSeconds(180)
         );
 
-        when(userRepository.findById(userId))
+        long versionBeforeReset = user.getLoginVersion();
+        assertEquals(1L, versionBeforeReset);
+
+        when(userRepository.findByIdForUpdate(userId))
                 .thenReturn(Optional.of(user));
 
         // when
@@ -236,14 +271,20 @@ class PasswordResetServiceTest {
                 exception.getMessage()
         );
 
+        // 기존 비밀번호 유지
         assertEquals(
                 "encodedOriginalPassword",
                 user.getPassword()
         );
 
-        assertEquals(0L, user.getLoginVersion());
+        // 재설정 실패로 인한 추가 버전 증가 없음
+        assertEquals(
+                versionBeforeReset,
+                user.getLoginVersion()
+        );
 
         verifyNoInteractions(passwordEncoder);
+        verify(userRepository).findByIdForUpdate(userId);
     }
 
     // ========================================
@@ -254,7 +295,7 @@ class PasswordResetServiceTest {
     void shouldRejectUnknownUser() {
 
         // given
-        when(userRepository.findById(userId))
+        when(userRepository.findByIdForUpdate(userId))
                 .thenReturn(Optional.empty());
 
         // when
@@ -272,6 +313,7 @@ class PasswordResetServiceTest {
                 exception.getMessage()
         );
 
+        verify(userRepository).findByIdForUpdate(userId);
         verifyNoInteractions(passwordEncoder);
     }
 
@@ -288,7 +330,9 @@ class PasswordResetServiceTest {
                 Instant.now().plusSeconds(180)
         );
 
-        when(userRepository.findById(userId))
+        long versionBeforeReset = user.getLoginVersion();
+
+        when(userRepository.findByIdForUpdate(userId))
                 .thenReturn(Optional.of(user));
 
         // when
@@ -306,11 +350,19 @@ class PasswordResetServiceTest {
                 exception.getMessage()
         );
 
+        // 기존 비밀번호 유지
         assertEquals(
                 "encodedOriginalPassword",
                 user.getPassword()
         );
 
+        // 실패했으므로 버전 변경 없음
+        assertEquals(
+                versionBeforeReset,
+                user.getLoginVersion()
+        );
+
         verifyNoInteractions(passwordEncoder);
+        verify(userRepository).findByIdForUpdate(userId);
     }
 }

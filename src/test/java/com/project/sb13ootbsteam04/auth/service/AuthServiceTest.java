@@ -48,7 +48,6 @@ class AuthServiceTest {
 
     @BeforeEach
     void setUp() {
-
         user = new User(
                 "테스트사용자",
                 "test@example.com",
@@ -61,32 +60,24 @@ class AuthServiceTest {
         );
     }
 
-    // ========================================
-    // 1. 정상 비밀번호 로그인
-    // ========================================
-
+    // 1. 일반 비밀번호 로그인 성공
     @Test
     void shouldLoginSuccessfully() {
 
-        // given
         when(userRepository.findByEmailForUpdate("test@example.com"))
                 .thenReturn(Optional.of(user));
 
         when(passwordEncoder.matches(
-                "password123",
-                "encodedPassword"
+                "password123", "encodedPassword"
         )).thenReturn(true);
 
         when(jwtTokenProvider.generateAccessToken(user))
                 .thenReturn("test.jwt.token");
 
-        // when
         LoginResponse response = authService.login(loginRequest);
 
-        // then
         assertEquals("test.jwt.token", response.accessToken());
         assertEquals("Bearer", response.tokenType());
-
         assertEquals(1L, user.getLoginVersion());
 
         verify(userRepository)
@@ -98,55 +89,41 @@ class AuthServiceTest {
         verify(jwtTokenProvider).generateAccessToken(user);
     }
 
-    // ========================================
     // 2. 존재하지 않는 이메일 로그인 차단
-    // ========================================
-
     @Test
     void shouldRejectUnknownEmail() {
 
-        // given
         when(userRepository.findByEmailForUpdate("test@example.com"))
                 .thenReturn(Optional.empty());
 
-        // when
         BadCredentialsException exception = assertThrows(
                 BadCredentialsException.class,
                 () -> authService.login(loginRequest)
         );
 
-        // then
         assertEquals(LOGIN_FAILURE_MESSAGE, exception.getMessage());
 
         verifyNoInteractions(jwtTokenProvider);
         verifyNoInteractions(passwordEncoder);
     }
 
-    // ========================================
     // 3. 잘못된 일반 비밀번호 로그인 차단
-    // ========================================
-
     @Test
     void shouldRejectWrongPassword() {
 
-        // given
         when(userRepository.findByEmailForUpdate("test@example.com"))
                 .thenReturn(Optional.of(user));
 
         when(passwordEncoder.matches(
-                "password123",
-                "encodedPassword"
+                "password123", "encodedPassword"
         )).thenReturn(false);
 
-        // when
         BadCredentialsException exception = assertThrows(
                 BadCredentialsException.class,
                 () -> authService.login(loginRequest)
         );
 
-        // then
         assertEquals(LOGIN_FAILURE_MESSAGE, exception.getMessage());
-
         assertEquals(0L, user.getLoginVersion());
 
         verify(passwordEncoder)
@@ -156,33 +133,25 @@ class AuthServiceTest {
                 .generateAccessToken(any(User.class));
     }
 
-    // ========================================
     // 4. 잠긴 계정 + 정상 비밀번호 로그인 차단
-    // ========================================
-
     @Test
     void shouldRejectLoginWhenAccountIsLocked() {
 
-        // given
         user.changeLocked(true);
 
         when(userRepository.findByEmailForUpdate("test@example.com"))
                 .thenReturn(Optional.of(user));
 
         when(passwordEncoder.matches(
-                "password123",
-                "encodedPassword"
+                "password123", "encodedPassword"
         )).thenReturn(true);
 
-        // when
         BadCredentialsException exception = assertThrows(
                 BadCredentialsException.class,
                 () -> authService.login(loginRequest)
         );
 
-        // then
         assertEquals(LOGIN_FAILURE_MESSAGE, exception.getMessage());
-
         assertEquals(0L, user.getLoginVersion());
 
         verify(passwordEncoder)
@@ -191,33 +160,25 @@ class AuthServiceTest {
         verifyNoInteractions(jwtTokenProvider);
     }
 
-    // ========================================
     // 5. 잠긴 계정 + 잘못된 비밀번호 로그인 차단
-    // ========================================
-
     @Test
     void shouldRejectLockedAccountWithWrongPassword() {
 
-        // given
         user.changeLocked(true);
 
         when(userRepository.findByEmailForUpdate("test@example.com"))
                 .thenReturn(Optional.of(user));
 
         when(passwordEncoder.matches(
-                "password123",
-                "encodedPassword"
+                "password123", "encodedPassword"
         )).thenReturn(false);
 
-        // when
         BadCredentialsException exception = assertThrows(
                 BadCredentialsException.class,
                 () -> authService.login(loginRequest)
         );
 
-        // then
         assertEquals(LOGIN_FAILURE_MESSAGE, exception.getMessage());
-
         assertEquals(0L, user.getLoginVersion());
 
         verify(passwordEncoder)
@@ -226,20 +187,15 @@ class AuthServiceTest {
         verifyNoInteractions(jwtTokenProvider);
     }
 
-    // ========================================
-    // 6. 재로그인 시 로그인 버전 증가
-    // ========================================
-
+    // 6. 일반 비밀번호 재로그인 시 버전 증가
     @Test
     void shouldIncreaseLoginVersionOnRelogin() {
 
-        // given
         when(userRepository.findByEmailForUpdate("test@example.com"))
                 .thenReturn(Optional.of(user));
 
         when(passwordEncoder.matches(
-                "password123",
-                "encodedPassword"
+                "password123", "encodedPassword"
         )).thenReturn(true);
 
         when(jwtTokenProvider.generateAccessToken(user))
@@ -247,13 +203,10 @@ class AuthServiceTest {
 
         // 첫 번째 로그인
         authService.login(loginRequest);
-
         assertEquals(1L, user.getLoginVersion());
 
         // 두 번째 로그인
         authService.login(loginRequest);
-
-        // then
         assertEquals(2L, user.getLoginVersion());
 
         verify(userRepository, times(2))
@@ -263,20 +216,15 @@ class AuthServiceTest {
                 .generateAccessToken(user);
     }
 
-    // ========================================
-    // 7. 로그인 버전 증가 후 JWT 발급
-    // ========================================
-
+    // 7. 로그인 버전 증가 후 일반 JWT 발급
     @Test
     void shouldIncreaseVersionBeforeGeneratingToken() {
 
-        // given
         when(userRepository.findByEmailForUpdate("test@example.com"))
                 .thenReturn(Optional.of(user));
 
         when(passwordEncoder.matches(
-                "password123",
-                "encodedPassword"
+                "password123", "encodedPassword"
         )).thenReturn(true);
 
         when(jwtTokenProvider.generateAccessToken(user))
@@ -289,12 +237,9 @@ class AuthServiceTest {
                     return "test.jwt.token";
                 });
 
-        // when
         LoginResponse response = authService.login(loginRequest);
 
-        // then
         assertEquals("test.jwt.token", response.accessToken());
-
         assertEquals(1L, user.getLoginVersion());
 
         InOrder inOrder = inOrder(
@@ -313,14 +258,10 @@ class AuthServiceTest {
                 .generateAccessToken(user);
     }
 
-    // ========================================
     // 8. 유효한 임시 비밀번호 로그인 성공
-    // ========================================
-
     @Test
     void shouldLoginWithValidTemporaryPassword() {
 
-        // given
         String temporaryPassword = "Temp1234!abc";
 
         user.issueTemporaryPassword(
@@ -328,6 +269,9 @@ class AuthServiceTest {
                 Instant.now().plusSeconds(180)
         );
 
+        // 임시 비밀번호 발급 시 버전 1
+        assertEquals(1L, user.getLoginVersion());
+
         LoginRequest temporaryRequest = new LoginRequest(
                 "test@example.com",
                 temporaryPassword
@@ -336,57 +280,49 @@ class AuthServiceTest {
         when(userRepository.findByEmailForUpdate("test@example.com"))
                 .thenReturn(Optional.of(user));
 
-        // 일반 비밀번호는 불일치
         when(passwordEncoder.matches(
-                temporaryPassword,
-                "encodedPassword"
+                temporaryPassword, "encodedPassword"
         )).thenReturn(false);
 
-        // 임시 비밀번호는 일치
         when(passwordEncoder.matches(
-                temporaryPassword,
-                "encodedTemporaryPassword"
+                temporaryPassword, "encodedTemporaryPassword"
         )).thenReturn(true);
 
         when(jwtTokenProvider.generateTemporaryAccessToken(user))
                 .thenReturn("temporary.jwt.token");
 
-        // when
         LoginResponse response = authService.login(temporaryRequest);
 
-        // then
         assertEquals("temporary.jwt.token", response.accessToken());
         assertEquals("Bearer", response.tokenType());
 
-        assertEquals(1L, user.getLoginVersion());
+        // 발급 +1, 임시 로그인 성공 +1
+        assertEquals(2L, user.getLoginVersion());
 
-        // 기존 비밀번호는 유지
         assertEquals("encodedPassword", user.getPassword());
 
         verify(passwordEncoder)
                 .matches(temporaryPassword, "encodedTemporaryPassword");
 
-        verify(jwtTokenProvider).generateTemporaryAccessToken(user);
+        verify(jwtTokenProvider)
+                .generateTemporaryAccessToken(user);
 
-        // 일반 JWT는 발급하지 않아야 함
-        verify(jwtTokenProvider, never()).generateAccessToken(user);
+        verify(jwtTokenProvider, never())
+                .generateAccessToken(user);
     }
 
-    // ========================================
     // 9. 만료된 임시 비밀번호 로그인 차단
-    // ========================================
-
     @Test
     void shouldRejectExpiredTemporaryPassword() {
 
-        // given
         String temporaryPassword = "Temp1234!abc";
 
-        // 이미 1초 전에 만료된 임시 비밀번호
         user.issueTemporaryPassword(
                 "encodedTemporaryPassword",
                 Instant.now().minusSeconds(1)
         );
+
+        long versionBeforeLogin = user.getLoginVersion();
 
         LoginRequest temporaryRequest = new LoginRequest(
                 "test@example.com",
@@ -397,40 +333,36 @@ class AuthServiceTest {
                 .thenReturn(Optional.of(user));
 
         when(passwordEncoder.matches(
-                temporaryPassword,
-                "encodedPassword"
+                temporaryPassword, "encodedPassword"
         )).thenReturn(false);
 
-        // when
         BadCredentialsException exception = assertThrows(
                 BadCredentialsException.class,
                 () -> authService.login(temporaryRequest)
         );
 
-        // then
         assertEquals(LOGIN_FAILURE_MESSAGE, exception.getMessage());
 
-        assertEquals(0L, user.getLoginVersion());
+        // 발급 시 증가한 버전 1 유지
+        assertEquals(1L, versionBeforeLogin);
+        assertEquals(versionBeforeLogin, user.getLoginVersion());
 
-        // 만료되었으므로 임시 비밀번호 해시와 비교하지 않음
         verify(passwordEncoder, never())
                 .matches(temporaryPassword, "encodedTemporaryPassword");
 
         verifyNoInteractions(jwtTokenProvider);
     }
 
-    // ========================================
     // 10. 잘못된 임시 비밀번호 로그인 차단
-    // ========================================
-
     @Test
     void shouldRejectWrongTemporaryPassword() {
 
-        // given
         user.issueTemporaryPassword(
                 "encodedTemporaryPassword",
                 Instant.now().plusSeconds(180)
         );
+
+        long versionBeforeLogin = user.getLoginVersion();
 
         LoginRequest temporaryRequest = new LoginRequest(
                 "test@example.com",
@@ -441,25 +373,23 @@ class AuthServiceTest {
                 .thenReturn(Optional.of(user));
 
         when(passwordEncoder.matches(
-                "WrongTemp123!",
-                "encodedPassword"
+                "WrongTemp123!", "encodedPassword"
         )).thenReturn(false);
 
         when(passwordEncoder.matches(
-                "WrongTemp123!",
-                "encodedTemporaryPassword"
+                "WrongTemp123!", "encodedTemporaryPassword"
         )).thenReturn(false);
 
-        // when
         BadCredentialsException exception = assertThrows(
                 BadCredentialsException.class,
                 () -> authService.login(temporaryRequest)
         );
 
-        // then
         assertEquals(LOGIN_FAILURE_MESSAGE, exception.getMessage());
 
-        assertEquals(0L, user.getLoginVersion());
+        // 로그인 실패이므로 추가 버전 증가 없음
+        assertEquals(1L, versionBeforeLogin);
+        assertEquals(versionBeforeLogin, user.getLoginVersion());
 
         verify(passwordEncoder)
                 .matches("WrongTemp123!", "encodedTemporaryPassword");
@@ -467,14 +397,10 @@ class AuthServiceTest {
         verifyNoInteractions(jwtTokenProvider);
     }
 
-    // ========================================
-    // 11. 잠긴 계정은 임시 비밀번호 로그인 차단
-    // ========================================
-
+    // 11. 잠긴 계정의 임시 비밀번호 로그인 차단
     @Test
     void shouldRejectTemporaryPasswordLoginWhenAccountIsLocked() {
 
-        // given
         String temporaryPassword = "Temp1234!abc";
 
         user.changeLocked(true);
@@ -484,6 +410,8 @@ class AuthServiceTest {
                 Instant.now().plusSeconds(180)
         );
 
+        long versionBeforeLogin = user.getLoginVersion();
+
         LoginRequest temporaryRequest = new LoginRequest(
                 "test@example.com",
                 temporaryPassword
@@ -493,37 +421,31 @@ class AuthServiceTest {
                 .thenReturn(Optional.of(user));
 
         when(passwordEncoder.matches(
-                temporaryPassword,
-                "encodedPassword"
+                temporaryPassword, "encodedPassword"
         )).thenReturn(false);
 
         when(passwordEncoder.matches(
-                temporaryPassword,
-                "encodedTemporaryPassword"
+                temporaryPassword, "encodedTemporaryPassword"
         )).thenReturn(true);
 
-        // when
         BadCredentialsException exception = assertThrows(
                 BadCredentialsException.class,
                 () -> authService.login(temporaryRequest)
         );
 
-        // then
         assertEquals(LOGIN_FAILURE_MESSAGE, exception.getMessage());
 
-        assertEquals(0L, user.getLoginVersion());
+        // 발급 당시 버전 1 유지
+        assertEquals(1L, versionBeforeLogin);
+        assertEquals(versionBeforeLogin, user.getLoginVersion());
 
         verifyNoInteractions(jwtTokenProvider);
     }
 
-    // ========================================
-    // 12. 임시 비밀번호 로그인 시 로그인 버전 증가
-    // ========================================
-
+    // 12. 임시 비밀번호 로그인 시 버전 증가 후 JWT 발급
     @Test
     void shouldIncreaseLoginVersionOnTemporaryPasswordLogin() {
 
-        // given
         String temporaryPassword = "Temp1234!abc";
 
         user.issueTemporaryPassword(
@@ -531,6 +453,9 @@ class AuthServiceTest {
                 Instant.now().plusSeconds(180)
         );
 
+        // 발급 직후 버전 1
+        assertEquals(1L, user.getLoginVersion());
+
         LoginRequest temporaryRequest = new LoginRequest(
                 "test@example.com",
                 temporaryPassword
@@ -540,13 +465,11 @@ class AuthServiceTest {
                 .thenReturn(Optional.of(user));
 
         when(passwordEncoder.matches(
-                temporaryPassword,
-                "encodedPassword"
+                temporaryPassword, "encodedPassword"
         )).thenReturn(false);
 
         when(passwordEncoder.matches(
-                temporaryPassword,
-                "encodedTemporaryPassword"
+                temporaryPassword, "encodedTemporaryPassword"
         )).thenReturn(true);
 
         when(jwtTokenProvider.generateTemporaryAccessToken(user))
@@ -554,26 +477,22 @@ class AuthServiceTest {
 
                     User tokenUser = invocation.getArgument(0);
 
-                    // JWT 발급 전에 로그인 버전 증가 확인
-                    assertEquals(1L, tokenUser.getLoginVersion());
+                    // 발급 +1, 로그인 +1
+                    // JWT 생성 시점에는 버전 2여야 함
+                    assertEquals(2L, tokenUser.getLoginVersion());
 
                     return "temporary.jwt.token";
                 });
 
-        // when
         LoginResponse response = authService.login(temporaryRequest);
 
-        // then
-        assertEquals(
-                "temporary.jwt.token",
-                response.accessToken()
-        );
+        assertEquals("temporary.jwt.token", response.accessToken());
+        assertEquals(2L, user.getLoginVersion());
 
-        assertEquals(1L, user.getLoginVersion());
+        verify(jwtTokenProvider)
+                .generateTemporaryAccessToken(user);
 
-        verify(jwtTokenProvider).generateTemporaryAccessToken(user);
-
-        // 일반 JWT가 발급되지 않았는지 확인
-        verify(jwtTokenProvider, never()).generateAccessToken(user);
+        verify(jwtTokenProvider, never())
+                .generateAccessToken(user);
     }
 }
