@@ -25,17 +25,17 @@ public class ClothesRepositoryCustomImpl implements ClothesRepositoryCustom {
     boolean hasNext = fetchedClothes.size() > condition.limit();
     List<Clothes> content = hasNext ? fetchedClothes.subList(0, condition.limit()) : fetchedClothes;
 
-    if (content.isEmpty()) {
-      long totalCount = condition.cursor() == null ? 0 : count(condition, filterClause);
-      return new ClothesSearchResult(List.of(), false, totalCount);
+    if (!content.isEmpty()) {
+      initializeAttributes(content);
     }
-
-    initializeAttributes(content);
-    return new ClothesSearchResult(content, hasNext, count(condition, filterClause));
+    // 첫 페이지에 일치하는 의상이 모두 들어오면 별도 COUNT 없이 전체 건수를 알 수 있다.
+    long totalCount = condition.cursor() == null && !hasNext ? content.size() : count(condition, filterClause);
+    return new ClothesSearchResult(content, hasNext, totalCount);
   }
 
   private List<Clothes> fetchPage(ClothesSearchCondition condition, String filterClause) {
-    StringBuilder jpql = new StringBuilder("select c from Clothes c join fetch c.owner").append(filterClause);
+    // 응답에는 소유자 ID만 필요하므로 사용자 엔티티 전체를 조회하지 않는다.
+    StringBuilder jpql = new StringBuilder("select c from Clothes c").append(filterClause);
 
     if (condition.cursor() != null) {
       jpql.append(" and (c.createdAt < :cursor")
@@ -58,7 +58,7 @@ public class ClothesRepositoryCustomImpl implements ClothesRepositoryCustom {
   }
 
   private long count(ClothesSearchCondition condition, String filterClause) {
-    // 전체 건수에는 커서 조건을 적용하지 않아 페이지 이동 중에도 같은 값을 유지한다.
+    // 현재 소유자·타입에 맞는 전체 건수이므로 커서 조건은 제외한다.
     TypedQuery<Long> query = entityManager.createQuery(
         "select count(c) from Clothes c" + filterClause,
         Long.class

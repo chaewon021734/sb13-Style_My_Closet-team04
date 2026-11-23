@@ -68,11 +68,11 @@ public interface ClothesApi {
   @ApiResponses({
       @ApiResponse(
           responseCode = "200",
-          description = "옷 목록 조회 성공",
+          description = "옷 목록 조회 성공 (조회 조건에 맞는 의상이 없으면 빈 목록을 반환합니다.)",
           content = @Content(schema = @Schema(implementation = ClothesDtoCursorResponse.class))),
       @ApiResponse(
           responseCode = "400",
-          description = "옷 목록 조회 실패",
+          description = "필수 파라미터 누락, 잘못된 UUID·의상 종류·커서, 커서 쌍 불일치 또는 limit 범위 초과",
           content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
       @ApiResponse(
           responseCode = "500",
