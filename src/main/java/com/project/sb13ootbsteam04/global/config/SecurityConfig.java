@@ -51,6 +51,12 @@ public class SecurityConfig {
                                 "/api/auth/login"
                         ).permitAll()
 
+                        // 임시 비밀번호 발급 API는 로그인 없이 접근 가능
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/api/auth/temporary-password"
+                        ).permitAll()
+
                         // 임시 비밀번호 인증 사용자만
                         // 비밀번호 재설정 API 접근 가능
                         .requestMatchers(
