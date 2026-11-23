@@ -23,7 +23,7 @@ public class TemporaryPasswordService {
     private final PasswordEncoder passwordEncoder;
     private final TemporaryPasswordGenerator passwordGenerator;
 
-    // 이메일 발송 Service 추가
+    // 이메일 발송 Service
     private final TemporaryPasswordMailService mailService;
 
     @Transactional
@@ -34,7 +34,7 @@ public class TemporaryPasswordService {
                 userRepository.findByEmailForUpdate(email);
 
         // 2. 등록되지 않은 이메일은 발급하지 않음
-        // 외부 API에서는 등록 여부와 관계없이 동일하게 응답 예정
+        // 외부 API에서는 등록 여부와 관계없이 동일한 응답 반환
         if (userOptional.isEmpty()) {
             return;
         }
@@ -46,25 +46,37 @@ public class TemporaryPasswordService {
             return;
         }
 
-        // 4. 임시 비밀번호 생성
-        String temporaryPassword = passwordGenerator.generate();
+        // 4. 현재 시간 확인
+        Instant now = Instant.now();
 
-        // 5. 임시 비밀번호 암호화
+        // 5. 기존 임시 비밀번호가 아직 유효하다면
+        // 새로운 임시 비밀번호를 발급하지 않음
+        if (user.isTemporaryPasswordActive(now)) {
+            return;
+        }
+
+        // 6. 임시 비밀번호 생성
+        String temporaryPassword =
+                passwordGenerator.generate();
+
+        // 7. 임시 비밀번호 암호화
         String encodedPassword =
                 passwordEncoder.encode(temporaryPassword);
 
-        // 6. 만료 시간 설정
-        Instant expiresAt = Instant.now()
-                .plus(EXPIRATION_MINUTES, ChronoUnit.MINUTES);
+        // 8. 만료 시간 설정 (현재 시간으로부터 3분)
+        Instant expiresAt = now.plus(
+                EXPIRATION_MINUTES,
+                ChronoUnit.MINUTES
+        );
 
-        // 7. 암호화된 비밀번호와 만료 시간 저장
+        // 9. 암호화된 임시 비밀번호와 만료 시간 저장
         // 기존 JWT 무효화를 위해 loginVersion 증가
         user.issueTemporaryPassword(
                 encodedPassword,
                 expiresAt
         );
 
-        // 8. 등록된 이메일로 임시 비밀번호 발송
+        // 10. 등록된 이메일로 임시 비밀번호 발송
         mailService.sendTemporaryPassword(
                 user.getEmail(),
                 temporaryPassword

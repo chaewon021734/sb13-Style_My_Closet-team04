@@ -98,6 +98,9 @@ class TemporaryPasswordServiceTest {
         // 최초 발급 시 로그인 버전 증가
         assertEquals(1L, user.getLoginVersion());
 
+        verify(passwordGenerator).generate();
+        verify(passwordEncoder).encode(TEMP_PASSWORD);
+
         verify(mailService).sendTemporaryPassword(
                 EMAIL,
                 TEMP_PASSWORD
@@ -127,10 +130,12 @@ class TemporaryPasswordServiceTest {
 
         assertNotNull(expiresAt);
 
+        // 발급 직전 시간 + 180초보다 이전이면 안 됨
         assertFalse(
                 expiresAt.isBefore(before.plusSeconds(180))
         );
 
+        // 발급 직후 시간 + 180초보다 이후이면 안 됨
         assertFalse(
                 expiresAt.isAfter(after.plusSeconds(180))
         );
@@ -198,16 +203,17 @@ class TemporaryPasswordServiceTest {
     }
 
     // ========================================
-    // 5. 재발급 시 이전 비밀번호 교체 및 JWT 무효화
+    // 5. 만료된 임시 비밀번호 재발급 및 JWT 무효화
     // ========================================
 
     @Test
     void shouldReplacePreviousPasswordAndIncreaseVersion() {
 
         // given
+        // 기존 임시 비밀번호를 만료된 상태로 설정
         user.issueTemporaryPassword(
                 "previousHash",
-                Instant.now().plusSeconds(60)
+                Instant.now().minusSeconds(10)
         );
 
         assertEquals(1L, user.getLoginVersion());
@@ -218,13 +224,20 @@ class TemporaryPasswordServiceTest {
         temporaryPasswordService.issueTemporaryPassword(EMAIL);
 
         // then
+        // 기존 임시 비밀번호가 새 비밀번호로 변경됨
         assertEquals(
                 ENCODED_PASSWORD,
                 user.getTemporaryPasswordHash()
         );
 
-        // 재발급 시 버전 추가 증가
+        // 재발급 시 loginVersion 추가 증가
         assertEquals(2L, user.getLoginVersion());
+
+        // 새로운 만료 시간이 설정되었는지 확인
+        assertTrue(
+                user.getTemporaryPasswordExpiresAt()
+                        .isAfter(Instant.now())
+        );
 
         verify(mailService).sendTemporaryPassword(
                 EMAIL,
@@ -259,6 +272,110 @@ class TemporaryPasswordServiceTest {
                 exception.getMessage()
         );
 
+        verify(mailService).sendTemporaryPassword(
+                EMAIL,
+                TEMP_PASSWORD
+        );
+    }
+
+    // ========================================
+    // 7. 기존 임시 비밀번호가 유효하면 재발급 차단
+    // ========================================
+
+    @Test
+    void shouldNotReissueWhileTemporaryPasswordIsActive() {
+
+        // given
+        // 기존 임시 비밀번호의 유효기간이 2분 남은 상황
+        user.issueTemporaryPassword(
+                "previousHash",
+                Instant.now().plusSeconds(120)
+        );
+
+        long previousLoginVersion = user.getLoginVersion();
+
+        Instant previousExpiresAt =
+                user.getTemporaryPasswordExpiresAt();
+
+        when(userRepository.findByEmailForUpdate(EMAIL))
+                .thenReturn(Optional.of(user));
+
+        // when
+        temporaryPasswordService.issueTemporaryPassword(EMAIL);
+
+        // then
+        // 기존 임시 비밀번호 유지
+        assertEquals(
+                "previousHash",
+                user.getTemporaryPasswordHash()
+        );
+
+        // 기존 만료 시간 유지
+        assertEquals(
+                previousExpiresAt,
+                user.getTemporaryPasswordExpiresAt()
+        );
+
+        // loginVersion 증가하지 않음
+        assertEquals(
+                previousLoginVersion,
+                user.getLoginVersion()
+        );
+
+        // 새 비밀번호 생성 및 암호화 없음
+        // 이메일도 다시 발송하지 않음
+        verifyNoInteractions(
+                passwordGenerator,
+                passwordEncoder,
+                mailService
+        );
+    }
+
+    // ========================================
+    // 8. 임시 비밀번호 만료 후 재발급 허용
+    // ========================================
+
+    @Test
+    void shouldReissueAfterTemporaryPasswordExpires() {
+
+        // given
+        user.issueTemporaryPassword(
+                "expiredHash",
+                Instant.now().minusSeconds(10)
+        );
+
+        long previousLoginVersion = user.getLoginVersion();
+
+        mockSuccessfulIssue();
+
+        // when
+        temporaryPasswordService.issueTemporaryPassword(EMAIL);
+
+        // then
+        // 새 임시 비밀번호로 교체
+        assertEquals(
+                ENCODED_PASSWORD,
+                user.getTemporaryPasswordHash()
+        );
+
+        // loginVersion 증가
+        assertEquals(
+                previousLoginVersion + 1,
+                user.getLoginVersion()
+        );
+
+        // 새 임시 비밀번호가 유효한 상태인지 확인
+        assertTrue(
+                user.isTemporaryPasswordActive(Instant.now())
+        );
+
+        // 새 비밀번호 생성 확인
+        verify(passwordGenerator).generate();
+
+        // 암호화 확인
+        verify(passwordEncoder).encode(TEMP_PASSWORD);
+
+        // 이메일 발송 확인
         verify(mailService).sendTemporaryPassword(
                 EMAIL,
                 TEMP_PASSWORD
