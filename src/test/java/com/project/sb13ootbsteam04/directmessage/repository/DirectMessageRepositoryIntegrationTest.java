@@ -170,4 +170,38 @@ class DirectMessageRepositoryIntegrationTest {
         .extracting(DirectMessage::getId)
         .containsExactly(message1.getId());
   }
+
+  //
+  @Test
+  void countMessagesBetweenUsers_returnsOnlyMessagesBetweenTwoUsers() {
+    User userA = userRepository.saveAndFlush(
+        new User("사용자A", "count-a-" + UUID.randomUUID() + "@test.com", "password")
+    );
+    User userB = userRepository.saveAndFlush(
+        new User("사용자B", "count-b-" + UUID.randomUUID() + "@test.com", "password")
+    );
+    User userC = userRepository.saveAndFlush(
+        new User("사용자C", "count-c-" + UUID.randomUUID() + "@test.com", "password")
+    );
+
+    directMessageRepository.saveAndFlush(
+        new DirectMessage(userA, userB, "A에서 B로")
+    );
+    directMessageRepository.saveAndFlush(
+        new DirectMessage(userB, userA, "B에서 A로")
+    );
+    directMessageRepository.saveAndFlush(
+        new DirectMessage(userA, userB, "A에서 B로 한 번 더")
+    );
+    directMessageRepository.saveAndFlush(
+        new DirectMessage(userC, userA, "C에서 A로")
+    );
+
+    long result = directMessageRepository.countMessagesBetweenUsers(
+        userA.getId(),
+        userB.getId()
+    );
+
+    assertThat(result).isEqualTo(3);
+  }
 }
