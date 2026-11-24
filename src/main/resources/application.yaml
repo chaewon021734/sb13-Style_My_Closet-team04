@@ -21,3 +21,5 @@ spring:
 weather:
   kakao:
     api-key: ${KAKAO_REST_API_KEY:}
+  kma:
+    api-key: ${KMA_SERVICE_KEY:}
