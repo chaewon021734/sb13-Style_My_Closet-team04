@@ -16,7 +16,7 @@ import org.springframework.batch.core.BatchStatus;
 import org.springframework.batch.core.job.Job;
 import org.springframework.batch.core.job.parameters.InvalidJobParametersException;
 import org.springframework.batch.core.job.parameters.JobParametersBuilder;
-import org.springframework.batch.core.launch.JobLauncher;
+import org.springframework.batch.core.launch.JobOperator;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
@@ -43,7 +43,7 @@ class WeatherForecastBatchJobIntegrationTest {
             "SKY", "3", "PTY", "0", "PCP", "강수없음", "POP", "20",
             "REH", "60", "TMP", "12", "WSD", "1.2");
 
-    @Autowired private JobLauncher jobLauncher;
+    @Autowired private JobOperator jobOperator;
     @Autowired @Qualifier(WeatherForecastBatchConfig.JOB_NAME) private Job job;
     @Autowired private WeatherLocationRepository locations;
     @Autowired private WeatherRepository weathers;
@@ -65,7 +65,7 @@ class WeatherForecastBatchJobIntegrationTest {
         double successBefore = counter(WeatherForecastBatchMetrics.LOCATION_SUCCESS);
         double savedBefore = counter(WeatherForecastBatchMetrics.FORECAST_SAVED);
 
-        var execution = jobLauncher.run(job, parameters());
+        var execution = jobOperator.start(job, parameters());
 
         assertThat(execution.getStatus()).isEqualTo(BatchStatus.COMPLETED);
         assertThat(weathers.count()).isEqualTo(1);
@@ -84,8 +84,8 @@ class WeatherForecastBatchJobIntegrationTest {
         when(client.getVillageForecast(BASE_DATE, BASE_TIME, 60, 127))
                 .thenReturn(forecastItems(60, 127));
 
-        var first = jobLauncher.run(job, parameters());
-        var second = jobLauncher.run(job, parameters());
+        var first = jobOperator.start(job, parameters());
+        var second = jobOperator.start(job, parameters());
 
         assertThat(first.getStatus()).isEqualTo(BatchStatus.COMPLETED);
         assertThat(second.getStatus()).isEqualTo(BatchStatus.COMPLETED);
@@ -105,7 +105,7 @@ class WeatherForecastBatchJobIntegrationTest {
                         ErrorCode.WEATHER_FORECAST_SERVICE_UNAVAILABLE, "테스트 장애"));
         double failureBefore = counter(WeatherForecastBatchMetrics.LOCATION_FAILURE);
 
-        var execution = jobLauncher.run(job, parameters());
+        var execution = jobOperator.start(job, parameters());
 
         assertThat(execution.getStatus()).isEqualTo(BatchStatus.FAILED);
         assertThat(weathers.count()).isEqualTo(1);
@@ -124,7 +124,7 @@ class WeatherForecastBatchJobIntegrationTest {
                 .addString("executionId", UUID.randomUUID().toString())
                 .toJobParameters();
 
-        assertThatThrownBy(() -> jobLauncher.run(job, invalid))
+        assertThatThrownBy(() -> jobOperator.start(job, invalid))
                 .isInstanceOf(InvalidJobParametersException.class);
     }
 

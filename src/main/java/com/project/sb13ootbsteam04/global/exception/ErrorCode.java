@@ -57,7 +57,9 @@ public enum ErrorCode {
   WEATHER_FORECAST_SERVICE_UNAVAILABLE(
       "WTH_009", HttpStatus.SERVICE_UNAVAILABLE, "기상청 단기예보 서비스를 이용할 수 없습니다."),
   WEATHER_FORECAST_LOOKUP_FAILED(
-      "WTH_010", HttpStatus.BAD_GATEWAY, "기상청 단기예보를 조회할 수 없습니다.");
+      "WTH_010", HttpStatus.BAD_GATEWAY, "기상청 단기예보를 조회할 수 없습니다."),
+  WEATHER_FORECAST_BATCH_PARTIAL_FAILURE(
+      "WTH_011", HttpStatus.INTERNAL_SERVER_ERROR, "일부 위치의 단기예보 수집에 실패했습니다.");
 
   private final String code;
   private final HttpStatus status;
