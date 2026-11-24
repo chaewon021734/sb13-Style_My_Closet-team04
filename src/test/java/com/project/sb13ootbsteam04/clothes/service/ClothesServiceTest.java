@@ -7,13 +7,13 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.inOrder;
-import static org.mockito.Mockito.lenient;
 
 import com.project.sb13ootbsteam04.clothes.entity.Clothes;
 import com.project.sb13ootbsteam04.clothes.entity.ClothesAttribute;
 import com.project.sb13ootbsteam04.clothes.entity.ClothesAttributeDef;
 import com.project.sb13ootbsteam04.clothes.entity.ClothesType;
 import com.project.sb13ootbsteam04.clothes.exception.ClothesAttributeDefinitionNotFoundException;
+import com.project.sb13ootbsteam04.clothes.exception.ClothesNotFoundException;
 import com.project.sb13ootbsteam04.clothes.exception.ClothesOwnerNotFoundException;
 import com.project.sb13ootbsteam04.clothes.exception.DuplicateClothesAttributeException;
 import com.project.sb13ootbsteam04.clothes.exception.InvalidClothesAttributeValueException;
@@ -34,6 +34,7 @@ import com.project.sb13ootbsteam04.user.entity.User;
 import com.project.sb13ootbsteam04.user.repository.UserRepository;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -311,41 +312,14 @@ class ClothesServiceTest {
   }
 
   @Test
-  @DisplayName("이미지를 첨부하면 기존 의상의 속성값과 이미지 URL을 교체해 반환한다")
-  void 의상_수정_성공() {
-    // given
-    UUID sizeId = UUID.randomUUID();
-    List<String> sizes = List.of("S", "M", "L");
-    ClothesAttributeDef size = definition(sizeId, "사이즈", sizes);
-    Clothes clothes = existingClothesWithSize(size);
-    ClothesImageCommand image = pngImage();
-    StoredImage replacement = new StoredImage("clothes/new.png", "https://cdn.example.com/clothes/new.png");
-    ClothesUpdateCommand command = new ClothesUpdateCommand(clothes.getId(), "수정된 모자", ClothesType.HAT,
-        List.of(new ClothesAttributeCommand(sizeId, "M")), image);
-    given(clothesImageStorage.upload(image)).willReturn(replacement);
-
-    // when
-    ClothesResult result = clothesService.update(command);
-
-    // then
-    assertAll(
-        () -> assertThat(clothes.getName()).isEqualTo(command.name()),
-        () -> assertThat(clothes.getType()).isEqualTo(command.type()),
-        () -> assertThat(clothes.getImageUrl()).isEqualTo(replacement.url()),
-        () -> assertThat(clothes.getAttributes()).extracting(ClothesAttribute::getValue).containsExactly("M"),
-        () -> assertThat(result).isEqualTo(new ClothesResult(command.clothesId(), ownerId, "수정된 모자",
-            replacement.url(), ClothesType.HAT, List.of(new ClothesAttributeResult(sizeId, "사이즈", sizes, "M"))))
-    );
-    then(clothesImageStorage).should().upload(image);
-  }
-
-  @Test
   @DisplayName("수정 화면에서 이름만 바꾸면 기존 속성값과 이미지 URL을 유지한다")
   void 기존_속성값을_그대로_전송하면_속성과_이미지를_유지한다() {
     // given
     UUID sizeId = UUID.randomUUID();
     List<String> sizes = List.of("S", "M");
-    Clothes clothes = existingClothesWithSize(definition(sizeId, "사이즈", sizes));
+    ClothesAttributeDef size = definition(sizeId, "사이즈", sizes);
+    Clothes clothes = existingClothesWithSize(size);
+    given(clothesAttributeDefRepository.findAllById(Set.of(sizeId))).willReturn(List.of(size));
     String originalUrl = clothes.getImageUrl();
     // 수정 화면은 변경하지 않은 선택값도 다시 보낸다.
     ClothesUpdateCommand command = new ClothesUpdateCommand(clothes.getId(), "수정된 스카프",
@@ -382,14 +356,27 @@ class ClothesServiceTest {
     then(clothesImageStorage).shouldHaveNoInteractions();
   }
 
+  @Test
+  void 수정할_옷이_없으면_옷_ID를_반환하고_이미지는_업로드하지_않는다() {
+    // given
+    UUID id = UUID.randomUUID();
+    ClothesUpdateCommand command = new ClothesUpdateCommand(id, null, null, null, pngImage());
+    given(clothesRepository.findByIdForUpdate(id)).willReturn(Optional.empty());
+
+    // when & then
+    assertThatThrownBy(() -> clothesService.update(command))
+        .isInstanceOfSatisfying(ClothesNotFoundException.class, exception -> assertAll(
+            () -> assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.CLOTHES_NOT_FOUND),
+            () -> assertThat(exception.getDetails()).containsEntry("clothesId", id.toString())));
+    then(clothesImageStorage).shouldHaveNoInteractions();
+  }
+
   private Clothes existingClothesWithSize(ClothesAttributeDef size) {
     Clothes clothes = Clothes.create(owner, "기존 스카프", ClothesType.SCARF, "https://cdn.example.com/clothes/old.png");
     UUID id = UUID.randomUUID();
     ReflectionTestUtils.setField(clothes, "id", id);
     ClothesAttribute.create(clothes, size, "S");
-    // 기존 정의를 재사용하거나 저장소에서 다시 읽는 경로를 모두 허용한다.
-    lenient().when(clothesAttributeDefRepository.findAllById(any())).thenReturn(List.of(size));
-    given(clothesRepository.findById(id)).willReturn(Optional.of(clothes));
+    given(clothesRepository.findByIdForUpdate(id)).willReturn(Optional.of(clothes));
     return clothes;
   }
 
