@@ -41,4 +41,9 @@ public class ClothesAttribute extends IdEntity {
     clothes.registerAttribute(attribute);
     return attribute;
   }
+
+  public void changeValue(String value) {
+    // 기존 행을 유지하고 정의에 등록된 표기로 값을 저장한다.
+    this.value = definition.resolveSelectableValue(value);
+  }
 }

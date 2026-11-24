@@ -100,4 +100,14 @@ public class Clothes extends UpdatedAtEntity {
     }
     return normalized;
   }
+
+  public void update(String name, ClothesType type) {
+    // PATCH에서 전달된 기본 정보만 변경한다.
+    if (name != null) {
+      this.name = normalizeName(name);
+    }
+    if (type != null) {
+      this.type = type;
+    }
+  }
 }
