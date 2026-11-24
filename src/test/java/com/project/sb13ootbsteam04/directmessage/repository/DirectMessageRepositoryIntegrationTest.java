@@ -133,4 +133,41 @@ class DirectMessageRepositoryIntegrationTest {
         .extracting(DirectMessage::getId)
         .containsExactlyElementsOf(expected);
   }
+
+  @Test
+  void findNextPage_returnsMessagesOlderThanCursor() {
+    User userA = userRepository.saveAndFlush(
+        new User("사용자A", "cursor-a-" + UUID.randomUUID() + "@test.com", "password")
+    );
+    User userB = userRepository.saveAndFlush(
+        new User("사용자B", "cursor-b-" + UUID.randomUUID() + "@test.com", "password")
+    );
+
+    DirectMessage message1 = directMessageRepository.saveAndFlush(
+        new DirectMessage(userA, userB, "첫 번째 메시지")
+    );
+    DirectMessage message2 = directMessageRepository.saveAndFlush(
+        new DirectMessage(userB, userA, "두 번째 메시지")
+    );
+    DirectMessage message3 = directMessageRepository.saveAndFlush(
+        new DirectMessage(userA, userB, "세 번째 메시지")
+    );
+    DirectMessage message4 = directMessageRepository.saveAndFlush(
+        new DirectMessage(userB, userA, "네 번째 메시지")
+    );
+
+    entityManager.clear();
+
+    var result = directMessageRepository.findNextPage(
+        userA.getId(),
+        userB.getId(),
+        message2.getCreatedAt(),
+        message2.getId(),
+        org.springframework.data.domain.PageRequest.ofSize(10)
+    );
+
+    assertThat(result)
+        .extracting(DirectMessage::getId)
+        .containsExactly(message1.getId());
+  }
 }
