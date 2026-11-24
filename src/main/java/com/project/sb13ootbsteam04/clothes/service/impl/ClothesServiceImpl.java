@@ -14,6 +14,7 @@ import com.project.sb13ootbsteam04.clothes.service.ClothesService;
 import com.project.sb13ootbsteam04.clothes.service.dto.ClothesAttributeCommand;
 import com.project.sb13ootbsteam04.clothes.service.dto.ClothesCreateCommand;
 import com.project.sb13ootbsteam04.clothes.service.dto.ClothesResult;
+import com.project.sb13ootbsteam04.clothes.service.dto.ClothesUpdateCommand;
 import com.project.sb13ootbsteam04.clothes.storage.ClothesImageStorage;
 import com.project.sb13ootbsteam04.clothes.storage.StoredImage;
 import com.project.sb13ootbsteam04.user.entity.User;
@@ -79,6 +80,11 @@ public class ClothesServiceImpl implements ClothesService {
       }
       throw exception;
     }
+  }
+
+  @Override
+  public ClothesResult update(ClothesUpdateCommand command) {
+    throw new UnsupportedOperationException("옷 수정 기능은 아직 구현되지 않았습니다.");
   }
 
   private User findOwner(UUID ownerId) {
