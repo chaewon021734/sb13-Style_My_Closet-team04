@@ -1,4 +1,3 @@
-
 package com.project.sb13ootbsteam04.feed.service;
 
 import com.project.sb13ootbsteam04.clothes.repository.ClothesRepository;
@@ -130,12 +129,14 @@ class FeedServiceTest {
 
         when(request.authorId()).thenReturn(userId);
         when(request.weatherId()).thenReturn(weatherId);
+        when(request.clothesIds()).thenReturn(null);
         when(weatherRepository.existsById(weatherId)).thenReturn(true);
 
-        assertThrows(
+        IllegalArgumentException exception = assertThrows(
                 IllegalArgumentException.class,
                 () -> feedService.createFeed(request, userId)
         );
+        assertEquals("의상 목록은 필수입니다.", exception.getMessage());
     }
 
     @Test
@@ -295,6 +296,7 @@ class FeedServiceTest {
         );
 
         verify(feedRepository, never()).delete(any(Feed.class));
+        verifyNoInteractions(feedClothesRepository, feedLikeRepository, commentRepository);
     }
 
     // ========================================

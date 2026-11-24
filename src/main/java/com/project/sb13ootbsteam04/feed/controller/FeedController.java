@@ -1,4 +1,3 @@
-
 package com.project.sb13ootbsteam04.feed.controller;
 
 import com.project.sb13ootbsteam04.feed.dto.CreateFeedRequest;
@@ -6,6 +5,7 @@ import com.project.sb13ootbsteam04.feed.dto.FeedPageResponse;
 import com.project.sb13ootbsteam04.feed.dto.FeedResponse;
 import com.project.sb13ootbsteam04.feed.dto.UpdateFeedRequest;
 import com.project.sb13ootbsteam04.feed.service.FeedService;
+import io.swagger.v3.oas.annotations.Operation;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -29,6 +29,7 @@ public class FeedController {
     // 피드 목록 조회
     // ========================================
 
+    @Operation(summary = "피드 목록 조회", description = "좋아요 수(likeCount) 정렬은 각 요청 시점의 값을 기준으로 합니다. 페이지 조회 사이에 좋아요 수가 변경되면 피드가 중복되거나 누락될 수 있으며, 페이지 간 정렬 일관성을 보장하지 않습니다.")
     @GetMapping
     public ResponseEntity<FeedPageResponse> getFeeds(
             @RequestParam(required = false) String cursor,
