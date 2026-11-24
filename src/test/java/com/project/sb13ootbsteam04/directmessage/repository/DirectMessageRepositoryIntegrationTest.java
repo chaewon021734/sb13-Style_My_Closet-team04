@@ -90,4 +90,47 @@ class DirectMessageRepositoryIntegrationTest {
             messageBtoA.getId()
         );
   }
+
+  //
+  @Test
+  void findFirstPage_returnsMessagesInLatestFirstOrder() {
+    User userA = userRepository.saveAndFlush(
+        new User("사용자A", "order-a-" + UUID.randomUUID() + "@test.com", "password")
+    );
+    User userB = userRepository.saveAndFlush(
+        new User("사용자B", "order-b-" + UUID.randomUUID() + "@test.com", "password")
+    );
+
+    DirectMessage message1 = directMessageRepository.saveAndFlush(
+        new DirectMessage(userA, userB, "첫 번째 메시지")
+    );
+    DirectMessage message2 = directMessageRepository.saveAndFlush(
+        new DirectMessage(userB, userA, "두 번째 메시지")
+    );
+    DirectMessage message3 = directMessageRepository.saveAndFlush(
+        new DirectMessage(userA, userB, "세 번째 메시지")
+    );
+
+    entityManager.clear();
+
+    var result = directMessageRepository.findFirstPage(
+        userA.getId(),
+        userB.getId(),
+        org.springframework.data.domain.PageRequest.ofSize(10)
+    );
+
+    var expected = java.util.stream.Stream.of(message1, message2, message3)
+        .sorted(
+            java.util.Comparator
+                .comparing(DirectMessage::getCreatedAt)
+                .thenComparing(DirectMessage::getId)
+                .reversed()
+        )
+        .map(DirectMessage::getId)
+        .toList();
+
+    assertThat(result)
+        .extracting(DirectMessage::getId)
+        .containsExactlyElementsOf(expected);
+  }
 }
