@@ -29,6 +29,31 @@ public interface DirectMessageRepository extends JpaRepository<DirectMessage, UU
       Pageable pageable
   );
 
+  // 다음 페이지 조회
+  @Query("""
+            SELECT dm
+            FROM DirectMessage dm
+            WHERE (
+                (dm.sender.id = :userId AND dm.receiver.id = :targetUserId)
+                OR
+                (dm.sender.id = :targetUserId AND dm.receiver.id = :userId)
+            )
+            AND (
+                dm.createdAt < :cursor
+                OR (
+                    dm.createdAt = :cursor
+                    AND dm.id < :idAfter
+                )
+            )
+            ORDER BY dm.createdAt DESC, dm.id DESC
+            """)
+  List<DirectMessage> findNextPage(
+      @Param("userId") UUID userId,
+      @Param("targetUserId") UUID targetUserId,
+      @Param("cursor") Instant cursor,
+      @Param("idAfter") UUID idAfter,
+      Pageable pageable
+  );
 
   // 두 사용자 사이의 전체 메시지 개수
   @Query("""
