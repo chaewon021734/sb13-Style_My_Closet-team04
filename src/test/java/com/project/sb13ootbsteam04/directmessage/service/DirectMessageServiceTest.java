@@ -57,4 +57,21 @@ class DirectMessageServiceTest {
         )
     ).isInstanceOf(IllegalArgumentException.class);
   }
+
+  @Test
+  void getMessages_throwsException_whenCursorFormatIsInvalid() {
+    UUID userId = UUID.randomUUID();
+    UUID targetUserId = UUID.randomUUID();
+    UUID idAfter = UUID.randomUUID();
+
+    assertThatThrownBy(() ->
+        directMessageService.getMessages(
+            userId,
+            targetUserId,
+            "invalid-date",
+            idAfter,
+            10
+        )
+    ).isInstanceOf(IllegalArgumentException.class);
+  }
 }
