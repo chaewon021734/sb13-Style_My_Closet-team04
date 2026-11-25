@@ -4,11 +4,13 @@ import com.project.sb13ootbsteam04.clothes.controller.dto.ClothesAttributeDto;
 import com.project.sb13ootbsteam04.clothes.controller.dto.ClothesAttributeWithDefDto;
 import com.project.sb13ootbsteam04.clothes.controller.dto.ClothesCreateRequest;
 import com.project.sb13ootbsteam04.clothes.controller.dto.ClothesDto;
+import com.project.sb13ootbsteam04.clothes.controller.dto.ClothesDtoCursorResponse;
 import com.project.sb13ootbsteam04.clothes.entity.Clothes;
 import com.project.sb13ootbsteam04.clothes.entity.ClothesAttribute;
 import com.project.sb13ootbsteam04.clothes.service.dto.ClothesAttributeCommand;
 import com.project.sb13ootbsteam04.clothes.service.dto.ClothesAttributeResult;
 import com.project.sb13ootbsteam04.clothes.service.dto.ClothesCreateCommand;
+import com.project.sb13ootbsteam04.clothes.service.dto.ClothesCursorResult;
 import com.project.sb13ootbsteam04.clothes.service.dto.ClothesResult;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
@@ -33,4 +35,6 @@ public interface ClothesMapper {
   ClothesAttributeResult toResult(ClothesAttribute attribute);
 
   ClothesAttributeWithDefDto toDto(ClothesAttributeResult result);
+
+  ClothesDtoCursorResponse toDto(ClothesCursorResult result);
 }

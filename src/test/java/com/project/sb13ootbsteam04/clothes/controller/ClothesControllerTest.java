@@ -1,9 +1,12 @@
 package com.project.sb13ootbsteam04.clothes.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -16,8 +19,11 @@ import com.project.sb13ootbsteam04.clothes.exception.ClothesImageStorageExceptio
 import com.project.sb13ootbsteam04.clothes.mapper.ClothesMapper;
 import com.project.sb13ootbsteam04.clothes.service.ClothesService;
 import com.project.sb13ootbsteam04.clothes.service.dto.ClothesAttributeCommand;
+import com.project.sb13ootbsteam04.clothes.service.dto.ClothesAttributeResult;
 import com.project.sb13ootbsteam04.clothes.service.dto.ClothesCreateCommand;
+import com.project.sb13ootbsteam04.clothes.service.dto.ClothesCursorResult;
 import com.project.sb13ootbsteam04.clothes.service.dto.ClothesResult;
+import com.project.sb13ootbsteam04.clothes.service.dto.ClothesSearchCommand;
 import com.project.sb13ootbsteam04.global.exception.GlobalExceptionHandler;
 import java.util.List;
 import java.util.UUID;
@@ -25,8 +31,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mapstruct.factory.Mappers;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
@@ -42,8 +50,9 @@ class ClothesControllerTest {
   @Mock
   private ClothesService clothesService;
 
-  @Mock
-  private ClothesMapper clothesMapper;
+  // 목록 응답은 실제 매퍼를 사용하고 등록 테스트의 기존 스텁도 지원한다.
+  @Spy
+  private ClothesMapper clothesMapper = Mappers.getMapper(ClothesMapper.class);
 
   private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -259,6 +268,78 @@ class ClothesControllerTest {
 
     then(clothesMapper).shouldHaveNoInteractions();
     then(clothesService).shouldHaveNoInteractions();
+  }
+
+  @Test
+  @DisplayName("첫 페이지는 ownerId와 limit만 받아 의상과 다음 페이지 커서를 반환한다")
+  void 옷_목록_첫_페이지_조회() throws Exception {
+    // given
+    UUID ownerId = UUID.randomUUID(), clothesId = UUID.randomUUID(), definitionId = UUID.randomUUID();
+    String nextCursor = "2026-11-19T02:00:00Z";
+    ClothesAttributeResult attribute = new ClothesAttributeResult(definitionId, "색상", List.of("블랙", "크림"), "크림");
+    ClothesResult clothes = new ClothesResult(clothesId, ownerId, "재킷", "https://cdn.example.com/jacket.png", ClothesType.OUTER, List.of(attribute));
+    ClothesSearchCommand command = new ClothesSearchCommand(null, null, 1, null, ownerId);
+    given(clothesService.search(command)).willReturn(new ClothesCursorResult(List.of(clothes), nextCursor, clothesId, true, 2, "createdAt", "DESCENDING"));
+
+    // when & then: 정적 클라이언트가 사용하는 JSON 키와 커서 값을 검증한다.
+    mockMvc.perform(get("/api/clothes").param("ownerId", ownerId.toString()).param("limit", "1"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.length()").value(1))
+        .andExpect(jsonPath("$.data[0].id").value(clothesId.toString()))
+        .andExpect(jsonPath("$.data[0].ownerId").value(ownerId.toString()))
+        .andExpect(jsonPath("$.data[0].name").value("재킷"))
+        .andExpect(jsonPath("$.data[0].imageUrl").value(clothes.imageUrl()))
+        .andExpect(jsonPath("$.data[0].type").value("OUTER"))
+        .andExpect(jsonPath("$.data[0].attributes[0].definitionId").value(definitionId.toString()))
+        .andExpect(jsonPath("$.data[0].attributes[0].definitionName").value("색상"))
+        .andExpect(jsonPath("$.data[0].attributes[0].selectableValues").value(contains("블랙", "크림")))
+        .andExpect(jsonPath("$.data[0].attributes[0].value").value("크림"))
+        .andExpect(jsonPath("$.nextCursor").value(nextCursor))
+        .andExpect(jsonPath("$.nextIdAfter").value(clothesId.toString()))
+        .andExpect(jsonPath("$.hasNext").value(true))
+        .andExpect(jsonPath("$.totalCount").value(2))
+        .andExpect(jsonPath("$.sortBy").value("createdAt"))
+        .andExpect(jsonPath("$.sortDirection").value("DESCENDING"));
+    then(clothesService).should().search(command);
+  }
+
+  @Test
+  @DisplayName("다음 페이지는 커서 쌍과 의상 타입을 서비스에 전달하고 마지막 페이지를 반환한다")
+  void 옷_목록_다음_페이지() throws Exception {
+    // given
+    UUID ownerId = UUID.randomUUID(), idAfter = UUID.randomUUID();
+    String cursor = "2026-11-19T02:00:00Z";
+    ClothesSearchCommand command = new ClothesSearchCommand(cursor, idAfter, 1, ClothesType.ETC, ownerId);
+    ClothesResult last = new ClothesResult(UUID.randomUUID(), ownerId, "머리끈", null, ClothesType.ETC, List.of());
+    given(clothesService.search(command)).willReturn(new ClothesCursorResult(List.of(last), null, null, false, 2, "createdAt", "DESCENDING"));
+
+    // when & then
+    mockMvc.perform(get("/api/clothes").param("ownerId", ownerId.toString()).param("limit", "1")
+            .param("cursor", cursor).param("idAfter", idAfter.toString()).param("typeEqual", "ETC"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data[0].id").value(last.id().toString()))
+        .andExpect(jsonPath("$.hasNext").value(false))
+        .andExpect(jsonPath("$.nextCursor").value(nullValue()))
+        .andExpect(jsonPath("$.nextIdAfter").value(nullValue()));
+    then(clothesService).should().search(command);
+  }
+
+  @Test
+  @DisplayName("서비스가 잘못된 커서를 거부하면 공통 오류 형식으로 400을 반환한다")
+  void 옷_목록_잘못된_커서() throws Exception {
+    // given
+    UUID ownerId = UUID.randomUUID(), idAfter = UUID.randomUUID();
+    ClothesSearchCommand command = new ClothesSearchCommand("invalid", idAfter, 10, null, ownerId);
+    given(clothesService.search(command)).willThrow(new IllegalArgumentException("cursor 형식 오류"));
+
+    // when & then
+    mockMvc.perform(get("/api/clothes").param("ownerId", ownerId.toString()).param("limit", "10")
+            .param("cursor", "invalid").param("idAfter", idAfter.toString()))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.exceptionName").value("IllegalArgumentException"))
+        .andExpect(jsonPath("$.message").value("요청 값이 올바르지 않습니다"))
+        .andExpect(jsonPath("$.details").isMap());
+    then(clothesService).should().search(command);
   }
 
   private MockMultipartFile requestPart(ClothesCreateRequest request) throws Exception {
