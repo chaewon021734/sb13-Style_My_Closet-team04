@@ -54,4 +54,19 @@ public interface DirectMessageRepository extends JpaRepository<DirectMessage, UU
       @Param("idAfter") UUID idAfter,
       Pageable pageable
   );
+
+  // 두 사용자 사이의 전체 메시지 개수
+  @Query("""
+            SELECT COUNT(dm)
+            FROM DirectMessage dm
+            WHERE (
+                (dm.sender.id = :userId AND dm.receiver.id = :targetUserId)
+                OR
+                (dm.sender.id = :targetUserId AND dm.receiver.id = :userId)
+            )
+            """)
+  long countMessagesBetweenUsers(
+      @Param("userId") UUID userId,
+      @Param("targetUserId") UUID targetUserId
+  );
 }
