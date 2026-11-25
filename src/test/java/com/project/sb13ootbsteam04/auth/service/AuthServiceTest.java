@@ -2,6 +2,7 @@ package com.project.sb13ootbsteam04.auth.service;
 
 import com.project.sb13ootbsteam04.auth.dto.request.LoginRequest;
 import com.project.sb13ootbsteam04.auth.dto.response.LoginResponse;
+import com.project.sb13ootbsteam04.auth.exception.LoginAttemptBlockedException;
 import com.project.sb13ootbsteam04.auth.jwt.JwtTokenProvider;
 import com.project.sb13ootbsteam04.user.entity.User;
 import com.project.sb13ootbsteam04.user.repository.UserRepository;
@@ -15,10 +16,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
 import java.util.Optional;
@@ -36,6 +35,9 @@ class AuthServiceTest {
     private static final String LOGIN_FAILURE_MESSAGE =
             "이메일 또는 비밀번호가 올바르지 않습니다.";
 
+    private static final String LOGIN_BLOCK_MESSAGE =
+            "로그인 시도 횟수가 초과되었습니다. 잠시 후 다시 시도해 주세요.";
+
     @Mock
     private UserRepository userRepository;
 
@@ -45,7 +47,6 @@ class AuthServiceTest {
     @Mock
     private JwtTokenProvider jwtTokenProvider;
 
-    // 로그인 실패 횟수 관리 Service 추가
     @Mock
     private LoginAttemptService loginAttemptService;
 
@@ -75,13 +76,11 @@ class AuthServiceTest {
     // ========================================
 
     private void mockUserFound() {
-
         when(userRepository.findByEmailForUpdate(EMAIL))
                 .thenReturn(Optional.of(user));
     }
 
     private void mockNormalPasswordSuccess() {
-
         when(passwordEncoder.matches(
                 "password123",
                 "encodedPassword"
@@ -91,7 +90,6 @@ class AuthServiceTest {
     private LoginRequest createTemporaryRequest(
             String temporaryPassword
     ) {
-
         return new LoginRequest(
                 EMAIL,
                 temporaryPassword
@@ -105,18 +103,15 @@ class AuthServiceTest {
     @Test
     void shouldLoginSuccessfully() {
 
-        // given
         mockUserFound();
         mockNormalPasswordSuccess();
 
         when(jwtTokenProvider.generateAccessToken(user))
                 .thenReturn("test.jwt.token");
 
-        // when
         LoginResponse response =
                 authService.login(loginRequest);
 
-        // then
         assertEquals(
                 "test.jwt.token",
                 response.accessToken()
@@ -127,10 +122,7 @@ class AuthServiceTest {
                 response.tokenType()
         );
 
-        assertEquals(
-                1L,
-                user.getLoginVersion()
-        );
+        assertEquals(1L, user.getLoginVersion());
 
         verify(userRepository)
                 .findByEmailForUpdate(EMAIL);
@@ -141,7 +133,6 @@ class AuthServiceTest {
         verify(jwtTokenProvider)
                 .generateAccessToken(user);
 
-        // 로그인 성공 시 실패 기록 초기화
         verify(loginAttemptService)
                 .recordSuccess(EMAIL);
 
@@ -156,17 +147,14 @@ class AuthServiceTest {
     @Test
     void shouldRejectUnknownEmail() {
 
-        // given
         when(userRepository.findByEmailForUpdate(EMAIL))
                 .thenReturn(Optional.empty());
 
-        // when
         BadCredentialsException exception = assertThrows(
                 BadCredentialsException.class,
                 () -> authService.login(loginRequest)
         );
 
-        // then
         assertEquals(
                 LOGIN_FAILURE_MESSAGE,
                 exception.getMessage()
@@ -191,7 +179,6 @@ class AuthServiceTest {
     @Test
     void shouldRejectWrongPassword() {
 
-        // given
         mockUserFound();
 
         when(passwordEncoder.matches(
@@ -199,27 +186,21 @@ class AuthServiceTest {
                 "encodedPassword"
         )).thenReturn(false);
 
-        // when
         BadCredentialsException exception = assertThrows(
                 BadCredentialsException.class,
                 () -> authService.login(loginRequest)
         );
 
-        // then
         assertEquals(
                 LOGIN_FAILURE_MESSAGE,
                 exception.getMessage()
         );
 
-        assertEquals(
-                0L,
-                user.getLoginVersion()
-        );
+        assertEquals(0L, user.getLoginVersion());
 
         verify(passwordEncoder)
                 .matches("password123", "encodedPassword");
 
-        // 로그인 실패 횟수 기록
         verify(loginAttemptService)
                 .recordFailure(EMAIL);
 
@@ -236,34 +217,26 @@ class AuthServiceTest {
     @Test
     void shouldRejectLoginWhenAccountIsLocked() {
 
-        // given
         user.changeLocked(true);
         mockUserFound();
 
-        // when
         BadCredentialsException exception = assertThrows(
                 BadCredentialsException.class,
                 () -> authService.login(loginRequest)
         );
 
-        // then
         assertEquals(
                 LOGIN_FAILURE_MESSAGE,
                 exception.getMessage()
         );
 
-        assertEquals(
-                0L,
-                user.getLoginVersion()
-        );
+        assertEquals(0L, user.getLoginVersion());
 
-        // 관리자 잠금 계정은 비밀번호 검증 전 차단
         verifyNoInteractions(
                 passwordEncoder,
                 jwtTokenProvider
         );
 
-        // 관리자 잠금은 로그인 실패 횟수와 별개
         verify(loginAttemptService, never())
                 .recordSuccess(anyString());
 
@@ -278,7 +251,6 @@ class AuthServiceTest {
     @Test
     void shouldRejectLockedAccountWithWrongPassword() {
 
-        // given
         user.changeLocked(true);
         mockUserFound();
 
@@ -287,24 +259,18 @@ class AuthServiceTest {
                 "wrongPassword"
         );
 
-        // when
         BadCredentialsException exception = assertThrows(
                 BadCredentialsException.class,
                 () -> authService.login(wrongRequest)
         );
 
-        // then
         assertEquals(
                 LOGIN_FAILURE_MESSAGE,
                 exception.getMessage()
         );
 
-        assertEquals(
-                0L,
-                user.getLoginVersion()
-        );
+        assertEquals(0L, user.getLoginVersion());
 
-        // 잠긴 계정은 비밀번호가 무엇이든 차단
         verifyNoInteractions(
                 passwordEncoder,
                 jwtTokenProvider
@@ -321,28 +287,19 @@ class AuthServiceTest {
     @Test
     void shouldIncreaseLoginVersionOnRelogin() {
 
-        // given
         mockUserFound();
         mockNormalPasswordSuccess();
 
         when(jwtTokenProvider.generateAccessToken(user))
                 .thenReturn("test.jwt.token");
 
-        // when
         authService.login(loginRequest);
 
-        assertEquals(
-                1L,
-                user.getLoginVersion()
-        );
+        assertEquals(1L, user.getLoginVersion());
 
         authService.login(loginRequest);
 
-        // then
-        assertEquals(
-                2L,
-                user.getLoginVersion()
-        );
+        assertEquals(2L, user.getLoginVersion());
 
         verify(userRepository, times(2))
                 .findByEmailForUpdate(EMAIL);
@@ -355,13 +312,12 @@ class AuthServiceTest {
     }
 
     // ========================================
-    // 7. 로그인 버전 증가 후 일반 JWT 발급
+    // 7. 버전 증가 후 일반 JWT 발급
     // ========================================
 
     @Test
     void shouldIncreaseVersionBeforeGeneratingToken() {
 
-        // given
         mockUserFound();
         mockNormalPasswordSuccess();
 
@@ -379,20 +335,15 @@ class AuthServiceTest {
                     return "test.jwt.token";
                 });
 
-        // when
         LoginResponse response =
                 authService.login(loginRequest);
 
-        // then
         assertEquals(
                 "test.jwt.token",
                 response.accessToken()
         );
 
-        assertEquals(
-                1L,
-                user.getLoginVersion()
-        );
+        assertEquals(1L, user.getLoginVersion());
 
         InOrder inOrder = inOrder(
                 loginAttemptService,
@@ -424,19 +375,14 @@ class AuthServiceTest {
     @Test
     void shouldLoginWithValidTemporaryPassword() {
 
-        // given
-        String temporaryPassword =
-                "Temp1234!abc";
+        String temporaryPassword = "Temp1234!abc";
 
         user.issueTemporaryPassword(
                 "encodedTemporaryPassword",
                 Instant.now().plusSeconds(180)
         );
 
-        assertEquals(
-                1L,
-                user.getLoginVersion()
-        );
+        assertEquals(1L, user.getLoginVersion());
 
         LoginRequest temporaryRequest =
                 createTemporaryRequest(temporaryPassword);
@@ -456,11 +402,9 @@ class AuthServiceTest {
         when(jwtTokenProvider.generateTemporaryAccessToken(user))
                 .thenReturn("temporary.jwt.token");
 
-        // when
         LoginResponse response =
                 authService.login(temporaryRequest);
 
-        // then
         assertEquals(
                 "temporary.jwt.token",
                 response.accessToken()
@@ -471,13 +415,8 @@ class AuthServiceTest {
                 response.tokenType()
         );
 
-        // 발급 +1, 임시 로그인 +1
-        assertEquals(
-                2L,
-                user.getLoginVersion()
-        );
+        assertEquals(2L, user.getLoginVersion());
 
-        // 기존 일반 비밀번호 유지
         assertEquals(
                 "encodedPassword",
                 user.getPassword()
@@ -495,7 +434,6 @@ class AuthServiceTest {
         verify(jwtTokenProvider, never())
                 .generateAccessToken(user);
 
-        // 임시 비밀번호 로그인 성공도 실패 기록 초기화
         verify(loginAttemptService)
                 .recordSuccess(EMAIL);
     }
@@ -507,9 +445,7 @@ class AuthServiceTest {
     @Test
     void shouldRejectExpiredTemporaryPassword() {
 
-        // given
-        String temporaryPassword =
-                "Temp1234!abc";
+        String temporaryPassword = "Temp1234!abc";
 
         user.issueTemporaryPassword(
                 "encodedTemporaryPassword",
@@ -529,13 +465,11 @@ class AuthServiceTest {
                 "encodedPassword"
         )).thenReturn(false);
 
-        // when
         BadCredentialsException exception = assertThrows(
                 BadCredentialsException.class,
                 () -> authService.login(temporaryRequest)
         );
 
-        // then
         assertEquals(
                 LOGIN_FAILURE_MESSAGE,
                 exception.getMessage()
@@ -552,7 +486,6 @@ class AuthServiceTest {
                         "encodedTemporaryPassword"
                 );
 
-        // 임시 비밀번호 만료 시에도 실패 횟수 기록
         verify(loginAttemptService)
                 .recordFailure(EMAIL);
 
@@ -566,7 +499,6 @@ class AuthServiceTest {
     @Test
     void shouldRejectWrongTemporaryPassword() {
 
-        // given
         user.issueTemporaryPassword(
                 "encodedTemporaryPassword",
                 Instant.now().plusSeconds(180)
@@ -590,13 +522,11 @@ class AuthServiceTest {
                 "encodedTemporaryPassword"
         )).thenReturn(false);
 
-        // when
         BadCredentialsException exception = assertThrows(
                 BadCredentialsException.class,
                 () -> authService.login(temporaryRequest)
         );
 
-        // then
         assertEquals(
                 LOGIN_FAILURE_MESSAGE,
                 exception.getMessage()
@@ -626,9 +556,7 @@ class AuthServiceTest {
     @Test
     void shouldRejectTemporaryPasswordLoginWhenAccountIsLocked() {
 
-        // given
-        String temporaryPassword =
-                "Temp1234!abc";
+        String temporaryPassword = "Temp1234!abc";
 
         user.changeLocked(true);
 
@@ -645,13 +573,11 @@ class AuthServiceTest {
 
         mockUserFound();
 
-        // when
         BadCredentialsException exception = assertThrows(
                 BadCredentialsException.class,
                 () -> authService.login(temporaryRequest)
         );
 
-        // then
         assertEquals(
                 LOGIN_FAILURE_MESSAGE,
                 exception.getMessage()
@@ -662,7 +588,6 @@ class AuthServiceTest {
                 user.getLoginVersion()
         );
 
-        // 관리자 잠금 상태에서는 암호 검증 없이 차단
         verifyNoInteractions(
                 passwordEncoder,
                 jwtTokenProvider
@@ -679,19 +604,14 @@ class AuthServiceTest {
     @Test
     void shouldIncreaseLoginVersionOnTemporaryPasswordLogin() {
 
-        // given
-        String temporaryPassword =
-                "Temp1234!abc";
+        String temporaryPassword = "Temp1234!abc";
 
         user.issueTemporaryPassword(
                 "encodedTemporaryPassword",
                 Instant.now().plusSeconds(180)
         );
 
-        assertEquals(
-                1L,
-                user.getLoginVersion()
-        );
+        assertEquals(1L, user.getLoginVersion());
 
         LoginRequest temporaryRequest =
                 createTemporaryRequest(temporaryPassword);
@@ -714,7 +634,6 @@ class AuthServiceTest {
                     User tokenUser =
                             invocation.getArgument(0);
 
-                    // 발급 +1, 로그인 +1
                     assertEquals(
                             2L,
                             tokenUser.getLoginVersion()
@@ -723,20 +642,15 @@ class AuthServiceTest {
                     return "temporary.jwt.token";
                 });
 
-        // when
         LoginResponse response =
                 authService.login(temporaryRequest);
 
-        // then
         assertEquals(
                 "temporary.jwt.token",
                 response.accessToken()
         );
 
-        assertEquals(
-                2L,
-                user.getLoginVersion()
-        );
+        assertEquals(2L, user.getLoginVersion());
 
         verify(jwtTokenProvider)
                 .generateTemporaryAccessToken(user);
@@ -749,7 +663,7 @@ class AuthServiceTest {
     }
 
     // ========================================
-    // 13. 계정이 차단되면 로그인 요청 거부
+    // 13. 계정 일시 차단 시 전용 예외 발생
     // ========================================
 
     @Test
@@ -759,19 +673,33 @@ class AuthServiceTest {
         when(loginAttemptService.isBlocked(EMAIL))
                 .thenReturn(true);
 
+        when(loginAttemptService.getRetryAfterSeconds(EMAIL))
+                .thenReturn(600L);
+
         // when
-        ResponseStatusException exception = assertThrows(
-                ResponseStatusException.class,
+        LoginAttemptBlockedException exception = assertThrows(
+                LoginAttemptBlockedException.class,
                 () -> authService.login(loginRequest)
         );
 
         // then
         assertEquals(
-                HttpStatus.TOO_MANY_REQUESTS,
-                exception.getStatusCode()
+                LOGIN_BLOCK_MESSAGE,
+                exception.getMessage()
         );
 
-        // 계정 조회 및 비밀번호 검사 전에 차단
+        assertEquals(
+                600L,
+                exception.getRetryAfterSeconds()
+        );
+
+        verify(loginAttemptService)
+                .isBlocked(EMAIL);
+
+        verify(loginAttemptService)
+                .getRetryAfterSeconds(EMAIL);
+
+        // 차단 중에는 DB 조회 및 JWT 발급 없음
         verifyNoInteractions(
                 userRepository,
                 passwordEncoder,
@@ -792,7 +720,6 @@ class AuthServiceTest {
     @Test
     void shouldRecordFailureForWrongPassword() {
 
-        // given
         mockUserFound();
 
         when(passwordEncoder.matches(
@@ -800,13 +727,11 @@ class AuthServiceTest {
                 "encodedPassword"
         )).thenReturn(false);
 
-        // when
         assertThrows(
                 BadCredentialsException.class,
                 () -> authService.login(loginRequest)
         );
 
-        // then
         verify(loginAttemptService)
                 .isBlocked(EMAIL);
 
@@ -816,33 +741,27 @@ class AuthServiceTest {
         verify(loginAttemptService, never())
                 .recordSuccess(anyString());
 
-        assertEquals(
-                0L,
-                user.getLoginVersion()
-        );
+        assertEquals(0L, user.getLoginVersion());
 
         verifyNoInteractions(jwtTokenProvider);
     }
 
     // ========================================
-    // 15. 이전 실패 기록이 있어도 정상 로그인 시 초기화
+    // 15. 정상 로그인 시 실패 기록 초기화
     // ========================================
 
     @Test
     void shouldClearFailureHistoryAfterSuccessfulLogin() {
 
-        // given
         mockUserFound();
         mockNormalPasswordSuccess();
 
         when(jwtTokenProvider.generateAccessToken(user))
                 .thenReturn("test.jwt.token");
 
-        // when
         LoginResponse response =
                 authService.login(loginRequest);
 
-        // then
         assertEquals(
                 "test.jwt.token",
                 response.accessToken()
@@ -856,15 +775,19 @@ class AuthServiceTest {
     }
 
     // ========================================
-    // 16. 5회 실패 후 다음 로그인 시도 차단
+    // 16. 실패 횟수 제한 후 다음 로그인 요청 차단
     // ========================================
 
     @Test
     void shouldRejectLoginAfterFailureLimitReached() {
 
-        // given
+        // 첫 요청은 차단되지 않고,
+        // 두 번째 요청부터 차단된 상태로 가정
         when(loginAttemptService.isBlocked(EMAIL))
                 .thenReturn(false, true);
+
+        when(loginAttemptService.getRetryAfterSeconds(EMAIL))
+                .thenReturn(600L);
 
         mockUserFound();
 
@@ -873,7 +796,7 @@ class AuthServiceTest {
                 "encodedPassword"
         )).thenReturn(false);
 
-        // 1번째 실패
+        // 첫 번째 요청: 비밀번호 오류
         assertThrows(
                 BadCredentialsException.class,
                 () -> authService.login(loginRequest)
@@ -882,27 +805,38 @@ class AuthServiceTest {
         verify(loginAttemptService)
                 .recordFailure(EMAIL);
 
-        // 다음 요청에서는 이미 차단된 상태라고 가정
-        ResponseStatusException exception = assertThrows(
-                ResponseStatusException.class,
+        // 두 번째 요청: 계정 일시 차단
+        LoginAttemptBlockedException exception = assertThrows(
+                LoginAttemptBlockedException.class,
                 () -> authService.login(loginRequest)
         );
 
-        // then
         assertEquals(
-                HttpStatus.TOO_MANY_REQUESTS,
-                exception.getStatusCode()
+                LOGIN_BLOCK_MESSAGE,
+                exception.getMessage()
         );
 
-        // 차단된 요청에서는 추가 사용자 조회 없음
+        assertEquals(
+                600L,
+                exception.getRetryAfterSeconds()
+        );
+
+        // 차단된 요청은 DB에 접근하지 않음
         verify(userRepository, times(1))
                 .findByEmailForUpdate(EMAIL);
 
         verify(loginAttemptService, times(2))
                 .isBlocked(EMAIL);
 
+        verify(loginAttemptService)
+                .getRetryAfterSeconds(EMAIL);
+
+        // 실패 횟수 기록은 첫 요청에서만 실행
         verify(loginAttemptService, times(1))
                 .recordFailure(EMAIL);
+
+        verify(loginAttemptService, never())
+                .recordSuccess(anyString());
 
         verifyNoInteractions(jwtTokenProvider);
     }
