@@ -1,6 +1,7 @@
 package com.project.sb13ootbsteam04.clothes.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.contains;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
@@ -270,7 +271,7 @@ class ClothesControllerTest {
         .andExpect(jsonPath("$.type").value("BAG"))
         .andExpect(jsonPath("$.attributes[0].definitionId").value(definitionId.toString()))
         .andExpect(jsonPath("$.attributes[0].definitionName").value("색상"))
-        .andExpect(jsonPath("$.attributes[0].selectableValues").value(List.of("블랙", "핑크")))
+        .andExpect(jsonPath("$.attributes[0].selectableValues").value(contains("블랙", "핑크")))
         .andExpect(jsonPath("$.attributes[0].value").value("핑크"));
 
     ArgumentCaptor<ClothesUpdateCommand> captor = ArgumentCaptor.forClass(ClothesUpdateCommand.class);

@@ -12,11 +12,13 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 @SpringBootTest
+@ActiveProfiles("test")
 @DisplayName("의상 관리 OpenAPI 문서")
 class ClothesOpenApiTest {
 
@@ -45,5 +47,21 @@ class ClothesOpenApiTest {
         .andExpect(jsonPath(CREATE_MULTIPART_PATH + ".schema.properties.request['$ref']").value("#/components/schemas/ClothesCreateRequest"))
         .andExpect(jsonPath(CREATE_MULTIPART_PATH + ".schema.properties.image.type").value("string"))
         .andExpect(jsonPath(CREATE_MULTIPART_PATH + ".schema.properties.image.format").value("binary"));
+  }
+
+  @Test
+  void 의상_수정_OpenAPI_계약() throws Exception {
+    // given
+    String patch = "$.paths['/api/clothes/{clothesId}'].patch";
+    String multipart = patch + ".requestBody.content['multipart/form-data']";
+
+    // when & then
+    mockMvc.perform(get("/v3/api-docs"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath(multipart + ".encoding.request.contentType").value("application/json"))
+        .andExpect(jsonPath(multipart + ".schema.required").value(contains("request")))
+        .andExpect(jsonPath(multipart + ".schema.properties.request['$ref']").value("#/components/schemas/ClothesUpdateRequest"))
+        .andExpect(jsonPath(multipart + ".schema.properties.image.format").value("binary"))
+        .andExpect(jsonPath("$.components.schemas.ClothesUpdateRequest.required").doesNotExist());
   }
 }
