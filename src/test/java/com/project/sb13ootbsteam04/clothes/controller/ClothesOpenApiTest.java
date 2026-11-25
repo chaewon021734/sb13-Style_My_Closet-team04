@@ -74,6 +74,7 @@ class ClothesOpenApiTest {
   }
 
   @Test
+  @DisplayName("옷 수정 문서는 JSON 요청 파트만 필수로 지정하고 이미지와 수정 필드는 선택으로 둔다")
   void 의상_수정_OpenAPI_계약() throws Exception {
     // given
     String patch = "$.paths['/api/clothes/{clothesId}'].patch";

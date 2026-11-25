@@ -468,6 +468,7 @@ class ClothesServiceTest {
   }
 
   @Test
+  @DisplayName("수정할 옷이 없으면 해당 ID를 담은 예외를 던지고 이미지를 업로드하지 않는다")
   void 수정할_옷이_없으면_옷_ID를_반환하고_이미지는_업로드하지_않는다() {
     // given
     UUID id = UUID.randomUUID();

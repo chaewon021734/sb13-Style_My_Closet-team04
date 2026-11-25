@@ -24,6 +24,7 @@ import com.project.sb13ootbsteam04.user.entity.User;
 import jakarta.persistence.EntityManager;
 import java.util.List;
 import java.util.UUID;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
@@ -37,6 +38,7 @@ import org.springframework.transaction.support.TransactionOperations;
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import({JpaAuditingConfig.class, ClothesServiceImpl.class, ClothesMapperImpl.class})
+@DisplayName("의상 수정 트랜잭션")
 class ClothesUpdateIntegrationTest {
 
   @Autowired private ClothesService clothesService;
@@ -46,6 +48,7 @@ class ClothesUpdateIntegrationTest {
 
   @Test
   @Transactional(propagation = Propagation.NOT_SUPPORTED)
+  @DisplayName("수정이 커밋되면 기존 속성 행을 유지하고 소유자 목록에 새 이름·이미지·속성을 반환한다")
   void 이미지와_속성을_수정하면_기존_속성_행을_유지하고_변경사항을_커밋한다() {
     // given
     User owner = new User("소유자", UUID.randomUUID() + "@example.com", "password");
@@ -100,6 +103,7 @@ class ClothesUpdateIntegrationTest {
 
   @Test
   @Transactional(propagation = Propagation.NOT_SUPPORTED)
+  @DisplayName("이미지 교체가 롤백되면 기존 이름과 URL을 복원하고 새 이미지 키만 삭제 요청한다")
   void 이미지_교체가_롤백되면_기존_URL을_보존하고_새_객체만_삭제한다() {
     // given
     String originalUrl = "https://cdn.example.com/clothes/old.png";
