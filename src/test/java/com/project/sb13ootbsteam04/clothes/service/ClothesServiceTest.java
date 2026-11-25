@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.inOrder;
@@ -20,11 +21,15 @@ import com.project.sb13ootbsteam04.clothes.exception.InvalidClothesAttributeValu
 import com.project.sb13ootbsteam04.clothes.mapper.ClothesMapper;
 import com.project.sb13ootbsteam04.clothes.repository.ClothesAttributeDefRepository;
 import com.project.sb13ootbsteam04.clothes.repository.ClothesRepository;
+import com.project.sb13ootbsteam04.clothes.repository.dto.ClothesSearchCondition;
+import com.project.sb13ootbsteam04.clothes.repository.dto.ClothesSearchResult;
 import com.project.sb13ootbsteam04.clothes.service.dto.ClothesAttributeCommand;
 import com.project.sb13ootbsteam04.clothes.service.dto.ClothesAttributeResult;
 import com.project.sb13ootbsteam04.clothes.service.dto.ClothesCreateCommand;
+import com.project.sb13ootbsteam04.clothes.service.dto.ClothesCursorResult;
 import com.project.sb13ootbsteam04.clothes.service.dto.ClothesImageCommand;
 import com.project.sb13ootbsteam04.clothes.service.dto.ClothesResult;
+import com.project.sb13ootbsteam04.clothes.service.dto.ClothesSearchCommand;
 import com.project.sb13ootbsteam04.clothes.service.dto.ClothesUpdateCommand;
 import com.project.sb13ootbsteam04.clothes.service.impl.ClothesServiceImpl;
 import com.project.sb13ootbsteam04.clothes.storage.ClothesImageStorage;
@@ -32,6 +37,7 @@ import com.project.sb13ootbsteam04.clothes.storage.StoredImage;
 import com.project.sb13ootbsteam04.global.exception.ErrorCode;
 import com.project.sb13ootbsteam04.user.entity.User;
 import com.project.sb13ootbsteam04.user.repository.UserRepository;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -312,6 +318,111 @@ class ClothesServiceTest {
   }
 
   @Test
+  @DisplayName("커서 기반 페이징으로 의상을 조회할 수 있다")
+  void 의상_목록_조회_성공() {
+    // given
+    int limit = 2;
+    UUID firstClothesId = UUID.randomUUID();
+    UUID secondClothesId = UUID.randomUUID();
+    Instant firstCreatedAt = Instant.parse("2026-11-19T02:00:00Z");
+    Instant secondCreatedAt = Instant.parse("2026-11-19T01:00:00Z");
+    ClothesSearchCommand command = new ClothesSearchCommand(
+        null,
+        null,
+        limit,
+        ClothesType.DRESS,
+        ownerId
+    );
+    Clothes firstClothes = clothes(firstClothesId, "첫 번째 의상", firstCreatedAt);
+    Clothes secondClothes = clothes(secondClothesId, "두 번째 의상", secondCreatedAt);
+    ClothesAttributeResult attributeResult = new ClothesAttributeResult(
+        UUID.randomUUID(),
+        "색상",
+        List.of("블랙", "크림"),
+        "블랙"
+    );
+    ClothesResult firstResult = clothesResult(firstClothesId, "첫 번째 의상", attributeResult);
+    ClothesResult secondResult = clothesResult(secondClothesId, "두 번째 의상", attributeResult);
+    ClothesSearchResult searchResult = new ClothesSearchResult(
+        List.of(firstClothes, secondClothes),
+        true,
+        3
+    );
+    given(clothesRepository.search(any(ClothesSearchCondition.class))).willReturn(searchResult);
+    given(clothesMapper.toResult(firstClothes)).willReturn(firstResult);
+    given(clothesMapper.toResult(secondClothes)).willReturn(secondResult);
+
+    // when
+    ClothesCursorResult result = clothesService.search(command);
+
+    // then
+    then(clothesRepository).should()
+        .search(argThat(condition -> condition.cursor() == null
+                && condition.idAfter() == null
+                && condition.limit() == limit
+                && condition.typeEqual() == ClothesType.DRESS
+                && condition.ownerId().equals(ownerId)));
+    assertAll(
+        () -> assertThat(result.data()).containsExactly(firstResult, secondResult),
+        () -> assertThat(result.nextCursor()).isEqualTo(secondCreatedAt.toString()),
+        () -> assertThat(result.nextIdAfter()).isEqualTo(secondClothesId),
+        () -> assertThat(result.hasNext()).isTrue(),
+        () -> assertThat(result.totalCount()).isEqualTo(3),
+        () -> assertThat(result.sortBy()).isEqualTo("createdAt"),
+        () -> assertThat(result.sortDirection()).isEqualTo("DESCENDING")
+    );
+  }
+
+  @Test
+  @DisplayName("마지막 옷 목록 페이지에는 다음 커서를 노출하지 않는다")
+  void 의상_목록_마지막_페이지_조회() {
+    // given
+    UUID clothesId = UUID.randomUUID();
+    Instant cursor = Instant.parse("2026-11-19T02:00:00.123456Z");
+    UUID idAfter = UUID.randomUUID();
+    ClothesSearchCommand command = new ClothesSearchCommand(cursor.toString(), idAfter, 1, ClothesType.DRESS, ownerId);
+    // 직전 페이지의 커서 정밀도, ID, 필터가 모두 저장소에 전달되어야 한다.
+    ClothesSearchCondition condition = new ClothesSearchCondition(cursor, idAfter, 1, ClothesType.DRESS, ownerId);
+    Clothes clothes = clothes(clothesId, "마지막 의상", Instant.parse("2026-11-19T01:00:00Z"));
+    ClothesResult clothesResult = clothesResult(
+        clothesId,
+        "마지막 의상",
+        new ClothesAttributeResult(UUID.randomUUID(), "색상", List.of("블랙"), "블랙")
+    );
+    given(clothesRepository.search(condition)).willReturn(new ClothesSearchResult(List.of(clothes), false, 2));
+    given(clothesMapper.toResult(clothes)).willReturn(clothesResult);
+
+    // when
+    ClothesCursorResult result = clothesService.search(command);
+
+    // then
+    assertAll(
+        () -> assertThat(result.data()).containsExactly(clothesResult),
+        () -> assertThat(result.nextCursor()).isNull(),
+        () -> assertThat(result.nextIdAfter()).isNull(),
+        () -> assertThat(result.hasNext()).isFalse(),
+        () -> assertThat(result.totalCount()).isEqualTo(2)
+    );
+  }
+
+  @Test
+  @DisplayName("옷 목록 조회 커서 형식이 올바르지 않으면 저장소를 호출하지 않는다")
+  void 의상_목록_조회_커서_형식_오류() {
+    // given
+    ClothesSearchCommand command = new ClothesSearchCommand(
+        "invalid-cursor",
+        UUID.randomUUID(),
+        20,
+        null,
+        ownerId
+    );
+
+    // when & then
+    assertThatThrownBy(() -> clothesService.search(command)).isInstanceOf(IllegalArgumentException.class).hasMessage("cursor는 ISO-8601 날짜 형식이어야 합니다.");
+    then(clothesRepository).shouldHaveNoInteractions();
+  }
+
+  @Test
   @DisplayName("수정 화면에서 이름만 바꾸면 기존 속성값과 이미지 URL을 유지한다")
   void 기존_속성값을_그대로_전송하면_속성과_이미지를_유지한다() {
     // given
@@ -379,6 +490,25 @@ class ClothesServiceTest {
     given(clothesRepository.findByIdForUpdate(id)).willReturn(Optional.of(clothes));
     return clothes;
   }
+
+  private Clothes clothes(UUID id, String name, Instant createdAt) {
+    Clothes clothes = Clothes.create(owner, name, ClothesType.DRESS, null);
+    ReflectionTestUtils.setField(clothes, "id", id);
+    ReflectionTestUtils.setField(clothes, "createdAt", createdAt);
+    return clothes;
+  }
+
+  private ClothesResult clothesResult(UUID id, String name, ClothesAttributeResult attribute) {
+    return new ClothesResult(
+        id,
+        ownerId,
+        name,
+        null,
+        ClothesType.DRESS,
+        List.of(attribute)
+    );
+  }
+
 
   private ClothesCreateCommand command(List<ClothesAttributeCommand> attributes, ClothesImageCommand image) {
     return new ClothesCreateCommand(

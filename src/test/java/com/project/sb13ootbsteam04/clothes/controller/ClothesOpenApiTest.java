@@ -1,6 +1,7 @@
 package com.project.sb13ootbsteam04.clothes.controller;
 
 import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -33,6 +34,29 @@ class ClothesOpenApiTest {
   @BeforeEach
   void setUp() {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).build();
+  }
+
+  @Test
+  @DisplayName("옷 목록 조회 문서는 첫 페이지의 필수 쿼리와 커서 페이지 응답을 명시한다")
+  void 옷_목록_조회_OpenAPI_계약() throws Exception {
+    // given
+    String operation = "$.paths['/api/clothes'].get";
+    String params = operation + ".parameters";
+    String responses = operation + ".responses";
+
+    // when & then
+    mockMvc.perform(get("/v3/api-docs"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath(params + "[?(@.in == 'query')].name")
+            .value(containsInAnyOrder("cursor", "idAfter", "limit", "typeEqual", "ownerId")))
+        .andExpect(jsonPath(params + "[?(@.required == true)].name")
+            .value(containsInAnyOrder("ownerId", "limit")))
+        .andExpect(jsonPath(responses + "['200'].content['*/*'].schema['$ref']")
+            .value("#/components/schemas/ClothesDtoCursorResponse"))
+        .andExpect(jsonPath(responses + "['400'].content['*/*'].schema['$ref']")
+            .value("#/components/schemas/ErrorResponse"))
+        .andExpect(jsonPath(responses + "['500'].content['*/*'].schema['$ref']")
+            .value("#/components/schemas/ErrorResponse"));
   }
 
   @Test

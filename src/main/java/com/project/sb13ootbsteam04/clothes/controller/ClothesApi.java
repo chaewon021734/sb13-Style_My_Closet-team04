@@ -2,6 +2,8 @@ package com.project.sb13ootbsteam04.clothes.controller;
 
 import com.project.sb13ootbsteam04.clothes.controller.dto.ClothesCreateRequest;
 import com.project.sb13ootbsteam04.clothes.controller.dto.ClothesDto;
+import com.project.sb13ootbsteam04.clothes.controller.dto.ClothesDtoCursorResponse;
+import com.project.sb13ootbsteam04.clothes.entity.ClothesType;
 import com.project.sb13ootbsteam04.clothes.controller.dto.ClothesUpdateRequest;
 import com.project.sb13ootbsteam04.global.exception.ApiErrorResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -59,6 +61,31 @@ public interface ClothesApi {
       )
       ClothesCreateRequest request,
       MultipartFile image
+  );
+
+  @Operation(
+      summary = "옷 목록 조회",
+      description = "소유자의 옷을 등록일 내림차순으로 조회합니다. 다음 페이지는 직전 응답의 nextCursor와 nextIdAfter를 함께 전달합니다.")
+  @ApiResponses({
+      @ApiResponse(
+          responseCode = "200",
+          description = "옷 목록 조회 성공 (조회 조건에 맞는 의상이 없으면 빈 목록을 반환합니다.)",
+          content = @Content(schema = @Schema(implementation = ClothesDtoCursorResponse.class))),
+      @ApiResponse(
+          responseCode = "400",
+          description = "필수 파라미터 누락, 잘못된 UUID·의상 종류·커서, 커서 쌍 불일치 또는 limit 범위 초과",
+          content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
+      @ApiResponse(
+          responseCode = "500",
+          description = "서버 처리 실패",
+          content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
+  })
+  ResponseEntity<ClothesDtoCursorResponse> search(
+      @Parameter(description = "직전 응답의 nextCursor") String cursor,
+      @Parameter(description = "직전 응답의 nextIdAfter") UUID idAfter,
+      @Parameter(description = "한 페이지에 조회할 의상 수 (서비스 허용 범위 1~100)") int limit,
+      @Parameter(description = "필터링할 의상 종류") ClothesType typeEqual,
+      @Parameter(description = "옷 소유자 ID") UUID ownerId
   );
 
   @Operation(
