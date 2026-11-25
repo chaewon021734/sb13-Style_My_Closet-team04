@@ -3,11 +3,12 @@ package com.project.sb13ootbsteam04.clothes.service.impl;
 import com.project.sb13ootbsteam04.clothes.entity.Clothes;
 import com.project.sb13ootbsteam04.clothes.entity.ClothesAttribute;
 import com.project.sb13ootbsteam04.clothes.entity.ClothesAttributeDef;
+import com.project.sb13ootbsteam04.clothes.exception.ClothesAccessException;
 import com.project.sb13ootbsteam04.clothes.exception.ClothesAttributeDefinitionNotFoundException;
 import com.project.sb13ootbsteam04.clothes.exception.ClothesNotFoundException;
+import com.project.sb13ootbsteam04.clothes.exception.ClothesOwnerNotFoundException;
 import com.project.sb13ootbsteam04.clothes.exception.DuplicateClothesAttributeException;
 import com.project.sb13ootbsteam04.clothes.exception.InvalidClothesAttributeValueException;
-import com.project.sb13ootbsteam04.clothes.exception.ClothesOwnerNotFoundException;
 import com.project.sb13ootbsteam04.clothes.mapper.ClothesMapper;
 import com.project.sb13ootbsteam04.clothes.repository.ClothesAttributeDefRepository;
 import com.project.sb13ootbsteam04.clothes.repository.ClothesRepository;
@@ -128,10 +129,14 @@ public class ClothesServiceImpl implements ClothesService {
 
   @Transactional
   @Override
-  public ClothesResult update(ClothesUpdateCommand command) {
+  public ClothesResult update(UUID actorId, ClothesUpdateCommand command) {
     Clothes clothes = clothesRepository.findByIdForUpdate(command.clothesId())
         .orElseThrow(() -> new ClothesNotFoundException(command.clothesId()));
 
+    // 잠금 조회한 소유자를 기준으로 변경과 이미지 업로드 전에 거부한다.
+    if (!clothes.getOwner().getId().equals(actorId)) {
+      throw ClothesAccessException.forbidden();
+    }
     clothes.update(command.name(), command.type());
     applyAttributes(clothes, command.attributes());
     if (command.image() != null) {

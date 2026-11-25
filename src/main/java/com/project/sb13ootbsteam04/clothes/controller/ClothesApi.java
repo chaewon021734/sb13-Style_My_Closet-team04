@@ -3,8 +3,8 @@ package com.project.sb13ootbsteam04.clothes.controller;
 import com.project.sb13ootbsteam04.clothes.controller.dto.ClothesCreateRequest;
 import com.project.sb13ootbsteam04.clothes.controller.dto.ClothesDto;
 import com.project.sb13ootbsteam04.clothes.controller.dto.ClothesDtoCursorResponse;
-import com.project.sb13ootbsteam04.clothes.entity.ClothesType;
 import com.project.sb13ootbsteam04.clothes.controller.dto.ClothesUpdateRequest;
+import com.project.sb13ootbsteam04.clothes.entity.ClothesType;
 import com.project.sb13ootbsteam04.global.exception.ApiErrorResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -16,6 +16,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.UUID;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.multipart.MultipartFile;
 
 @Tag(name = "의상 관리", description = "의상 관련 API")
@@ -90,7 +91,7 @@ public interface ClothesApi {
 
   @Operation(
       summary = "옷 수정",
-      description = "전달한 항목을 수정합니다. 이미지를 첨부하지 않으면 기존 이미지를 유지합니다.")
+      description = "로그인한 사용자가 소유한 옷을 수정합니다. 이미지를 생략하면 기존 이미지를 유지합니다.")
   @ApiResponses({
       @ApiResponse(
           responseCode = "200",
@@ -99,6 +100,14 @@ public interface ClothesApi {
       @ApiResponse(
           responseCode = "400",
           description = "옷 수정 실패",
+          content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
+      @ApiResponse(
+          responseCode = "401",
+          description = "유효한 사용자 인증이 필요합니다. 보안 필터에서 거부하면 응답 본문이 없을 수 있습니다.",
+          content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
+      @ApiResponse(
+          responseCode = "403",
+          description = "수정 권한이 없습니다. 타인 의상은 오류 본문을 반환하며 보안 필터에서 거부하면 본문이 없을 수 있습니다.",
           content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
       @ApiResponse(
           responseCode = "404",
@@ -128,6 +137,7 @@ public interface ClothesApi {
           )
       )
       ClothesUpdateRequest request,
-      MultipartFile image
+      MultipartFile image,
+      @Parameter(hidden = true) Authentication authentication
   );
 }
