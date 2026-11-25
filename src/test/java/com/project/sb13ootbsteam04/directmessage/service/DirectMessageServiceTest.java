@@ -8,7 +8,11 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Pageable;
 
+import static org.mockito.Mockito.verify;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.any;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -73,5 +77,26 @@ class DirectMessageServiceTest {
             10
         )
     ).isInstanceOf(IllegalArgumentException.class);
+  }
+
+  //
+  @Test
+  void getMessages_callsFindFirstPage_whenCursorIsNull() {
+    UUID userId = UUID.randomUUID();
+    UUID targetUserId = UUID.randomUUID();
+
+    directMessageService.getMessages(
+        userId,
+        targetUserId,
+        null,
+        null,
+        10
+    );
+
+    verify(directMessageRepository).findFirstPage(
+        eq(userId),
+        eq(targetUserId),
+        any(Pageable.class)
+    );
   }
 }
