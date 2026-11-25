@@ -11,7 +11,10 @@ import com.project.sb13ootbsteam04.clothes.entity.ClothesAttributeDef;
 import com.project.sb13ootbsteam04.clothes.entity.ClothesType;
 import com.project.sb13ootbsteam04.clothes.mapper.ClothesMapperImpl;
 import com.project.sb13ootbsteam04.clothes.service.dto.ClothesAttributeCommand;
+import com.project.sb13ootbsteam04.clothes.service.dto.ClothesCursorResult;
 import com.project.sb13ootbsteam04.clothes.service.dto.ClothesImageCommand;
+import com.project.sb13ootbsteam04.clothes.service.dto.ClothesResult;
+import com.project.sb13ootbsteam04.clothes.service.dto.ClothesSearchCommand;
 import com.project.sb13ootbsteam04.clothes.service.dto.ClothesUpdateCommand;
 import com.project.sb13ootbsteam04.clothes.service.impl.ClothesServiceImpl;
 import com.project.sb13ootbsteam04.clothes.storage.ClothesImageStorage;
@@ -63,12 +66,21 @@ class ClothesUpdateIntegrationTest {
     given(storage.upload(image)).willReturn(uploaded);
 
     // when: 컨트롤러에서 호출할 때처럼 서비스가 직접 트랜잭션을 열고 커밋한다.
-    var result = clothesService.update(new ClothesUpdateCommand(clothes.getId(), "새 코트", null, List.of(
+    ClothesResult result = clothesService.update(new ClothesUpdateCommand(clothes.getId(), "새 코트", null, List.of(
         new ClothesAttributeCommand(size.getId(), "m"), new ClothesAttributeCommand(color.getId(), "블랙")), image));
 
     // then
     assertThat(result.id()).isEqualTo(clothes.getId());
     assertThat(result.imageUrl()).isEqualTo(uploaded.url());
+
+    // 수정 트랜잭션이 끝난 뒤 소유자의 목록에도 같은 의상과 속성값이 반환되어야 한다.
+    ClothesCursorResult page = clothesService.search(new ClothesSearchCommand(null, null, 10, ClothesType.OUTER, owner.getId()));
+    assertThat(page.data()).singleElement().satisfies(listed -> {
+      assertThat(listed.id()).isEqualTo(result.id());
+      assertThat(listed.name()).isEqualTo("새 코트");
+      assertThat(listed.imageUrl()).isEqualTo(uploaded.url());
+      assertThat(listed.attributes()).containsExactlyInAnyOrderElementsOf(result.attributes());
+    });
 
     transactions.executeWithoutResult(status -> {
       Clothes persisted = entityManager.find(Clothes.class, clothes.getId());
