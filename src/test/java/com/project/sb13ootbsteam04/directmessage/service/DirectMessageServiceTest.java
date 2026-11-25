@@ -40,4 +40,21 @@ class DirectMessageServiceTest {
         )
     ).isInstanceOf(IllegalArgumentException.class);
   }
+
+  //
+  @Test
+  void getMessages_throwsException_whenCursorAndIdAfterAreNotBothPresent() {
+    UUID userId = UUID.randomUUID();
+    UUID targetUserId = UUID.randomUUID();
+
+    assertThatThrownBy(() ->
+        directMessageService.getMessages(
+            userId,
+            targetUserId,
+            "2026-11-25T10:00:00Z",
+            null,
+            10
+        )
+    ).isInstanceOf(IllegalArgumentException.class);
+  }
 }
