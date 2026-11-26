@@ -13,6 +13,7 @@ import com.project.sb13ootbsteam04.clothes.entity.Clothes;
 import com.project.sb13ootbsteam04.clothes.entity.ClothesAttribute;
 import com.project.sb13ootbsteam04.clothes.entity.ClothesAttributeDef;
 import com.project.sb13ootbsteam04.clothes.entity.ClothesType;
+import com.project.sb13ootbsteam04.clothes.exception.ClothesAccessException;
 import com.project.sb13ootbsteam04.clothes.exception.ClothesAttributeDefinitionNotFoundException;
 import com.project.sb13ootbsteam04.clothes.exception.ClothesNotFoundException;
 import com.project.sb13ootbsteam04.clothes.exception.ClothesOwnerNotFoundException;
@@ -437,7 +438,7 @@ class ClothesServiceTest {
         ClothesType.SCARF, List.of(new ClothesAttributeCommand(sizeId, "S")), null);
 
     // when
-    ClothesResult result = clothesService.update(command);
+    ClothesResult result = clothesService.update(ownerId, command);
 
     // then
     assertAll(
@@ -460,7 +461,7 @@ class ClothesServiceTest {
         List.of(new ClothesAttributeResult(size.getId(), "사이즈", size.getSelectableValues(), "S")));
 
     // when
-    ClothesResult result = clothesService.update(command);
+    ClothesResult result = clothesService.update(ownerId, command);
 
     // then
     assertThat(result).isEqualTo(expected);
@@ -476,10 +477,26 @@ class ClothesServiceTest {
     given(clothesRepository.findByIdForUpdate(id)).willReturn(Optional.empty());
 
     // when & then
-    assertThatThrownBy(() -> clothesService.update(command))
+    assertThatThrownBy(() -> clothesService.update(ownerId, command))
         .isInstanceOfSatisfying(ClothesNotFoundException.class, exception -> assertAll(
             () -> assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.CLOTHES_NOT_FOUND),
             () -> assertThat(exception.getDetails()).containsEntry("clothesId", id.toString())));
+    then(clothesImageStorage).shouldHaveNoInteractions();
+  }
+
+  @Test
+  @DisplayName("타인의 의상 수정은 필드 변경 및 이미지 업로드 전에 거부한다")
+  void 타인_의상_수정_거부() {
+    // given
+    Clothes clothes = clothes(UUID.randomUUID(), "기존 이름", Instant.now());
+    given(clothesRepository.findByIdForUpdate(clothes.getId())).willReturn(Optional.of(clothes));
+    ClothesUpdateCommand command = new ClothesUpdateCommand(clothes.getId(), "새 이름", null, null, pngImage());
+
+    // when & then
+    assertThatThrownBy(() -> clothesService.update(UUID.randomUUID(), command))
+        .isInstanceOfSatisfying(ClothesAccessException.class,
+            ex -> assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.CLOTHES_UPDATE_FORBIDDEN));
+    assertThat(clothes.getName()).isEqualTo("기존 이름");
     then(clothesImageStorage).shouldHaveNoInteractions();
   }
 

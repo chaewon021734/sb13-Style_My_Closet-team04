@@ -83,6 +83,10 @@ class ClothesOpenApiTest {
     // when & then
     mockMvc.perform(get("/v3/api-docs"))
         .andExpect(status().isOk())
+        // 인증 주체는 서버에서 결정하므로 클라이언트에는 경로 ID만 노출한다.
+        .andExpect(jsonPath(patch + ".parameters[*].name").value(contains("clothesId")))
+        .andExpect(jsonPath(patch + ".responses['200'].content['*/*'].schema['$ref']")
+            .value("#/components/schemas/ClothesDto"))
         .andExpect(jsonPath(multipart + ".encoding.request.contentType").value("application/json"))
         .andExpect(jsonPath(multipart + ".schema.required").value(contains("request")))
         .andExpect(jsonPath(multipart + ".schema.properties.request['$ref']").value("#/components/schemas/ClothesUpdateRequest"))

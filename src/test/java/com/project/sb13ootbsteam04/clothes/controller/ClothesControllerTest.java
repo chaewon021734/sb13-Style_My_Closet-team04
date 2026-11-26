@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -14,6 +15,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.project.sb13ootbsteam04.clothes.controller.dto.ClothesAttributeDto;
 import com.project.sb13ootbsteam04.clothes.controller.dto.ClothesCreateRequest;
 import com.project.sb13ootbsteam04.clothes.entity.ClothesType;
+import com.project.sb13ootbsteam04.clothes.exception.ClothesAccessException;
 import com.project.sb13ootbsteam04.clothes.exception.ClothesImageStorageException;
 import com.project.sb13ootbsteam04.clothes.mapper.ClothesMapper;
 import com.project.sb13ootbsteam04.clothes.mapper.ClothesMapperImpl;
@@ -40,6 +42,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
@@ -334,11 +338,11 @@ class ClothesControllerTest {
     String imageUrl = "https://cdn.example.com/clothes/bag.png";
     ClothesResult result = new ClothesResult(clothesId, ownerId, "수정된 가방", imageUrl, ClothesType.BAG,
         List.of(new ClothesAttributeResult(definitionId, "색상", List.of("블랙", "핑크"), "핑크")));
-    given(clothesService.update(any(ClothesUpdateCommand.class))).willReturn(result);
+    given(clothesService.update(eq(ownerId), any(ClothesUpdateCommand.class))).willReturn(result);
 
     // when & then: 실제 매퍼를 거쳐 프런트가 읽는 중첩 필드까지 검증한다.
     mockMvc.perform(multipart(HttpMethod.PATCH, "/api/clothes/{clothesId}", clothesId)
-            .file(requestPart(request)).file(image))
+            .file(requestPart(request)).file(image).principal(login(ownerId)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.id").value(clothesId.toString()))
         .andExpect(jsonPath("$.ownerId").value(ownerId.toString()))
@@ -351,7 +355,7 @@ class ClothesControllerTest {
         .andExpect(jsonPath("$.attributes[0].value").value("핑크"));
 
     ArgumentCaptor<ClothesUpdateCommand> captor = ArgumentCaptor.forClass(ClothesUpdateCommand.class);
-    then(clothesService).should().update(captor.capture());
+    then(clothesService).should().update(eq(ownerId), captor.capture());
     ClothesUpdateCommand command = captor.getValue();
     assertThat(command.clothesId()).isEqualTo(clothesId);
     assertThat(command.name()).isEqualTo("수정된 가방");
@@ -370,14 +374,14 @@ class ClothesControllerTest {
     String existingUrl = "https://cdn.example.com/clothes/original.png";
     ClothesUpdateCommand expected = new ClothesUpdateCommand(clothesId, "새 이름", null, null, null);
     ClothesResult result = new ClothesResult(clothesId, UUID.randomUUID(), "새 이름", existingUrl, ClothesType.BAG, List.of());
-    given(clothesService.update(expected)).willReturn(result);
+    given(clothesService.update(result.ownerId(), expected)).willReturn(result);
 
     // when & then: 이미지 파트를 보내지 않아도 서비스가 반환한 기존 URL을 응답한다.
     mockMvc.perform(multipart(HttpMethod.PATCH, "/api/clothes/{clothesId}", clothesId)
-            .file(requestPart(Map.of("name", "새 이름"))))
+            .file(requestPart(Map.of("name", "새 이름"))).principal(login(result.ownerId())))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.imageUrl").value(existingUrl));
-    then(clothesService).should().update(expected);
+    then(clothesService).should().update(result.ownerId(), expected);
   }
 
   @Test
@@ -393,6 +397,34 @@ class ClothesControllerTest {
     then(clothesService).shouldHaveNoInteractions();
   }
 
+
+  @Test
+  @DisplayName("로그인 없이 옷을 수정하면 401이고 서비스가 호출되지 않는다")
+  void 미인증_수정_거부() throws Exception {
+    // when & then
+    mockMvc.perform(multipart(HttpMethod.PATCH, "/api/clothes/{id}", UUID.randomUUID())
+            .file(requestPart(Map.of("name", "새 이름"))))
+        .andExpect(status().isUnauthorized());
+    then(clothesService).shouldHaveNoInteractions();
+  }
+
+  @Test
+  @DisplayName("의상 소유권 오류는 403으로 반환한다")
+  void 소유권_오류_응답() throws Exception {
+    // given
+    UUID actorId = UUID.randomUUID();
+    given(clothesService.update(eq(actorId), any())).willThrow(ClothesAccessException.forbidden());
+
+    // when & then
+    mockMvc.perform(multipart(HttpMethod.PATCH, "/api/clothes/{id}", UUID.randomUUID())
+            .file(requestPart(Map.of("name", "새 이름"))).principal(login(actorId)))
+        .andExpect(status().isForbidden());
+  }
+
+  private JwtAuthenticationToken login(UUID actorId) {
+    Jwt jwt = Jwt.withTokenValue("test-token").header("alg", "HS256").subject(actorId.toString()).build();
+    return new JwtAuthenticationToken(jwt, List.of());
+  }
 
   private MockMultipartFile requestPart(Object request) throws Exception {
     return new MockMultipartFile(

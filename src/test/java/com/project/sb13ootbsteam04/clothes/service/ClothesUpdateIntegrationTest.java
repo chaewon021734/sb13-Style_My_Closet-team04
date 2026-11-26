@@ -30,12 +30,15 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.context.annotation.Import;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionOperations;
 
-@DataJpaTest
+// H2에서 의상 속성의 value 컬럼을 식별자로 사용할 수 있도록 한다.
+@DataJpaTest(properties = "spring.datasource.url=jdbc:h2:mem:clothes-update;MODE=PostgreSQL;NON_KEYWORDS=VALUE")
+@ActiveProfiles("test")
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import({JpaAuditingConfig.class, ClothesServiceImpl.class, ClothesMapperImpl.class})
 @DisplayName("의상 수정 트랜잭션")
@@ -69,7 +72,7 @@ class ClothesUpdateIntegrationTest {
     given(storage.upload(image)).willReturn(uploaded);
 
     // when: 컨트롤러에서 호출할 때처럼 서비스가 직접 트랜잭션을 열고 커밋한다.
-    ClothesResult result = clothesService.update(new ClothesUpdateCommand(clothes.getId(), "새 코트", null, List.of(
+    ClothesResult result = clothesService.update(owner.getId(), new ClothesUpdateCommand(clothes.getId(), "새 코트", null, List.of(
         new ClothesAttributeCommand(size.getId(), "m"), new ClothesAttributeCommand(color.getId(), "블랙")), image));
 
     // then
@@ -107,8 +110,8 @@ class ClothesUpdateIntegrationTest {
   void 이미지_교체가_롤백되면_기존_URL을_보존하고_새_객체만_삭제한다() {
     // given
     String originalUrl = "https://cdn.example.com/clothes/old.png";
+    User owner = new User("소유자", UUID.randomUUID() + "@example.com", "password");
     UUID clothesId = transactions.execute(status -> {
-      User owner = new User("소유자", UUID.randomUUID() + "@example.com", "password");
       entityManager.persist(owner);
       Clothes clothes = Clothes.create(owner, "기존 옷", ClothesType.TOP, originalUrl);
       entityManager.persist(clothes);
@@ -124,7 +127,7 @@ class ClothesUpdateIntegrationTest {
 
     // when & then: 변경 SQL이 실행된 뒤 외부 트랜잭션에서 실패해도 함께 복구해야 한다.
     assertThatThrownBy(() -> transactions.executeWithoutResult(status -> {
-      assertThat(clothesService.update(command).imageUrl()).isEqualTo(uploaded.url());
+      assertThat(clothesService.update(owner.getId(), command).imageUrl()).isEqualTo(uploaded.url());
       entityManager.flush();
       throw failure;
     })).isSameAs(failure);
