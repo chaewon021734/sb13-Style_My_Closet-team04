@@ -14,7 +14,7 @@ import org.junit.jupiter.api.Test;
 class ClothesTest {
 
   @Test
-  @DisplayName("의상을 생성하면 소유자, 이름, 종류, 이미지 URL이 설정된다")
+  @DisplayName("의상 생성 후 업로드한 이미지를 연결한다")
   void 의상_생성_성공() {
     // given
     User owner = owner();
@@ -23,7 +23,8 @@ class ClothesTest {
     String imageUrl = "https://example.com/clothes.jpg";
 
     // when
-    Clothes clothes = Clothes.create(owner, name, type, imageUrl);
+    Clothes clothes = Clothes.create(owner, name, type);
+    clothes.updateImage(imageUrl, "clothes/test.jpg");
 
     // then
     assertAll(
@@ -51,28 +52,35 @@ class ClothesTest {
     User owner = owner();
 
     assertAll(
-        () -> assertThrows(NullPointerException.class, () -> Clothes.create(null, "셔츠", ClothesType.TOP, null)),
-        () -> assertThrows(NullPointerException.class, () -> Clothes.create(owner, null, ClothesType.TOP, null)),
-        () -> assertThrows(IllegalArgumentException.class, () -> Clothes.create(owner, " ", ClothesType.TOP, null)),
-        () -> assertThrows(NullPointerException.class, () -> Clothes.create(owner, "셔츠", null, null))
+        () -> assertThrows(NullPointerException.class, () -> Clothes.create(null, "셔츠", ClothesType.TOP)),
+        () -> assertThrows(NullPointerException.class, () -> Clothes.create(owner, null, ClothesType.TOP)),
+        () -> assertThrows(IllegalArgumentException.class, () -> Clothes.create(owner, " ", ClothesType.TOP)),
+        () -> assertThrows(NullPointerException.class, () -> Clothes.create(owner, "셔츠", null))
     );
   }
 
   @Test
-  @DisplayName("이미지 URL을 정규화하고 빈 URL은 거부한다")
-  void 이미지_URL_수정() {
+  @DisplayName("이미지 교체는 유효한 URL과 키를 함께 반영하며 실패하면 기존 쌍을 유지한다")
+  void 이미지_교체_검증() {
+    // given
     Clothes clothes = clothes();
+    String key = " " + "가".repeat(498) + " ";
+    String url = "x".repeat(499) + "😀";
 
-    clothes.updateImageUrl(" https://cdn.example.com/image.png ");
+    // when
+    clothes.updateImage(" " + url + " ", key);
 
-    assertAll(
-        () -> assertEquals("https://cdn.example.com/image.png", clothes.getImageUrl()),
-        () -> assertThrows(IllegalArgumentException.class,() -> clothes.updateImageUrl(" "))
-    );
+    // then
+    for (String invalid : new String[]{null, " ", "x".repeat(501)}) {
+      assertThrows(IllegalArgumentException.class, () -> clothes.updateImage("new-url", invalid));
+      assertThrows(IllegalArgumentException.class, () -> clothes.updateImage(invalid, "new-key"));
+    }
+    assertEquals(url, clothes.getImageUrl());
+    assertEquals(key, clothes.getImageObjectKey());
   }
 
   private Clothes clothes() {
-    return Clothes.create(owner(), "셔츠", ClothesType.TOP, null);
+    return Clothes.create(owner(), "셔츠", ClothesType.TOP);
   }
 
   private User owner() {

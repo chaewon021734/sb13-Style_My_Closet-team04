@@ -62,7 +62,8 @@ class ClothesMapperTest {
 
     User owner = new User("소유자", "owner@example.com", "encoded-password");
     ReflectionTestUtils.setField(owner, "id", ownerId);
-    Clothes clothes = Clothes.create(owner, "셔츠", ClothesType.TOP, "https://cdn.example.com/image.png");
+    Clothes clothes = Clothes.create(owner, "셔츠", ClothesType.TOP);
+    clothes.updateImage("https://cdn.example.com/image.png", "clothes/image.png");
     ClothesAttributeDef definition = ClothesAttributeDef.create("색상", List.of("블랙", "크림"));
     ReflectionTestUtils.setField(clothes, "id", clothesId);
     ReflectionTestUtils.setField(definition, "id", definitionId);

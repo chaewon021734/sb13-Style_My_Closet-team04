@@ -85,6 +85,6 @@ class ClothesAttributeTest {
 
   private Clothes clothes() {
     User owner = new User("소유자", "owner@example.com", "encoded-password");
-    return Clothes.create(owner, "셔츠", ClothesType.TOP, null);
+    return Clothes.create(owner, "셔츠", ClothesType.TOP);
   }
 }
