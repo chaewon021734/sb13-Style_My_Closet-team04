@@ -3,6 +3,7 @@ package com.project.sb13ootbsteam04.directmessage.service;
 
 import com.project.sb13ootbsteam04.directmessage.repository.DirectMessageRepository;
 import com.project.sb13ootbsteam04.user.repository.ProfileRepository;
+import java.time.Instant;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -62,6 +63,7 @@ class DirectMessageServiceTest {
     ).isInstanceOf(IllegalArgumentException.class);
   }
 
+  //
   @Test
   void getMessages_throwsException_whenCursorFormatIsInvalid() {
     UUID userId = UUID.randomUUID();
@@ -96,6 +98,31 @@ class DirectMessageServiceTest {
     verify(directMessageRepository).findFirstPage(
         eq(userId),
         eq(targetUserId),
+        any(Pageable.class)
+    );
+  }
+
+  //
+  @Test
+  void getMessages_callsFindNextPage_whenCursorIsPresent() {
+    UUID userId = UUID.randomUUID();
+    UUID targetUserId = UUID.randomUUID();
+    UUID idAfter = UUID.randomUUID();
+    String cursor = "2026-11-25T10:00:00Z";
+
+    directMessageService.getMessages(
+        userId,
+        targetUserId,
+        cursor,
+        idAfter,
+        10
+    );
+
+    verify(directMessageRepository).findNextPage(
+        eq(userId),
+        eq(targetUserId),
+        eq(Instant.parse(cursor)),
+        eq(idAfter),
         any(Pageable.class)
     );
   }
