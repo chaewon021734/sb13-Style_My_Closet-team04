@@ -15,6 +15,7 @@ import org.springframework.stereotype.Component;
 import java.util.ArrayList;
 import java.util.UUID;
 
+import static com.project.sb13ootbsteam04.global.exception.ErrorCode.INTERNAL_SERVER_ERROR;
 import static com.project.sb13ootbsteam04.global.exception.ErrorCode.WEATHER_FORECAST_BATCH_PARTIAL_FAILURE;
 
 @Component
@@ -28,6 +29,7 @@ public class WeatherForecastBatchTasklet implements Tasklet {
     public static final String SUCCESS_COUNT = "weather.successCount";
     public static final String FAILURE_COUNT = "weather.failureCount";
     public static final String SAVED_COUNT = "weather.savedCount";
+    public static final String LAST_FAILURE_ERROR_CODE = "weather.lastFailureErrorCode";
 
     private final WeatherLocationRepository locations;
     private final KmaForecastClient client;
@@ -42,6 +44,7 @@ public class WeatherForecastBatchTasklet implements Tasklet {
         var baseTime = parameters.getLocalTime(BASE_TIME);
         var targets = locations.findAllByOrderByIdAsc();
         var failures = new ArrayList<UUID>();
+        var lastFailureErrorCode = INTERNAL_SERVER_ERROR;
         int successCount = 0;
         int savedCount = 0;
 
@@ -57,10 +60,14 @@ public class WeatherForecastBatchTasklet implements Tasklet {
                 metrics.recordSuccess(saved);
             } catch (RuntimeException exception) {
                 failures.add(location.getId());
+                lastFailureErrorCode = exception instanceof WeatherForecastException weatherException
+                        ? weatherException.getErrorCode()
+                        : INTERNAL_SERVER_ERROR;
                 contribution.incrementProcessSkipCount();
                 metrics.recordFailure();
-                log.warn("단기예보 위치 수집 실패: locationId={}, error={}",
-                        location.getId(), exception.getClass().getSimpleName());
+                log.warn("단기예보 위치 수집 실패: locationId={}, errorCode={}, exceptionType={}",
+                        location.getId(), lastFailureErrorCode.getCode(),
+                        exception.getClass().getSimpleName());
             }
         }
 
@@ -71,8 +78,10 @@ public class WeatherForecastBatchTasklet implements Tasklet {
         context.putInt(SAVED_COUNT, savedCount);
 
         if (!failures.isEmpty()) {
+            context.putString(LAST_FAILURE_ERROR_CODE, lastFailureErrorCode.getCode());
             throw new WeatherForecastException(WEATHER_FORECAST_BATCH_PARTIAL_FAILURE,
-                    "실패 위치 수: " + failures.size());
+                    "실패 위치 수: " + failures.size()
+                            + ", 마지막 오류 코드: " + lastFailureErrorCode.getCode());
         }
         return RepeatStatus.FINISHED;
     }

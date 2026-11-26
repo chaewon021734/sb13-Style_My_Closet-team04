@@ -115,6 +115,14 @@ class WeatherForecastBatchJobIntegrationTest {
         assertThat(context.getInt(WeatherForecastBatchTasklet.SUCCESS_COUNT)).isEqualTo(1);
         assertThat(context.getInt(WeatherForecastBatchTasklet.FAILURE_COUNT)).isEqualTo(1);
         assertThat(context.getInt(WeatherForecastBatchTasklet.SAVED_COUNT)).isEqualTo(1);
+        assertThat(context.getString(WeatherForecastBatchTasklet.LAST_FAILURE_ERROR_CODE))
+                .isEqualTo(ErrorCode.WEATHER_FORECAST_SERVICE_UNAVAILABLE.getCode());
+        assertThat(execution.getAllFailureExceptions())
+                .anySatisfy(exception -> {
+                    assertThat(exception).isInstanceOf(WeatherForecastException.class);
+                    assertThat(((WeatherForecastException) exception).getDetails().get("reason"))
+                            .contains(ErrorCode.WEATHER_FORECAST_SERVICE_UNAVAILABLE.getCode());
+                });
     }
 
     @Test
