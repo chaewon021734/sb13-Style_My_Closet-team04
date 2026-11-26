@@ -4,6 +4,7 @@ import com.project.sb13ootbsteam04.clothes.controller.dto.ClothesCreateRequest;
 import com.project.sb13ootbsteam04.clothes.controller.dto.ClothesDto;
 import com.project.sb13ootbsteam04.clothes.controller.dto.ClothesDtoCursorResponse;
 import com.project.sb13ootbsteam04.clothes.entity.ClothesType;
+import com.project.sb13ootbsteam04.clothes.exception.ClothesAccessException;
 import com.project.sb13ootbsteam04.clothes.exception.InvalidClothesImageException;
 import com.project.sb13ootbsteam04.clothes.mapper.ClothesMapper;
 import com.project.sb13ootbsteam04.clothes.service.ClothesService;
@@ -19,7 +20,11 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -69,6 +74,31 @@ public class ClothesController implements ClothesApi {
     ClothesSearchCommand command = new ClothesSearchCommand(cursor, idAfter, limit, typeEqual, ownerId);
     ClothesCursorResult result = clothesService.search(command);
     return ResponseEntity.status(HttpStatus.OK).body(clothesMapper.toDto(result));
+  }
+
+  @Override
+  @DeleteMapping("/{clothesId}")
+  public ResponseEntity<Void> delete(@PathVariable UUID clothesId, Authentication authentication) {
+    UUID actorId = authenticatedUserId(authentication);
+    clothesService.delete(actorId, clothesId);
+
+    return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
+  }
+
+  private UUID authenticatedUserId(Authentication authentication) {
+    // JWT subject에는 사용자 UUID가 들어간다.
+    if (!(authentication instanceof JwtAuthenticationToken token) || !token.isAuthenticated()) {
+      throw ClothesAccessException.unauthenticated();
+    }
+    String subject = token.getToken().getSubject();
+    if (subject == null) {
+      throw ClothesAccessException.unauthenticated();
+    }
+    try {
+      return UUID.fromString(subject);
+    } catch (IllegalArgumentException invalidSubject) {
+      throw ClothesAccessException.unauthenticated();
+    }
   }
 
   private ClothesImageCommand toImageCommand(MultipartFile image) {
