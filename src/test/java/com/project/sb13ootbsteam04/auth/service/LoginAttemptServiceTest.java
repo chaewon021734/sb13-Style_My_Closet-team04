@@ -2,11 +2,13 @@ package com.project.sb13ootbsteam04.auth.service;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
-import java.time.Duration;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -180,6 +182,45 @@ class LoginAttemptServiceTest {
         assertEquals(
                 510L,
                 loginAttemptService.getRetryAfterSeconds(EMAIL)
+        );
+    }
+
+    // ========================================
+    // 8. 만료된 로그인 실패 기록 주기적 정리
+    // ========================================
+
+    @Test
+    void shouldCleanupExpiredAttemptsPeriodically() {
+
+        // 서로 다른 이메일 99개에 실패 기록 생성
+        for (int i = 0; i < 99; i++) {
+            loginAttemptService.recordFailure(
+                    "user" + i + "@example.com"
+            );
+        }
+
+        // 10분 집계 기간이 지나도록 기존 이메일에 재접근하지 않음
+        clock.advance(Duration.ofMinutes(11));
+
+        // 100번째 로그인 실패 기록으로 정리 실행
+        loginAttemptService.recordFailure(
+                "new@example.com"
+        );
+
+        // 내부 Map에 신규 기록만 남았는지 확인
+        Object field = ReflectionTestUtils.getField(
+                loginAttemptService,
+                "attempts"
+        );
+
+        assertNotNull(field);
+        assertInstanceOf(Map.class, field);
+
+        Map<?, ?> attempts = (Map<?, ?>) field;
+
+        assertEquals(1, attempts.size());
+        assertTrue(
+                attempts.containsKey("new@example.com")
         );
     }
 

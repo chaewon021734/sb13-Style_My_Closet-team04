@@ -8,6 +8,7 @@ import java.time.Instant;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @Service
 public class LoginAttemptService {
@@ -19,8 +20,15 @@ public class LoginAttemptService {
     private static final Duration WINDOW =
             Duration.ofMinutes(10);
 
+    // 만료된 실패 기록 정리 주기
+    private static final int CLEANUP_INTERVAL = 100;
+
+    // 계정별 로그인 실패 기록
     private final ConcurrentHashMap<String, AttemptState>
             attempts = new ConcurrentHashMap<>();
+
+    // 정리 주기 카운터
+    private final AtomicInteger cleanupCounter = new AtomicInteger();
 
     private final Clock clock;
 
@@ -86,6 +94,7 @@ public class LoginAttemptService {
                     && !now.isBefore(
                     previous.startedAt().plus(WINDOW)
             ))) {
+
                 return new AttemptState(now, 1, null);
             }
 
@@ -117,6 +126,46 @@ public class LoginAttemptService {
                     failedCount,
                     null
             );
+        });
+
+        // 일정 횟수마다 만료된 실패 기록 정리
+        if (cleanupCounter.incrementAndGet() >= CLEANUP_INTERVAL) {
+
+            if (cleanupCounter.getAndSet(0) >= CLEANUP_INTERVAL) {
+                cleanupExpiredAttempts();
+            }
+        }
+    }
+
+    // ========================================
+    // 만료된 로그인 실패 기록 정리
+    // ========================================
+
+    private void cleanupExpiredAttempts() {
+
+        Instant now = clock.instant();
+
+        attempts.forEach((email, state) -> {
+
+            boolean expired;
+
+            // 계정 차단 기록의 만료 여부 확인
+            if (state.blockedUntil() != null) {
+
+                expired = !now.isBefore(state.blockedUntil());
+
+            } else {
+
+                // 일반 로그인 실패 기록의 만료 여부 확인
+                expired = !now.isBefore(
+                        state.startedAt().plus(WINDOW)
+                );
+            }
+
+            // 현재 상태가 그대로인 경우에만 제거
+            if (expired) {
+                attempts.remove(email, state);
+            }
         });
     }
 
