@@ -12,7 +12,9 @@ import static org.mockito.Mockito.inOrder;
 import com.project.sb13ootbsteam04.clothes.entity.Clothes;
 import com.project.sb13ootbsteam04.clothes.entity.ClothesAttributeDef;
 import com.project.sb13ootbsteam04.clothes.entity.ClothesType;
+import com.project.sb13ootbsteam04.clothes.exception.ClothesAccessException;
 import com.project.sb13ootbsteam04.clothes.exception.ClothesAttributeDefinitionNotFoundException;
+import com.project.sb13ootbsteam04.clothes.exception.ClothesNotFoundException;
 import com.project.sb13ootbsteam04.clothes.exception.ClothesOwnerNotFoundException;
 import com.project.sb13ootbsteam04.clothes.exception.DuplicateClothesAttributeException;
 import com.project.sb13ootbsteam04.clothes.exception.InvalidClothesAttributeValueException;
@@ -423,6 +425,57 @@ class ClothesServiceTest {
     // when & then
     assertThatThrownBy(() -> clothesService.search(command)).isInstanceOf(IllegalArgumentException.class).hasMessage("cursor는 ISO-8601 날짜 형식이어야 합니다.");
     then(clothesRepository).shouldHaveNoInteractions();
+  }
+
+  @Test
+  @DisplayName("소유자는 이미지가 없는 본인 의상을 삭제할 수 있다")
+  void 옷_삭제_성공() {
+    // given
+    Clothes target = clothes(UUID.randomUUID(), "삭제할 옷", Instant.EPOCH);
+    given(clothesRepository.findByIdForUpdate(target.getId())).willReturn(Optional.of(target));
+
+    // when
+    clothesService.delete(ownerId, target.getId());
+
+    // then
+    then(clothesRepository).should().delete(target);
+    then(clothesImageStorage).shouldHaveNoInteractions();
+  }
+
+  @Test
+  @DisplayName("의상이 없으면 요청 ID를 담은 예외를 반환하고 삭제하지 않는다")
+  void 존재하지_않는_의상_삭제() {
+    // given
+    UUID missingId = UUID.randomUUID();
+    given(clothesRepository.findByIdForUpdate(missingId)).willReturn(Optional.empty());
+
+    // when & then
+    assertThatThrownBy(() -> clothesService.delete(ownerId, missingId))
+        .isInstanceOfSatisfying(ClothesNotFoundException.class, ex -> {
+          assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.CLOTHES_NOT_FOUND);
+          assertThat(ex.getDetails()).containsEntry("clothesId", missingId.toString());
+        });
+    then(clothesRepository).should().findByIdForUpdate(missingId);
+    then(clothesRepository).shouldHaveNoMoreInteractions();
+    then(clothesImageStorage).shouldHaveNoInteractions();
+  }
+
+  @Test
+  @DisplayName("타인의 의상 삭제를 거부하고 의상과 이미지를 보존한다")
+  void 다른_사용자의_옷_삭제() {
+    // given
+    Clothes target = clothes(UUID.randomUUID(), "다른 사용자의 옷", Instant.EPOCH);
+    target.updateImageUrl("https://cdn.example.com/clothes/coat.jpg");
+    UUID otherUserId = UUID.randomUUID();
+    given(clothesRepository.findByIdForUpdate(target.getId())).willReturn(Optional.of(target));
+
+    // when & then
+    assertThatThrownBy(() -> clothesService.delete(otherUserId, target.getId()))
+        .isInstanceOfSatisfying(ClothesAccessException.class,
+            ex -> assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.CLOTHES_OWNER_REQUIRED));
+    then(clothesRepository).should().findByIdForUpdate(target.getId());
+    then(clothesRepository).shouldHaveNoMoreInteractions();
+    then(clothesImageStorage).shouldHaveNoInteractions();
   }
 
   private Clothes clothes(UUID id, String name, Instant createdAt) {

@@ -122,6 +122,11 @@ public class ClothesServiceImpl implements ClothesService {
     );
   }
 
+  @Override
+  public void delete(UUID actorId, UUID clothesId) {
+    throw new UnsupportedOperationException("의상 삭제 기능은 아직 구현되지 않았습니다.");
+  }
+
   private Instant parseCursor(String cursor) {
     // 첫 페이지 조회 시에는 커서가 없으므로 null을 반환한다.
     if (cursor == null) {
