@@ -49,6 +49,14 @@ public class DirectMessageService {
           targetUserId,
           PageRequest.of(0, limit + 1)
       );
+    } else {
+      directMessageRepository.findNextPage(
+          userId,
+          targetUserId,
+          Instant.parse(cursor),
+          idAfter,
+          PageRequest.of(0, limit + 1)
+      );
     }
   }
 }
