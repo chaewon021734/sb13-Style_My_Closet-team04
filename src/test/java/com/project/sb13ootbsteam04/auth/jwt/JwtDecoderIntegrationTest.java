@@ -247,4 +247,72 @@ class JwtDecoderIntegrationTest {
 
         verify(userRepository).findById(userId);
     }
+
+    // ========================================
+    // 6. JWT 서명 변조 시 인증 거부
+    // ========================================
+
+    @Test
+    void shouldRejectTamperedJwtSignature() {
+
+        String token = createToken();
+
+        String[] parts = token.split("\\.");
+
+        assertEquals(3, parts.length);
+
+        // 서명 부분의 첫 문자를 변경
+        char original = parts[2].charAt(0);
+        char replacement = original == 'A' ? 'B' : 'A';
+
+        parts[2] = replacement + parts[2].substring(1);
+
+        String tamperedToken = String.join(".", parts);
+
+        assertNotEquals(token, tamperedToken);
+
+        // 변조된 서명은 JWT 디코더에서 거부되어야 함
+        assertThrows(
+                JwtException.class,
+                () -> jwtDecoder.decode(tamperedToken)
+        );
+
+        // 서명 검증 단계에서 거부되므로 DB 조회 없음
+        verifyNoInteractions(userRepository);
+    }
+
+    // ========================================
+    // 7. 만료된 JWT 인증 거부
+    // ========================================
+
+    @Test
+    void shouldRejectExpiredJwt() {
+
+        Instant now = Instant.now();
+
+        // 유효기간이 이미 1시간 전에 종료된 JWT
+        JwtClaimsSet claims = JwtClaimsSet.builder()
+                .subject(userId.toString())
+                .issuedAt(now.minusSeconds(7200))
+                .expiresAt(now.minusSeconds(3600))
+                .claim("role", user.getRole().name())
+                .claim("loginVersion", user.getLoginVersion())
+                .claim("authType", "NORMAL")
+                .build();
+
+        JwsHeader header = JwsHeader
+                .with(MacAlgorithm.HS256)
+                .build();
+
+        // 올바른 비밀 키로 만료된 JWT 생성
+        String expiredToken = jwtEncoder.encode(
+                JwtEncoderParameters.from(header, claims)
+        ).getTokenValue();
+
+        // 서명이 정상이어도 유효기간이 만료되면 거부
+        assertThrows(
+                JwtException.class,
+                () -> jwtDecoder.decode(expiredToken)
+        );
+    }
 }
