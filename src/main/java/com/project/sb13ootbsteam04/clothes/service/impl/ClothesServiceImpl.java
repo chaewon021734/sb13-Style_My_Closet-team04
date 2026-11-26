@@ -5,6 +5,7 @@ import com.project.sb13ootbsteam04.clothes.entity.ClothesAttribute;
 import com.project.sb13ootbsteam04.clothes.entity.ClothesAttributeDef;
 import com.project.sb13ootbsteam04.clothes.exception.ClothesAccessException;
 import com.project.sb13ootbsteam04.clothes.exception.ClothesAttributeDefinitionNotFoundException;
+import com.project.sb13ootbsteam04.clothes.exception.ClothesImageStorageException;
 import com.project.sb13ootbsteam04.clothes.exception.ClothesNotFoundException;
 import com.project.sb13ootbsteam04.clothes.exception.ClothesOwnerNotFoundException;
 import com.project.sb13ootbsteam04.clothes.exception.DuplicateClothesAttributeException;
@@ -61,7 +62,7 @@ public class ClothesServiceImpl implements ClothesService {
     User owner = findOwner(command.ownerId());
     Map<UUID, ClothesAttributeDef> definitions = loadDefinitions(command.attributes());
 
-    Clothes clothes = Clothes.create(owner, command.name(), command.type(), null);
+    Clothes clothes = Clothes.create(owner, command.name(), command.type());
 
     for (ClothesAttributeCommand attribute : command.attributes()) {
       try {
@@ -80,7 +81,12 @@ public class ClothesServiceImpl implements ClothesService {
     try {
       if (command.image() != null) {
         storedImage = clothesImageStorage.upload(command.image());
-        clothes.updateImage(storedImage.url(), storedImage.objectKey());
+        try {
+          clothes.updateImage(storedImage.url(), storedImage.objectKey());
+        } catch (IllegalArgumentException invalidMetadata) {
+          // 저장소가 생성한 값의 오류는 서버 측 실패로 분류하고 외부 catch에서 업로드를 보상한다.
+          throw ClothesImageStorageException.uploadFailed(invalidMetadata);
+        }
       }
 
       return transactionOperations.execute(status -> {
