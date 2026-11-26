@@ -41,6 +41,10 @@ public class Clothes extends UpdatedAtEntity {
   @Column(name = "image_url", length = 500)
   private String imageUrl;
 
+  // 이미지 저장소 객체 식별을 위한 내부 관리 필드. 외부에 노출하지 않는다.
+  @Column(name = "image_object_key", length = 500)
+  private String imageObjectKey;
+
   @OneToMany(
       mappedBy = "clothes",
       fetch = FetchType.LAZY,
@@ -71,7 +75,13 @@ public class Clothes extends UpdatedAtEntity {
   }
 
   public void updateImageUrl(String imageUrl) {
+    updateImage(imageUrl, null);
+  }
+
+  // URL만 갱신하는 기존 호출은 이전 객체의 키를 남기지 않는다.
+  public void updateImage(String imageUrl, String objectKey) {
     this.imageUrl = normalizeImageUrl(imageUrl);
+    this.imageObjectKey = objectKey;
   }
 
   void registerAttribute(ClothesAttribute attribute) {

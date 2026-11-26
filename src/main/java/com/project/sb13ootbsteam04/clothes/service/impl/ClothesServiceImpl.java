@@ -3,10 +3,12 @@ package com.project.sb13ootbsteam04.clothes.service.impl;
 import com.project.sb13ootbsteam04.clothes.entity.Clothes;
 import com.project.sb13ootbsteam04.clothes.entity.ClothesAttribute;
 import com.project.sb13ootbsteam04.clothes.entity.ClothesAttributeDef;
+import com.project.sb13ootbsteam04.clothes.exception.ClothesAccessException;
 import com.project.sb13ootbsteam04.clothes.exception.ClothesAttributeDefinitionNotFoundException;
+import com.project.sb13ootbsteam04.clothes.exception.ClothesNotFoundException;
+import com.project.sb13ootbsteam04.clothes.exception.ClothesOwnerNotFoundException;
 import com.project.sb13ootbsteam04.clothes.exception.DuplicateClothesAttributeException;
 import com.project.sb13ootbsteam04.clothes.exception.InvalidClothesAttributeValueException;
-import com.project.sb13ootbsteam04.clothes.exception.ClothesOwnerNotFoundException;
 import com.project.sb13ootbsteam04.clothes.mapper.ClothesMapper;
 import com.project.sb13ootbsteam04.clothes.repository.ClothesAttributeDefRepository;
 import com.project.sb13ootbsteam04.clothes.repository.ClothesRepository;
@@ -35,6 +37,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionOperations;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Slf4j
 @RequiredArgsConstructor
@@ -76,7 +80,7 @@ public class ClothesServiceImpl implements ClothesService {
     try {
       if (command.image() != null) {
         storedImage = clothesImageStorage.upload(command.image());
-        clothes.updateImageUrl(storedImage.url());
+        clothes.updateImage(storedImage.url(), storedImage.objectKey());
       }
 
       return transactionOperations.execute(status -> {
@@ -123,8 +127,31 @@ public class ClothesServiceImpl implements ClothesService {
   }
 
   @Override
+  @Transactional
   public void delete(UUID actorId, UUID clothesId) {
-    throw new UnsupportedOperationException("의상 삭제 기능은 아직 구현되지 않았습니다.");
+    // 미인증 요청은 대상 의상을 조회하거나 잠그기 전에 거부한다.
+    if (actorId == null) {
+      throw ClothesAccessException.unauthenticated();
+    }
+
+    Clothes clothes = clothesRepository.findByIdForUpdate(clothesId)
+        .orElseThrow(() -> new ClothesNotFoundException(clothesId));
+
+    if (!clothes.getOwner().getId().equals(actorId)) {
+      throw ClothesAccessException.forbidden();
+    }
+
+    String objectKey = clothes.getImageObjectKey();
+    clothesRepository.delete(clothes);
+    // 과거 URL에서 키를 추측하지 않고 커밋된 삭제만 저장소에 반영한다.
+    if (objectKey != null) {
+      TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+        @Override
+        public void afterCommit() {
+          deleteImageSafely(objectKey);
+        }
+      });
+    }
   }
 
   private Instant parseCursor(String cursor) {
@@ -178,7 +205,7 @@ public class ClothesServiceImpl implements ClothesService {
     try {
       clothesImageStorage.delete(objectKey);
     } catch (RuntimeException cleanupFailure) {
-      log.error("롤백된 의상 이미지 정리에 실패했습니다. objectKey={}", objectKey, cleanupFailure);
+      log.error("의상 이미지 정리에 실패했습니다. objectKey={}", objectKey, cleanupFailure);
     }
   }
 }
