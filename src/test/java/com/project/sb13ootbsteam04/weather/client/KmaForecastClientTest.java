@@ -41,21 +41,21 @@ class KmaForecastClientTest {
                         "https://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getVilageFcst"
                                 + "?serviceKey={serviceKey}&pageNo={pageNo}&numOfRows={numOfRows}"
                                 + "&dataType={dataType}&base_date={baseDate}&base_time={baseTime}&nx={nx}&ny={ny}",
-                        "test-key", 1, 1000, "JSON", "20261124", "0230", 60, 127))
+                        "test-key", 1, 1000, "JSON", "20261124", "0200", 60, 127))
                 .andExpect(method(HttpMethod.GET))
                 .andExpect(queryParam("serviceKey", "test-key"))
                 .andExpect(queryParam("base_date", "20261124"))
-                .andExpect(queryParam("base_time", "0230"))
+                .andExpect(queryParam("base_time", "0200"))
                 .andExpect(queryParam("nx", "60"))
                 .andExpect(queryParam("ny", "127"))
                 .andRespond(withSuccess(successResponse(), MediaType.APPLICATION_JSON));
 
         var items = client.getVillageForecast(
-                LocalDate.of(2026, 11, 24), LocalTime.of(2, 30), 60, 127);
+                LocalDate.of(2026, 11, 24), LocalTime.of(2, 0), 60, 127);
 
         assertThat(items).singleElement().satisfies(item -> {
             assertThat(item.baseDate()).isEqualTo("20261124");
-            assertThat(item.baseTime()).isEqualTo("0230");
+            assertThat(item.baseTime()).isEqualTo("0200");
             assertThat(item.fcstDate()).isEqualTo("20261124");
             assertThat(item.fcstTime()).isEqualTo("0300");
             assertThat(item.category()).isEqualTo("TMP");
@@ -71,7 +71,7 @@ class KmaForecastClientTest {
         var noKeyClient = new KmaForecastClient(RestClient.create(), " ");
 
         assertThatThrownBy(() -> noKeyClient.getVillageForecast(
-                LocalDate.of(2026, 11, 24), LocalTime.of(2, 30), 60, 127))
+                LocalDate.of(2026, 11, 24), LocalTime.of(2, 0), 60, 127))
                 .isInstanceOfSatisfying(WeatherForecastException.class, exception -> {
                     assertThat(exception.getErrorCode())
                             .isEqualTo(ErrorCode.WEATHER_FORECAST_API_KEY_NOT_CONFIGURED);
@@ -86,13 +86,13 @@ class KmaForecastClientTest {
                         "https://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getVilageFcst"
                                 + "?serviceKey={serviceKey}&pageNo={pageNo}&numOfRows={numOfRows}"
                                 + "&dataType={dataType}&base_date={baseDate}&base_time={baseTime}&nx={nx}&ny={ny}",
-                        "test-key", 1, 1000, "JSON", "20261124", "0230", 60, 127))
+                        "test-key", 1, 1000, "JSON", "20261124", "0200", 60, 127))
                 .andRespond(withSuccess("""
                         {"response":{"header":{"resultCode":"03","resultMsg":"NO_DATA"},"body":null}}
                         """, MediaType.APPLICATION_JSON));
 
         assertThatThrownBy(() -> client.getVillageForecast(
-                LocalDate.of(2026, 11, 24), LocalTime.of(2, 30), 60, 127))
+                LocalDate.of(2026, 11, 24), LocalTime.of(2, 0), 60, 127))
                 .isInstanceOfSatisfying(WeatherForecastException.class,
                         exception -> assertThat(exception.getErrorCode())
                                 .isEqualTo(ErrorCode.WEATHER_FORECAST_LOOKUP_FAILED));
@@ -105,14 +105,14 @@ class KmaForecastClientTest {
                         "https://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getVilageFcst"
                                 + "?serviceKey={serviceKey}&pageNo={pageNo}&numOfRows={numOfRows}"
                                 + "&dataType={dataType}&base_date={baseDate}&base_time={baseTime}&nx={nx}&ny={ny}",
-                        "test-key", 1, 1000, "JSON", "20261124", "0230", 60, 127))
+                        "test-key", 1, 1000, "JSON", "20261124", "0200", 60, 127))
                 .andRespond(withSuccess("""
                         {"response":{"header":{"resultCode":"00","resultMsg":"NORMAL_SERVICE"},
                         "body":{"items":null,"totalCount":1}}}
                         """, MediaType.APPLICATION_JSON));
 
         assertThatThrownBy(() -> client.getVillageForecast(
-                LocalDate.of(2026, 11, 24), LocalTime.of(2, 30), 60, 127))
+                LocalDate.of(2026, 11, 24), LocalTime.of(2, 0), 60, 127))
                 .isInstanceOfSatisfying(WeatherForecastException.class,
                         exception -> assertThat(exception.getErrorCode())
                                 .isEqualTo(ErrorCode.WEATHER_FORECAST_RESPONSE_INVALID));
@@ -125,11 +125,11 @@ class KmaForecastClientTest {
                         "https://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getVilageFcst"
                                 + "?serviceKey={serviceKey}&pageNo={pageNo}&numOfRows={numOfRows}"
                                 + "&dataType={dataType}&base_date={baseDate}&base_time={baseTime}&nx={nx}&ny={ny}",
-                        "test-key", 1, 1000, "JSON", "20261124", "0230", 60, 127))
+                        "test-key", 1, 1000, "JSON", "20261124", "0200", 60, 127))
                 .andRespond(withServerError().body("upstream-secret"));
 
         assertThatThrownBy(() -> client.getVillageForecast(
-                LocalDate.of(2026, 11, 24), LocalTime.of(2, 30), 60, 127))
+                LocalDate.of(2026, 11, 24), LocalTime.of(2, 0), 60, 127))
                 .isInstanceOfSatisfying(WeatherForecastException.class, exception -> {
                     assertThat(exception.getErrorCode())
                             .isEqualTo(ErrorCode.WEATHER_FORECAST_LOOKUP_FAILED);
@@ -144,11 +144,11 @@ class KmaForecastClientTest {
                         "https://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getVilageFcst"
                                 + "?serviceKey={serviceKey}&pageNo={pageNo}&numOfRows={numOfRows}"
                                 + "&dataType={dataType}&base_date={baseDate}&base_time={baseTime}&nx={nx}&ny={ny}",
-                        "test-key", 1, 1000, "JSON", "20261124", "0230", 60, 127))
+                        "test-key", 1, 1000, "JSON", "20261124", "0200", 60, 127))
                 .andRespond(withException(new SocketTimeoutException("test-key")));
 
         assertThatThrownBy(() -> client.getVillageForecast(
-                LocalDate.of(2026, 11, 24), LocalTime.of(2, 30), 60, 127))
+                LocalDate.of(2026, 11, 24), LocalTime.of(2, 0), 60, 127))
                 .isInstanceOfSatisfying(WeatherForecastException.class, exception -> {
                     assertThat(exception.getErrorCode())
                             .isEqualTo(ErrorCode.WEATHER_FORECAST_SERVICE_UNAVAILABLE);
@@ -158,7 +158,78 @@ class KmaForecastClientTest {
         server.verify();
     }
 
+    @Test
+    void encodesDecodedServiceKeyExactlyOnce() {
+        var builder = RestClient.builder().baseUrl("https://apis.data.go.kr");
+        var encodedKeyServer = MockRestServiceServer.bindTo(builder).build();
+        var encodedKeyClient = new KmaForecastClient(builder.build(), "decoded+key");
+        encodedKeyServer.expect(request -> assertThat(request.getURI().getRawQuery())
+                        .contains("serviceKey=decoded%2Bkey")
+                        .doesNotContain("%252B"))
+                .andRespond(withSuccess(successResponse(), MediaType.APPLICATION_JSON));
+
+        encodedKeyClient.getVillageForecast(
+                LocalDate.of(2026, 11, 24), LocalTime.of(2, 0), 60, 127);
+
+        encodedKeyServer.verify();
+    }
+
+    @Test
+    void fetchesPagesUntilTotalCountIsReached() {
+        expectPage(1, successResponse(1, 2, "0200", "0300", "7"));
+        expectPage(2, successResponse(2, 2, "0200", "0400", "8"));
+
+        var items = client.getVillageForecast(
+                LocalDate.of(2026, 11, 24), LocalTime.of(2, 0), 60, 127);
+
+        assertThat(items).extracting(item -> item.fcstTime())
+                .containsExactly("0300", "0400");
+        server.verify();
+    }
+
+    @Test
+    void rejectsEmptyPageBeforeTotalCountIsReached() {
+        expectPage(1, successResponse(1, 2, "0200", "0300", "7"));
+        expectPage(2, """
+                {"response":{"header":{"resultCode":"00","resultMsg":"NORMAL_SERVICE"},
+                "body":{"items":{"item":[]},"pageNo":2,"numOfRows":1000,"totalCount":2}}}
+                """);
+
+        assertThatThrownBy(() -> client.getVillageForecast(
+                LocalDate.of(2026, 11, 24), LocalTime.of(2, 0), 60, 127))
+                .isInstanceOfSatisfying(WeatherForecastException.class,
+                        exception -> assertThat(exception.getErrorCode())
+                                .isEqualTo(ErrorCode.WEATHER_FORECAST_RESPONSE_INVALID));
+        server.verify();
+    }
+
+    @Test
+    void rejectsResponseFromDifferentIssueTime() {
+        expectPage(1, successResponse(1, 1, "0500", "0600", "9"));
+
+        assertThatThrownBy(() -> client.getVillageForecast(
+                LocalDate.of(2026, 11, 24), LocalTime.of(2, 0), 60, 127))
+                .isInstanceOfSatisfying(WeatherForecastException.class,
+                        exception -> assertThat(exception.getErrorCode())
+                                .isEqualTo(ErrorCode.WEATHER_FORECAST_RESPONSE_INVALID));
+        server.verify();
+    }
+
+    private void expectPage(int pageNumber, String response) {
+        server.expect(requestToUriTemplate(
+                        "https://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getVilageFcst"
+                                + "?serviceKey={serviceKey}&pageNo={pageNo}&numOfRows={numOfRows}"
+                                + "&dataType={dataType}&base_date={baseDate}&base_time={baseTime}&nx={nx}&ny={ny}",
+                        "test-key", pageNumber, 1000, "JSON", "20261124", "0200", 60, 127))
+                .andRespond(withSuccess(response, MediaType.APPLICATION_JSON));
+    }
+
     private String successResponse() {
+        return successResponse(1, 1, "0200", "0300", "7");
+    }
+
+    private String successResponse(int pageNumber, int totalCount, String baseTime,
+                                   String forecastTime, String forecastValue) {
         return """
                 {
                   "response": {
@@ -167,17 +238,17 @@ class KmaForecastClientTest {
                       "dataType": "JSON",
                       "items": {
                         "item": [
-                          {"baseDate":"20261124","baseTime":"0230","category":"TMP",
-                           "fcstDate":"20261124","fcstTime":"0300","fcstValue":"7",
+                          {"baseDate":"20261124","baseTime":"%s","category":"TMP",
+                           "fcstDate":"20261124","fcstTime":"%s","fcstValue":"%s",
                            "nx":60,"ny":127}
                         ]
                       },
-                      "pageNo": 1,
+                      "pageNo": %d,
                       "numOfRows": 1000,
-                      "totalCount": 1
+                      "totalCount": %d
                     }
                   }
                 }
-                """;
+                """.formatted(baseTime, forecastTime, forecastValue, pageNumber, totalCount);
     }
 }
