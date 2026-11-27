@@ -1,8 +1,14 @@
 spring:
-  config:
-    import: optional:file:.env[.properties]
   datasource:
-    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:ootb}
-    username: ${DB_USERNAME:postgres}
-    password: ${DB_PASSWORD:postgres}
+    url: ${OTBOO_TEST_DB_URL}
+    username: ${OTBOO_TEST_DB_USERNAME}
+    password: ${OTBOO_TEST_DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    open-in-view: false
+
+  flyway:
+    enabled: false
