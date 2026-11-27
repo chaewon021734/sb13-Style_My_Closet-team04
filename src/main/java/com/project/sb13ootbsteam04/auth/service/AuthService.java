@@ -2,13 +2,12 @@ package com.project.sb13ootbsteam04.auth.service;
 
 import com.project.sb13ootbsteam04.auth.dto.LoginRequest;
 import com.project.sb13ootbsteam04.auth.dto.LoginResponse;
+import com.project.sb13ootbsteam04.auth.dto.LoginResult;
 import com.project.sb13ootbsteam04.auth.jwt.JwtTokenProvider;
 import com.project.sb13ootbsteam04.user.dto.response.UserDto;
 import com.project.sb13ootbsteam04.user.entity.User;
 import com.project.sb13ootbsteam04.user.repository.UserRepository;
-
 import lombok.RequiredArgsConstructor;
-
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -26,11 +25,11 @@ public class AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
+    private final RefreshTokenService refreshTokenService;
 
     @Transactional
-    public LoginResponse login(LoginRequest request) {
+    public LoginResult login(LoginRequest request) {
 
-        // 1. 사용자 조회 및 비관적 쓰기 락 획득
         User user = userRepository
                 .findByEmailForUpdate(request.email())
                 .orElseThrow(() ->
@@ -39,21 +38,17 @@ public class AuthService {
                         )
                 );
 
-        // 2. 계정 잠금 여부 검증
         if (user.isLocked()) {
             throw new BadCredentialsException(
                     LOGIN_FAILURE_MESSAGE
             );
         }
 
-        // 3. 일반 비밀번호 검증
-        boolean normalPasswordMatches =
-                passwordEncoder.matches(
-                        request.password(),
-                        user.getPassword()
-                );
+        boolean normalPasswordMatches = passwordEncoder.matches(
+                request.password(),
+                user.getPassword()
+        );
 
-        // 4. 임시 비밀번호 검증
         boolean temporaryPasswordMatches = false;
 
         if (!normalPasswordMatches
@@ -65,40 +60,43 @@ public class AuthService {
             );
         }
 
-        // 5. 두 비밀번호 모두 일치하지 않으면 로그인 실패
         if (!normalPasswordMatches && !temporaryPasswordMatches) {
             throw new BadCredentialsException(
                     LOGIN_FAILURE_MESSAGE
             );
         }
 
-        // 6. 기존 JWT 무효화를 위한 로그인 버전 증가
+        // 기존 로그인 토큰 무효화
         user.increaseLoginVersion();
 
-        // 7. 인증 방식에 따라 JWT 발급
         String accessToken;
+
+        RefreshTokenService.IssuedRefreshToken refreshToken = null;
 
         if (temporaryPasswordMatches) {
 
-            // 임시 JWT는 비밀번호 재설정 전용
-            accessToken =
-                    jwtTokenProvider.generateTemporaryAccessToken(user);
+            // 임시 비밀번호 로그인 시 제한된 Access Token만 발급
+            accessToken = jwtTokenProvider
+                    .generateTemporaryAccessToken(user);
 
         } else {
 
-            // 일반 JWT
-            accessToken =
-                    jwtTokenProvider.generateAccessToken(user);
+            // 정상 로그인 시 Access Token 발급
+            accessToken = jwtTokenProvider
+                    .generateAccessToken(user);
+
+            // 정상 로그인 시 Refresh Token 발급
+            refreshToken = refreshTokenService.issue(user);
         }
 
-        // 8. 프론트엔드에서 사용하는 사용자 정보 변환
         UserDto userDto = UserDto.from(user);
 
-        // 9. JWT 및 사용자 정보 반환
-        return new LoginResponse(
+        LoginResponse response = new LoginResponse(
                 accessToken,
                 "Bearer",
                 userDto
         );
+
+        return new LoginResult(response, refreshToken);
     }
 }
