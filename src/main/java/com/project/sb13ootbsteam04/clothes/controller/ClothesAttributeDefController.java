@@ -17,6 +17,7 @@ import org.springframework.data.domain.Sort.Direction;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -78,5 +79,13 @@ public class ClothesAttributeDefController implements ClothesAttributeDefApi {
     ClothesAttributeDefDto response = clothesAttributeDefMapper.toDto(result);
 
     return ResponseEntity.status(HttpStatus.OK).body(response);
+  }
+
+  @Override
+  @DeleteMapping("/{definitionId}")
+  public ResponseEntity<Void> delete(@PathVariable UUID definitionId) {
+    clothesAttributeDefService.delete(definitionId);
+    // 삭제 성공 응답에는 프론트엔드가 해석할 본문을 포함하지 않는다.
+    return ResponseEntity.noContent().build();
   }
 }
