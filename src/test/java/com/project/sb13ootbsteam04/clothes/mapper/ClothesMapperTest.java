@@ -6,11 +6,13 @@ import static org.junit.jupiter.api.Assertions.assertAll;
 import com.project.sb13ootbsteam04.clothes.controller.dto.ClothesAttributeDto;
 import com.project.sb13ootbsteam04.clothes.controller.dto.ClothesCreateRequest;
 import com.project.sb13ootbsteam04.clothes.controller.dto.ClothesDto;
+import com.project.sb13ootbsteam04.clothes.controller.dto.ClothesDtoCursorResponse;
 import com.project.sb13ootbsteam04.clothes.entity.Clothes;
 import com.project.sb13ootbsteam04.clothes.entity.ClothesAttribute;
 import com.project.sb13ootbsteam04.clothes.entity.ClothesAttributeDef;
 import com.project.sb13ootbsteam04.clothes.entity.ClothesType;
 import com.project.sb13ootbsteam04.clothes.service.dto.ClothesCreateCommand;
+import com.project.sb13ootbsteam04.clothes.service.dto.ClothesCursorResult;
 import com.project.sb13ootbsteam04.clothes.service.dto.ClothesResult;
 import com.project.sb13ootbsteam04.user.entity.User;
 import java.util.List;
@@ -83,6 +85,51 @@ class ClothesMapperTest {
                 () -> assertThat(attribute.selectableValues()).containsExactly("블랙", "크림"),
                 () -> assertThat(attribute.value()).isEqualTo("블랙")
             ))
+    );
+  }
+
+  @Test
+  @DisplayName("옷 목록 서비스 결과를 Swagger 커서 응답 구조로 변환한다")
+  void 목록_Result_DTO_변환() {
+    // given
+    UUID clothesId = UUID.randomUUID();
+    UUID ownerId = UUID.randomUUID();
+    UUID nextIdAfter = UUID.randomUUID();
+    ClothesResult clothes = new ClothesResult(
+        clothesId,
+        ownerId,
+        "셔츠",
+        null,
+        ClothesType.TOP,
+        List.of()
+    );
+    ClothesCursorResult result = new ClothesCursorResult(
+        List.of(clothes),
+        "2026-11-20T00:00:00Z",
+        nextIdAfter,
+        true,
+        2,
+        "createdAt",
+        "DESCENDING"
+    );
+
+    // when
+    ClothesDtoCursorResponse response = mapper.toDto(result);
+
+    // then
+    assertAll(
+        () -> assertThat(response.data()).singleElement().satisfies(dto ->
+            assertAll(
+                () -> assertThat(dto.id()).isEqualTo(clothesId),
+                () -> assertThat(dto.ownerId()).isEqualTo(ownerId),
+                () -> assertThat(dto.name()).isEqualTo("셔츠")
+            )),
+        () -> assertThat(response.nextCursor()).isEqualTo("2026-11-20T00:00:00Z"),
+        () -> assertThat(response.nextIdAfter()).isEqualTo(nextIdAfter),
+        () -> assertThat(response.hasNext()).isTrue(),
+        () -> assertThat(response.totalCount()).isEqualTo(2),
+        () -> assertThat(response.sortBy()).isEqualTo("createdAt"),
+        () -> assertThat(response.sortDirection()).isEqualTo("DESCENDING")
     );
   }
 }
