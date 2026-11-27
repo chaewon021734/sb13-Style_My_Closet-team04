@@ -51,7 +51,31 @@ public class JwtAccountStatusValidator
             return invalidToken();
         }
 
-        // 6. 정상 계정이면 검증 성공
+        // 6. JWT 역할과 DB 사용자 권한 일치 여부 검증
+        String tokenRole = jwt.getClaimAsString("role");
+
+        if (tokenRole == null
+                || user.getRole() == null
+                || !user.getRole().name().equals(tokenRole)) {
+            return invalidToken();
+        }
+
+        // 7. JWT 로그인 버전 검증
+        Object loginVersionClaim = jwt.getClaim("loginVersion");
+
+        // 로그인 버전이 없거나 숫자가 아니면 인증 실패
+        if (!(loginVersionClaim instanceof Number tokenLoginVersion)) {
+            return invalidToken();
+        }
+
+        // JWT 로그인 버전과 DB 로그인 버전 비교
+        if (tokenLoginVersion.longValue() != user.getLoginVersion()
+                || tokenLoginVersion.doubleValue()
+                != (double) tokenLoginVersion.longValue()) {
+            return invalidToken();
+        }
+
+        // 8. 모든 검증을 통과하면 인증 성공
         return OAuth2TokenValidatorResult.success();
     }
 
