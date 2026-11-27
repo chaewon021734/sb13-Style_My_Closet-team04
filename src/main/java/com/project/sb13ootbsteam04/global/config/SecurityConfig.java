@@ -56,6 +56,11 @@ public class SecurityConfig {
                                 "/api/auth/login"
                         ).permitAll()
 
+                        // 속성 정의 조회는 인증 사용자에게 열고 변경만 관리자에게 허용한다.
+                        .requestMatchers(HttpMethod.POST, "/api/clothes/attribute-defs").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PATCH, "/api/clothes/attribute-defs/*").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/clothes/attribute-defs/*").hasRole("ADMIN")
+
                         // 나머지 API는 JWT 인증 필수
                         .anyRequest().authenticated()
                 )

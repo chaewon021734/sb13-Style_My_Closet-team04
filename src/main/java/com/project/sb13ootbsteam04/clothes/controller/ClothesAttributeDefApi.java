@@ -26,6 +26,8 @@ public interface ClothesAttributeDefApi {
       summary = "의상 속성 정의 등록",
       description = "의상 속성 정의 등록 API")
   @ApiResponses({
+      @ApiResponse(responseCode = "401", description = "인증이 필요합니다", content = @Content),
+      @ApiResponse(responseCode = "403", description = "관리자 권한이 필요합니다", content = @Content),
       @ApiResponse(
           responseCode = "201",
           description = "의상 속성 정의 등록 성공",
@@ -86,6 +88,8 @@ public interface ClothesAttributeDefApi {
       summary = "의상 속성 정의 수정",
       description = "의상 속성 정의 수정 API")
   @ApiResponses({
+      @ApiResponse(responseCode = "401", description = "인증이 필요합니다", content = @Content),
+      @ApiResponse(responseCode = "403", description = "관리자 권한이 필요합니다", content = @Content),
       @ApiResponse(
           responseCode = "200",
           description = "의상 속성 정의 수정 성공",
@@ -124,6 +128,8 @@ public interface ClothesAttributeDefApi {
       summary = "의상 속성 정의 삭제",
       description = "의상 속성 정의 삭제 API")
   @ApiResponses({
+      @ApiResponse(responseCode = "401", description = "인증이 필요합니다", content = @Content),
+      @ApiResponse(responseCode = "403", description = "관리자 권한이 필요합니다", content = @Content),
       @ApiResponse(
           responseCode = "204",
           description = "의상 속성 정의 삭제 성공"),

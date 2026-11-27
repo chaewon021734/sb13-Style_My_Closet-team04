@@ -14,16 +14,27 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.project.sb13ootbsteam04.clothes.service.ClothesAttributeDefService;
+import com.project.sb13ootbsteam04.clothes.mapper.ClothesAttributeDefMapper;
+import com.project.sb13ootbsteam04.clothes.controller.ClothesAttributeDefController;
+import java.util.UUID;
 import java.time.Instant;
 
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(controllers = SecurityConfigTest.TestController.class)
 @Import({
         SecurityConfig.class,
-        SecurityConfigTest.TestController.class
+        SecurityConfigTest.TestController.class,
+        ClothesAttributeDefController.class
 })
 class SecurityConfigTest {
 
@@ -35,6 +46,32 @@ class SecurityConfigTest {
 
     @MockitoBean
     private AuthService authService;
+
+    @MockitoBean
+    private ClothesAttributeDefService clothesService;
+
+    @MockitoBean
+    private ClothesAttributeDefMapper clothesMapper;
+
+    @Test
+    void attributeDefinitionsRequireAdminForWrites() throws Exception {
+        // given
+        String collection = "/api/clothes/attribute-defs";
+        UUID id = UUID.randomUUID();
+        String item = collection + "/" + id;
+        var user = user("member").roles("USER");
+
+        // when & then
+        mockMvc.perform(delete(item)).andExpect(status().isUnauthorized());
+        mockMvc.perform(post(collection).with(user)).andExpect(status().isForbidden());
+        mockMvc.perform(patch(item).with(user)).andExpect(status().isForbidden());
+        mockMvc.perform(delete(item).with(user)).andExpect(status().isForbidden());
+        verifyNoInteractions(clothesService);
+        mockMvc.perform(get(collection).param("sortBy", "name").param("sortDirection", "ASCENDING").with(user))
+                .andExpect(status().isOk());
+        mockMvc.perform(delete(item).with(user("admin").roles("ADMIN"))).andExpect(status().isNoContent());
+        verify(clothesService).delete(id);
+    }
 
     // 테스트 전용 API
     @RestController
