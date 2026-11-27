@@ -36,8 +36,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionOperations;
 
-// H2에서 의상 속성의 value 컬럼을 식별자로 사용할 수 있도록 한다.
-@DataJpaTest(properties = "spring.datasource.url=jdbc:h2:mem:clothes-update;MODE=PostgreSQL;NON_KEYWORDS=VALUE")
+@DataJpaTest
 @ActiveProfiles("test")
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import({JpaAuditingConfig.class, ClothesServiceImpl.class, ClothesMapperImpl.class})
@@ -55,7 +54,8 @@ class ClothesUpdateIntegrationTest {
   void 이미지와_속성을_수정하면_기존_속성_행을_유지하고_변경사항을_커밋한다() {
     // given
     User owner = new User("소유자", UUID.randomUUID() + "@example.com", "password");
-    Clothes clothes = Clothes.create(owner, "코트", ClothesType.OUTER, null);
+    Clothes clothes = Clothes.create(owner, "코트", ClothesType.OUTER);
+    clothes.updateImage("https://cdn.example.com/clothes/old.png", "clothes/old.png");
     ClothesAttributeDef size = ClothesAttributeDef.create("사이즈", List.of("S", "M"));
     ClothesAttributeDef color = ClothesAttributeDef.create("색상", List.of("블랙"));
     ClothesAttribute original = ClothesAttribute.create(clothes, size, "S");
@@ -91,6 +91,7 @@ class ClothesUpdateIntegrationTest {
     transactions.executeWithoutResult(status -> {
       Clothes persisted = entityManager.find(Clothes.class, clothes.getId());
       assertThat(persisted.getImageUrl()).isEqualTo(uploaded.url());
+      assertThat(persisted.getImageObjectKey()).isEqualTo(uploaded.objectKey());
       assertThat(persisted.getName()).isEqualTo("새 코트");
       assertThat(entityManager.find(ClothesAttribute.class, original.getId()).getValue()).isEqualTo("M");
       assertThat(persisted.getAttributes()).extracting(ClothesAttribute::getValue).containsExactlyInAnyOrder("M", "블랙");
@@ -101,6 +102,7 @@ class ClothesUpdateIntegrationTest {
     });
 
     then(storage).should().upload(image);
+    then(storage).should().delete("clothes/old.png");
     then(storage).shouldHaveNoMoreInteractions();
   }
 
@@ -113,7 +115,8 @@ class ClothesUpdateIntegrationTest {
     User owner = new User("소유자", UUID.randomUUID() + "@example.com", "password");
     UUID clothesId = transactions.execute(status -> {
       entityManager.persist(owner);
-      Clothes clothes = Clothes.create(owner, "기존 옷", ClothesType.TOP, originalUrl);
+      Clothes clothes = Clothes.create(owner, "기존 옷", ClothesType.TOP);
+      clothes.updateImage(originalUrl, "clothes/old.png");
       entityManager.persist(clothes);
       return clothes.getId();
     });
@@ -135,6 +138,7 @@ class ClothesUpdateIntegrationTest {
     transactions.executeWithoutResult(status -> {
       Clothes persisted = entityManager.find(Clothes.class, clothesId);
       assertThat(persisted.getImageUrl()).isEqualTo(originalUrl);
+      assertThat(persisted.getImageObjectKey()).isEqualTo("clothes/old.png");
       assertThat(persisted.getName()).isEqualTo("기존 옷");
       entityManager.remove(persisted);
       entityManager.remove(persisted.getOwner());

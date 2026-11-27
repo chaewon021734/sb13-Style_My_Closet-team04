@@ -23,8 +23,8 @@ public enum ErrorCode {
   CLOTHES_ATTRIBUTE_VALUE_INVALID("CLT_013", HttpStatus.BAD_REQUEST, "선택할 수 없는 의상 속성 값입니다"),
   CLOTHES_ATTRIBUTE_DEFINITION_NAME_DUPLICATED("CLT_014", HttpStatus.CONFLICT, "이미 존재하는 의상 속성 정의 이름입니다"),
   CLOTHES_NOT_FOUND("CLT_015", HttpStatus.NOT_FOUND, "존재하지 않는 의상입니다"),
-  CLOTHES_AUTHENTICATION_REQUIRED("CLT_016", HttpStatus.UNAUTHORIZED, "의상을 수정하려면 로그인이 필요합니다"),
-  CLOTHES_UPDATE_FORBIDDEN("CLT_017", HttpStatus.FORBIDDEN, "본인의 의상만 수정할 수 있습니다"),
+  CLOTHES_AUTHENTICATION_REQUIRED("CLT_016", HttpStatus.UNAUTHORIZED, "로그인이 필요합니다"),
+  CLOTHES_OWNER_REQUIRED("CLT_017", HttpStatus.FORBIDDEN, "의상 소유자만 이 작업을 수행할 수 있습니다"),
 
   // WEATHER
   WEATHER_LOCATION_LOOKUP_FAILED(

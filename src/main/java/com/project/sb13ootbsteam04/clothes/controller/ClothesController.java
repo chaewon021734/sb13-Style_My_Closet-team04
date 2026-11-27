@@ -24,8 +24,12 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -92,6 +96,15 @@ public class ClothesController implements ClothesApi {
     ClothesDto response = clothesMapper.toDto(result);
 
     return ResponseEntity.status(HttpStatus.OK).body(response);
+  }
+
+  @Override
+  @DeleteMapping("/{clothesId}")
+  public ResponseEntity<Void> delete(@PathVariable UUID clothesId, Authentication authentication) {
+    UUID actorId = authenticatedUserId(authentication);
+    clothesService.delete(actorId, clothesId);
+
+    return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
   }
 
   private UUID authenticatedUserId(Authentication authentication) {

@@ -7,8 +7,10 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -334,6 +336,7 @@ class ClothesControllerTest {
         "type", "BAG",
         "attributes", List.of(Map.of("definitionId", definitionId, "value", "핑크"))
     );
+
     MockMultipartFile image = pngImagePart();
     String imageUrl = "https://cdn.example.com/clothes/bag.png";
     ClothesResult result = new ClothesResult(clothesId, ownerId, "수정된 가방", imageUrl, ClothesType.BAG,
@@ -419,6 +422,24 @@ class ClothesControllerTest {
     mockMvc.perform(multipart(HttpMethod.PATCH, "/api/clothes/{id}", UUID.randomUUID())
             .file(requestPart(Map.of("name", "새 이름"))).principal(login(actorId)))
         .andExpect(status().isForbidden());
+  }
+
+  @Test
+  @DisplayName("인증된 사용자의 ID와 의상 ID로 삭제를 요청하고 빈 204 응답을 반환한다")
+  void 의상_삭제_성공() throws Exception {
+    // given
+    UUID clothesId = UUID.randomUUID();
+    UUID actorId = UUID.randomUUID();
+    // 인증 필터가 전달하는 주체의 UUID가 서비스까지 전달되는지 확인한다.
+    Jwt jwt = Jwt.withTokenValue("test-token").header("alg", "HS256").subject(actorId.toString()).build();
+
+    // when & then
+    mockMvc.perform(delete("/api/clothes/{clothesId}", clothesId)
+            .principal(new JwtAuthenticationToken(jwt, List.of())))
+        .andExpect(status().isNoContent())
+        .andExpect(content().string(""));
+    then(clothesService).should().delete(actorId, clothesId);
+    then(clothesService).shouldHaveNoMoreInteractions();
   }
 
   private JwtAuthenticationToken login(UUID actorId) {

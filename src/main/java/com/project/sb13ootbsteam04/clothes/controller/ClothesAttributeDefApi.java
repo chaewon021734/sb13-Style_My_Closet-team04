@@ -37,7 +37,7 @@ public interface ClothesAttributeDefApi {
       @ApiResponse(
           responseCode = "401",
           description = "유효한 인증 토큰이 필요합니다.",
-          content = @Content),
+          content = @Content), // 의상 속성 정의 등록·수정·삭제는 보안 필터가 컨트롤러 호출 전에 권한 검사를 진행한다.
       @ApiResponse(
           responseCode = "403",
           description = "의상 속성 정의를 변경하려면 관리자 권한이 필요합니다.",

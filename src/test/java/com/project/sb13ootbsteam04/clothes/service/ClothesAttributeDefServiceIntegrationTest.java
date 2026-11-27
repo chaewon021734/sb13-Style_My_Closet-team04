@@ -100,7 +100,7 @@ class ClothesAttributeDefServiceIntegrationTest {
     // given
     User owner = userRepository.saveAndFlush(new User("테스터", "clothes-delete-" + UUID.randomUUID() + "@example.com", "encoded-password"));
     ClothesAttributeDef sizeDefinition = clothesAttributeDefRepository.saveAndFlush(ClothesAttributeDef.create("사이즈", List.of("S", "M", "L")));
-    Clothes clothes = Clothes.create(owner, "재킷", ClothesType.OUTER, null);
+    Clothes clothes = Clothes.create(owner, "재킷", ClothesType.OUTER);
     ClothesAttribute deletedAttribute = ClothesAttribute.create(clothes, existingDefinition, "블랙");
     ClothesAttribute retainedAttribute = ClothesAttribute.create(clothes, sizeDefinition, "M");
     clothesRepository.saveAndFlush(clothes);

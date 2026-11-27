@@ -14,4 +14,6 @@ public interface ClothesService {
   ClothesCursorResult search(ClothesSearchCommand command);
 
   ClothesResult update(UUID actorId, ClothesUpdateCommand command);
+
+  void delete(UUID actorId, UUID clothesId);
 }

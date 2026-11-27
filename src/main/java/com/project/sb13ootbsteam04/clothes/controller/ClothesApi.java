@@ -140,4 +140,37 @@ public interface ClothesApi {
       MultipartFile image,
       @Parameter(hidden = true) Authentication authentication
   );
+
+  @Operation(
+      summary = "옷 삭제",
+      description = "로그인한 사용자가 소유한 옷을 삭제합니다.")
+  @ApiResponses({
+      @ApiResponse(
+          responseCode = "204",
+          description = "옷 삭제 성공", content = @Content),
+      @ApiResponse(
+          responseCode = "400",
+          description = "옷 삭제 실패",
+          content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
+      @ApiResponse(
+          responseCode = "401",
+          description = "유효한 사용자 인증이 필요합니다. 보안 필터에서 거부하면 응답 본문이 없을 수 있습니다.",
+          content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
+      @ApiResponse(
+          responseCode = "403",
+          description = "삭제 권한이 없습니다. 타인의 의상은 오류 본문을 반환하며 보안 필터에서 거부하면 본문이 없을 수 있습니다.",
+          content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
+      @ApiResponse(
+          responseCode = "404",
+          description = "삭제할 의상을 찾을 수 없음",
+          content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
+      @ApiResponse(
+          responseCode = "500",
+          description = "서버 처리 실패",
+          content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
+  })
+  ResponseEntity<Void> delete(
+      UUID clothesId,
+      @Parameter(hidden = true) Authentication authentication
+  );
 }

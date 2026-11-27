@@ -14,6 +14,8 @@ import com.project.sb13ootbsteam04.clothes.entity.ClothesAttribute;
 import com.project.sb13ootbsteam04.clothes.entity.ClothesAttributeDef;
 import com.project.sb13ootbsteam04.clothes.entity.ClothesType;
 import com.project.sb13ootbsteam04.clothes.exception.ClothesAccessException;
+import com.project.sb13ootbsteam04.clothes.exception.ClothesAccessException;
+import com.project.sb13ootbsteam04.clothes.exception.ClothesImageStorageException;
 import com.project.sb13ootbsteam04.clothes.exception.ClothesAttributeDefinitionNotFoundException;
 import com.project.sb13ootbsteam04.clothes.exception.ClothesNotFoundException;
 import com.project.sb13ootbsteam04.clothes.exception.ClothesOwnerNotFoundException;
@@ -148,6 +150,7 @@ class ClothesServiceTest {
         () -> assertThat(saved.getOwner()).isSameAs(owner),
         () -> assertThat(saved.getName()).isEqualTo("테스트 의상"),
         () -> assertThat(saved.getType()).isEqualTo(ClothesType.DRESS),
+        () -> assertThat(saved.getImageObjectKey()).isEqualTo("clothes/image.png"),
         () -> assertThat(saved.getImageUrl()).isEqualTo("https://cdn.example.com/clothes/image.png"),
         () -> assertThat(saved.getAttributes())
             .extracting(attribute -> attribute.getDefinition().getId())
@@ -294,6 +297,24 @@ class ClothesServiceTest {
   }
 
   @Test
+  @DisplayName("저장소가 컬럼 길이를 초과한 URL을 반환하면 새 객체를 정리하고 저장소 오류를 반환한다")
+  void 저장소_URL_길이_초과() {
+    // given
+    ClothesImageCommand image = pngImage();
+    ClothesCreateCommand command = command(List.of(), image);
+    StoredImage stored = new StoredImage("clothes/new.png", "x".repeat(501));
+    givenOwnerExists();
+    given(clothesImageStorage.upload(image)).willReturn(stored);
+
+    // when & then
+    assertThatThrownBy(() -> clothesService.create(command))
+        .isInstanceOfSatisfying(ClothesImageStorageException.class,
+            e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.CLOTHES_IMAGE_UPLOAD_FAILED));
+    then(clothesImageStorage).should().delete(stored.objectKey());
+    then(clothesRepository).shouldHaveNoInteractions();
+  }
+
+  @Test
   @DisplayName("이미지 업로드 후 의상 저장에 실패하면 업로드한 객체를 삭제한다")
   void 의상_저장_실패시_업로드한_이미지_정리() {
 
@@ -317,6 +338,7 @@ class ClothesServiceTest {
         () -> then(clothesMapper).shouldHaveNoInteractions()
     );
   }
+
 
   @Test
   @DisplayName("커서 기반 페이징으로 의상을 조회할 수 있다")
@@ -495,13 +517,14 @@ class ClothesServiceTest {
     // when & then
     assertThatThrownBy(() -> clothesService.update(UUID.randomUUID(), command))
         .isInstanceOfSatisfying(ClothesAccessException.class,
-            ex -> assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.CLOTHES_UPDATE_FORBIDDEN));
+            ex -> assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.CLOTHES_OWNER_REQUIRED));
     assertThat(clothes.getName()).isEqualTo("기존 이름");
     then(clothesImageStorage).shouldHaveNoInteractions();
   }
 
   private Clothes existingClothesWithSize(ClothesAttributeDef size) {
-    Clothes clothes = Clothes.create(owner, "기존 스카프", ClothesType.SCARF, "https://cdn.example.com/clothes/old.png");
+    Clothes clothes = Clothes.create(owner, "기존 스카프", ClothesType.SCARF);
+    clothes.updateImage("https://cdn.example.com/clothes/old.png", "clothes/old.png");
     UUID id = UUID.randomUUID();
     ReflectionTestUtils.setField(clothes, "id", id);
     ClothesAttribute.create(clothes, size, "S");
@@ -509,8 +532,73 @@ class ClothesServiceTest {
     return clothes;
   }
 
+  @Test
+  @DisplayName("소유자는 이미지가 없는 본인 의상을 삭제할 수 있다")
+  void 옷_삭제_성공() {
+    // given
+    Clothes target = clothes(UUID.randomUUID(), "삭제할 옷", Instant.EPOCH);
+    given(clothesRepository.findByIdForUpdate(target.getId())).willReturn(Optional.of(target));
+
+    // when
+    clothesService.delete(ownerId, target.getId());
+
+    // then
+    then(clothesRepository).should().delete(target);
+    then(clothesImageStorage).shouldHaveNoInteractions();
+  }
+
+  @Test
+  @DisplayName("로그인하지 않은 옷 삭제 요청은 의상을 조회하기 전에 거부한다")
+  void 미인증_삭제_거부() {
+    // given
+    UUID clothesId = UUID.randomUUID();
+
+    // when & then
+    assertThatThrownBy(() -> clothesService.delete(null, clothesId))
+        .isInstanceOfSatisfying(ClothesAccessException.class,
+            ex -> assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.CLOTHES_AUTHENTICATION_REQUIRED));
+    then(clothesRepository).shouldHaveNoInteractions();
+    then(clothesImageStorage).shouldHaveNoInteractions();
+  }
+
+  @Test
+  @DisplayName("의상이 없으면 요청 ID를 담은 예외를 반환하고 삭제하지 않는다")
+  void 존재하지_않는_의상_삭제() {
+    // given
+    UUID missingId = UUID.randomUUID();
+    given(clothesRepository.findByIdForUpdate(missingId)).willReturn(Optional.empty());
+
+    // when & then
+    assertThatThrownBy(() -> clothesService.delete(ownerId, missingId))
+        .isInstanceOfSatisfying(ClothesNotFoundException.class, ex -> {
+          assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.CLOTHES_NOT_FOUND);
+          assertThat(ex.getDetails()).containsEntry("clothesId", missingId.toString());
+        });
+    then(clothesRepository).should().findByIdForUpdate(missingId);
+    then(clothesRepository).shouldHaveNoMoreInteractions();
+    then(clothesImageStorage).shouldHaveNoInteractions();
+  }
+
+  @Test
+  @DisplayName("타인의 의상 삭제를 거부하고 의상과 이미지를 보존한다")
+  void 다른_사용자의_옷_삭제() {
+    // given
+    Clothes target = clothes(UUID.randomUUID(), "다른 사용자의 옷", Instant.EPOCH);
+    target.updateImage("https://cdn.example.com/clothes/coat.jpg", "clothes/coat.jpg");
+    UUID otherUserId = UUID.randomUUID();
+    given(clothesRepository.findByIdForUpdate(target.getId())).willReturn(Optional.of(target));
+
+    // when & then
+    assertThatThrownBy(() -> clothesService.delete(otherUserId, target.getId()))
+        .isInstanceOfSatisfying(ClothesAccessException.class,
+            ex -> assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.CLOTHES_OWNER_REQUIRED));
+    then(clothesRepository).should().findByIdForUpdate(target.getId());
+    then(clothesRepository).shouldHaveNoMoreInteractions();
+    then(clothesImageStorage).shouldHaveNoInteractions();
+  }
+
   private Clothes clothes(UUID id, String name, Instant createdAt) {
-    Clothes clothes = Clothes.create(owner, name, ClothesType.DRESS, null);
+    Clothes clothes = Clothes.create(owner, name, ClothesType.DRESS);
     ReflectionTestUtils.setField(clothes, "id", id);
     ReflectionTestUtils.setField(clothes, "createdAt", createdAt);
     return clothes;
