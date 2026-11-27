@@ -8,6 +8,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
+import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
@@ -16,6 +17,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import lombok.AccessLevel;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -23,9 +25,13 @@ import lombok.NoArgsConstructor;
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@Table(name = "clothes")
+@Table(
+    name = "clothes",
+    indexes = @Index(name = "idx_clothes_owner_id", columnList = "owner_id")
+) // ownerId 조회 성능을 위해 인덱스 추가
 public class Clothes extends UpdatedAtEntity {
 
+  private static final int MAX_NAME_LENGTH = 255;
   private static final int IMAGE_COLUMN_LENGTH = 500;
 
   @ManyToOne(fetch = FetchType.LAZY, optional = false)
@@ -89,6 +95,9 @@ public class Clothes extends UpdatedAtEntity {
     String normalized = Objects.requireNonNull(name, "의상 이름은 필수입니다").trim();
     if (normalized.isEmpty()) {
       throw new IllegalArgumentException("의상 이름은 비어 있을 수 없습니다");
+    }
+    if (normalized.length() > MAX_NAME_LENGTH) {
+      throw new IllegalArgumentException("의상 이름은 255자까지만 입력 가능합니다");
     }
     return normalized;
   }
