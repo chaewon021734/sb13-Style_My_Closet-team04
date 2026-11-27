@@ -1,11 +1,14 @@
 package com.project.sb13ootbsteam04.user.entity;
 
 import com.project.sb13ootbsteam04.global.entity.BaseEntity;
+
 import jakarta.persistence.*;
+
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.time.Instant;
 import java.util.Objects;
 
 @Entity
@@ -30,10 +33,19 @@ public class User extends BaseEntity {
     @Column(nullable = false)
     private boolean locked = false;
 
-    // 로그인 성공 시 증가하는 버전
-    // 이전에 발급한 JWT를 무효화하기 위해 사용
+    // 로그인 버전 (PR A)
     @Column(name = "login_version", nullable = false)
     private long loginVersion = 0L;
+
+    // ========================================
+    // PR C - 임시 비밀번호 정보
+    // ========================================
+
+    @Column(name = "temporary_password_hash", length = 255)
+    private String temporaryPasswordHash;
+
+    @Column(name = "temporary_password_expires_at")
+    private Instant temporaryPasswordExpiresAt;
 
     public User(String name, String email, String password) {
         this.name = name;
@@ -45,17 +57,15 @@ public class User extends BaseEntity {
     }
 
     // ========================================
-    // 1. 로그인 버전 증가 (PR A)
+    // 1. 로그인 버전 관리 (PR A)
     // ========================================
 
-    // 로그인 성공 시 버전 증가
-    // JWT에 포함된 버전과 DB의 버전이 다르면 인증 거부
     public void increaseLoginVersion() {
         this.loginVersion++;
     }
 
     // ========================================
-    // 2. 초기 관리자 계정 생성 (PR B)
+    // 2. 초기 관리자 생성 (PR B)
     // ========================================
 
     public static User createAdmin(
@@ -65,7 +75,6 @@ public class User extends BaseEntity {
     ) {
         User admin = new User(name, email, encodedPassword);
         admin.role = UserRole.ADMIN;
-
         return admin;
     }
 
@@ -80,31 +89,101 @@ public class User extends BaseEntity {
                 "변경할 사용자 권한은 필수입니다."
         );
 
-        // 기존 권한과 동일하면 변경하지 않음
         if (this.role == newRole) {
             return;
         }
 
         this.role = newRole;
-
-        // 권한이 변경되면 기존 JWT 무효화
         increaseLoginVersion();
     }
 
     // ========================================
-    // 4. 사용자 계정 잠금 및 해제 (PR B)
+    // 4. 계정 잠금 및 해제 (PR B)
     // ========================================
 
     public void changeLocked(boolean locked) {
 
-        // 현재 상태와 동일하면 변경하지 않음
         if (this.locked == locked) {
             return;
         }
 
         this.locked = locked;
+        increaseLoginVersion();
+    }
 
-        // 계정 잠금 및 해제 시 기존 JWT 무효화
+    // ========================================
+    // 5. 임시 비밀번호 발급 (PR C)
+    // ========================================
+
+    public void issueTemporaryPassword(
+            String encodedPassword,
+            Instant expiresAt
+    ) {
+
+        if (encodedPassword == null
+                || encodedPassword.isBlank()) {
+            throw new IllegalArgumentException(
+                    "임시 비밀번호는 필수입니다."
+            );
+        }
+
+        Objects.requireNonNull(
+                expiresAt,
+                "임시 비밀번호 만료 시간은 필수입니다."
+        );
+
+        this.temporaryPasswordHash = encodedPassword;
+        this.temporaryPasswordExpiresAt = expiresAt;
+
+        // 기존 JWT 무효화
+        increaseLoginVersion();
+    }
+
+    // ========================================
+    // 6. 임시 비밀번호 유효성 확인 (PR C)
+    // ========================================
+
+    public boolean isTemporaryPasswordActive(Instant now) {
+
+        Objects.requireNonNull(
+                now,
+                "현재 시간은 필수입니다."
+        );
+
+        return temporaryPasswordHash != null
+                && temporaryPasswordExpiresAt != null
+                && now.isBefore(temporaryPasswordExpiresAt);
+    }
+
+    // ========================================
+    // 7. 임시 비밀번호 정보 삭제 (PR C)
+    // ========================================
+
+    public void clearTemporaryPassword() {
+
+        this.temporaryPasswordHash = null;
+        this.temporaryPasswordExpiresAt = null;
+    }
+
+    // ========================================
+    // 8. 새 비밀번호로 변경 (PR C)
+    // ========================================
+
+    public void changePassword(String encodedPassword) {
+
+        if (encodedPassword == null
+                || encodedPassword.isBlank()) {
+            throw new IllegalArgumentException(
+                    "새 비밀번호는 필수입니다."
+            );
+        }
+
+        this.password = encodedPassword;
+
+        // 임시 비밀번호 사용 종료
+        clearTemporaryPassword();
+
+        // 기존 JWT 모두 무효화
         increaseLoginVersion();
     }
 }
