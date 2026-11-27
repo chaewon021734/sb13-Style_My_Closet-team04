@@ -36,8 +36,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionOperations;
 
-// H2에서 의상 속성의 value 컬럼을 식별자로 사용할 수 있도록 한다.
-@DataJpaTest(properties = "spring.datasource.url=jdbc:h2:mem:clothes-update;MODE=PostgreSQL;NON_KEYWORDS=VALUE")
+@DataJpaTest
 @ActiveProfiles("test")
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import({JpaAuditingConfig.class, ClothesServiceImpl.class, ClothesMapperImpl.class})

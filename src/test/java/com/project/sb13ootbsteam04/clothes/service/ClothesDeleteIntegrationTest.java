@@ -21,8 +21,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.support.TransactionOperations;
 
-// 실제 커밋을 사용하는 테스트라 다른 컨텍스트와 데이터베이스를 분리한다.
-@SpringBootTest(properties = "spring.datasource.url=jdbc:h2:mem:clothes-delete;MODE=PostgreSQL;NON_KEYWORDS=VALUE")
+@SpringBootTest
 @ActiveProfiles("test")
 @DisplayName("의상 삭제 통합 테스트")
 class ClothesDeleteIntegrationTest {
