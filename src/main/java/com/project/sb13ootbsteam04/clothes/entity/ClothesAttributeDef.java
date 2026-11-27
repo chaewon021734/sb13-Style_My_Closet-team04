@@ -6,11 +6,10 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
+import java.util.TreeSet;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -86,11 +85,12 @@ public class ClothesAttributeDef extends UpdatedAtEntity {
     }
 
     List<String> normalizedValues = new ArrayList<>(values.size());
-    Set<String> uniqueValues = new HashSet<>();
+    // 속성 정의 등록, 수정 시 대소문자 구분 없이 중복 제거하는 TreeSet 적용
+    Set<String> uniqueValues = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
     for (String value : values) {
       String normalized = normalizeValue(value);
-      // Locale.ROOT로 실행 환경과 무관하게 중복을 판정한다.
-      if (!uniqueValues.add(normalized.toLowerCase(Locale.ROOT))) {
+      // 선택할 때와 같은 대소문자 비교를 사용하고 저장 순서는 목록에 보존한다.
+      if (!uniqueValues.add(normalized)) {
         throw new IllegalArgumentException("중복된 선택지입니다");
       }
       normalizedValues.add(normalized);
@@ -102,18 +102,17 @@ public class ClothesAttributeDef extends UpdatedAtEntity {
     // 입력값 정규화는 목록 순회 전에 한 번만 수행한다.
     String normalizedValue = normalizeValue(value);
     return selectableValues.stream()
-        .filter(selectableValue -> selectableValue.equalsIgnoreCase(normalizedValue))
+        .filter(normalizedValue::equalsIgnoreCase)
         .findFirst()
         .orElseThrow(() -> new IllegalArgumentException("선택할 수 없는 속성값입니다"));
   }
 
   public void update(String name, List<String> selectableValues) {
     String normalizedName = normalizeName(name);
-    List<String> normalizedValues = normalizeValues(selectableValues);
-
-    // 모든 검증을 통과한 후에만 필드를 업데이트한다.
+    // 기존 정의의 이름만 바꾸는 경우 이전 중복 기준으로 저장된 기존 선택지는 그대로 보존한다.
+    if (!this.selectableValues.equals(selectableValues)) {
+      this.selectableValues = normalizeValues(selectableValues);
+    }
     this.name = normalizedName;
-    this.selectableValues = normalizedValues;
   }
-
 }
