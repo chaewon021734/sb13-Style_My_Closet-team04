@@ -1,9 +1,13 @@
 package com.project.sb13ootbsteam04.user.controller;
 
+import com.project.sb13ootbsteam04.auth.controller.CsrfController;
 import com.project.sb13ootbsteam04.global.config.SecurityConfig;
 import com.project.sb13ootbsteam04.user.entity.UserRole;
 import com.project.sb13ootbsteam04.user.service.AdminUserService;
 
+import jakarta.servlet.http.Cookie;
+
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,12 +21,18 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.UUID;
 
+import static com.project.sb13ootbsteam04.global.support.CsrfTestSupport.issueCsrfCookie;
+import static com.project.sb13ootbsteam04.global.support.CsrfTestSupport.withCsrf;
+
 import static org.mockito.Mockito.*;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(controllers = AdminUserController.class)
+@WebMvcTest(controllers = {
+        AdminUserController.class,
+        CsrfController.class
+})
 @Import(SecurityConfig.class)
 class AdminUserControllerTest {
 
@@ -34,6 +44,15 @@ class AdminUserControllerTest {
 
     @MockitoBean
     private JwtDecoder jwtDecoder;
+
+    private Cookie csrfCookie;
+
+    // 각 테스트 실행 전에 실제 CSRF 토큰 발급
+    @BeforeEach
+    void setUp() throws Exception {
+
+        csrfCookie = issueCsrfCookie(mockMvc);
+    }
 
     // ========================================
     // 1. ADMIN 권한으로 사용자 권한 변경
@@ -51,7 +70,10 @@ class AdminUserControllerTest {
                 """;
 
         mockMvc.perform(
-                        patch("/api/admin/users/{userId}/role", userId)
+                        withCsrf(
+                                patch("/api/admin/users/{userId}/role", userId),
+                                csrfCookie
+                        )
                                 .with(jwt()
                                         .jwt(token -> token
                                                 .claim("role", "ADMIN"))
@@ -87,7 +109,10 @@ class AdminUserControllerTest {
                 """;
 
         mockMvc.perform(
-                        patch("/api/admin/users/{userId}/locked", userId)
+                        withCsrf(
+                                patch("/api/admin/users/{userId}/locked", userId),
+                                csrfCookie
+                        )
                                 .with(jwt()
                                         .jwt(token -> token
                                                 .subject(currentAdminId.toString())
@@ -128,7 +153,10 @@ class AdminUserControllerTest {
                 """;
 
         mockMvc.perform(
-                        patch("/api/admin/users/{userId}/locked", userId)
+                        withCsrf(
+                                patch("/api/admin/users/{userId}/locked", userId),
+                                csrfCookie
+                        )
                                 .with(jwt()
                                         .jwt(token -> token
                                                 .subject(currentAdminId.toString())
@@ -168,7 +196,10 @@ class AdminUserControllerTest {
                 """;
 
         mockMvc.perform(
-                        patch("/api/admin/users/{userId}/role", userId)
+                        withCsrf(
+                                patch("/api/admin/users/{userId}/role", userId),
+                                csrfCookie
+                        )
                                 .with(jwt()
                                         .jwt(token -> token
                                                 .claim("role", "USER"))
@@ -201,8 +232,12 @@ class AdminUserControllerTest {
                 }
                 """;
 
+        // 정상 CSRF 토큰이 있더라도 JWT 인증 없이는 접근 불가
         mockMvc.perform(
-                        patch("/api/admin/users/{userId}/role", userId)
+                        withCsrf(
+                                patch("/api/admin/users/{userId}/role", userId),
+                                csrfCookie
+                        )
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(requestBody)
                 )
@@ -227,7 +262,10 @@ class AdminUserControllerTest {
                 """;
 
         mockMvc.perform(
-                        patch("/api/admin/users/{userId}/locked", userId)
+                        withCsrf(
+                                patch("/api/admin/users/{userId}/locked", userId),
+                                csrfCookie
+                        )
                                 .with(jwt()
                                         .jwt(token -> token
                                                 .claim("role", "USER"))
@@ -255,7 +293,10 @@ class AdminUserControllerTest {
         UUID userId = UUID.randomUUID();
 
         mockMvc.perform(
-                        patch("/api/admin/users/{userId}/role", userId)
+                        withCsrf(
+                                patch("/api/admin/users/{userId}/role", userId),
+                                csrfCookie
+                        )
                                 .with(jwt()
                                         .authorities(
                                                 new SimpleGrantedAuthority(
@@ -281,7 +322,10 @@ class AdminUserControllerTest {
         UUID userId = UUID.randomUUID();
 
         mockMvc.perform(
-                        patch("/api/admin/users/{userId}/locked", userId)
+                        withCsrf(
+                                patch("/api/admin/users/{userId}/locked", userId),
+                                csrfCookie
+                        )
                                 .with(jwt()
                                         .authorities(
                                                 new SimpleGrantedAuthority(
