@@ -15,7 +15,6 @@ import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
 import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.security.oauth2.jwt.JwsHeader;
-
 import org.springframework.test.util.ReflectionTestUtils;
 
 import javax.crypto.SecretKey;
@@ -86,8 +85,33 @@ class JwtDecoderIntegrationTest {
         );
     }
 
+    // ========================================
     // 테스트용 실제 JWT 발급
-    private String createToken() {
+    // ========================================
+
+    private String createToken(long loginVersion) {
+
+        Instant now = Instant.now();
+
+        JwtClaimsSet claims = JwtClaimsSet.builder()
+                .subject(userId.toString())
+                .issuedAt(now)
+                .expiresAt(now.plusSeconds(3600))
+                .claim("role", "USER")
+                .claim("loginVersion", loginVersion)
+                .build();
+
+        JwsHeader header = JwsHeader
+                .with(MacAlgorithm.HS256)
+                .build();
+
+        return jwtEncoder.encode(
+                JwtEncoderParameters.from(header, claims)
+        ).getTokenValue();
+    }
+
+    // 로그인 버전 클레임이 없는 기존 JWT 생성
+    private String createTokenWithoutLoginVersion() {
 
         Instant now = Instant.now();
 
@@ -107,17 +131,23 @@ class JwtDecoderIntegrationTest {
         ).getTokenValue();
     }
 
-    // 1. 정상 계정이면 JWT 검증 성공
+    // ========================================
+    // 1. 정상 계정 JWT 검증 성공
+    // ========================================
+
     @Test
     void shouldAcceptTokenForActiveUser() {
 
+        // given
         when(userRepository.findById(userId))
                 .thenReturn(Optional.of(user));
 
-        String token = createToken();
+        String token = createToken(0L);
 
+        // when
         Jwt decodedJwt = jwtDecoder.decode(token);
 
+        // then
         assertEquals(
                 userId.toString(),
                 decodedJwt.getSubject()
@@ -128,13 +158,22 @@ class JwtDecoderIntegrationTest {
                 decodedJwt.getClaimAsString("role")
         );
 
+        assertEquals(
+                0L,
+                ((Number) decodedJwt.getClaim("loginVersion")).longValue()
+        );
+
         verify(userRepository).findById(userId);
     }
 
-    // 2. 잠긴 계정이면 기존 JWT 검증 실패
+    // ========================================
+    // 2. 잠긴 계정 JWT 검증 실패
+    // ========================================
+
     @Test
     void shouldRejectTokenForLockedUser() {
 
+        // given
         ReflectionTestUtils.setField(
                 user,
                 "locked",
@@ -144,8 +183,9 @@ class JwtDecoderIntegrationTest {
         when(userRepository.findById(userId))
                 .thenReturn(Optional.of(user));
 
-        String token = createToken();
+        String token = createToken(0L);
 
+        // when & then
         assertThrows(
                 JwtException.class,
                 () -> jwtDecoder.decode(token)
@@ -154,15 +194,90 @@ class JwtDecoderIntegrationTest {
         verify(userRepository).findById(userId);
     }
 
-    // 3. 삭제된 계정이면 기존 JWT 검증 실패
+    // ========================================
+    // 3. 삭제된 계정 JWT 검증 실패
+    // ========================================
+
     @Test
     void shouldRejectTokenForDeletedUser() {
 
+        // given
         when(userRepository.findById(userId))
                 .thenReturn(Optional.empty());
 
-        String token = createToken();
+        String token = createToken(0L);
 
+        // when & then
+        assertThrows(
+                JwtException.class,
+                () -> jwtDecoder.decode(token)
+        );
+
+        verify(userRepository).findById(userId);
+    }
+
+    // ========================================
+    // 4. 재로그인 후 기존 JWT 검증 실패
+    // ========================================
+
+    @Test
+    void shouldRejectOldTokenAfterRelogin() {
+
+        // given
+        when(userRepository.findById(userId))
+                .thenReturn(Optional.of(user));
+
+        // 첫 번째 로그인
+        user.increaseLoginVersion();
+
+        String firstToken = createToken(user.getLoginVersion());
+
+        // 첫 번째 JWT는 정상적으로 인증됨
+        Jwt firstJwt = jwtDecoder.decode(firstToken);
+
+        assertEquals(
+                1L,
+                ((Number) firstJwt.getClaim("loginVersion")).longValue()
+        );
+
+        // 두 번째 로그인
+        user.increaseLoginVersion();
+
+        String secondToken = createToken(user.getLoginVersion());
+
+        // when & then
+
+        // 기존 JWT는 로그인 버전이 달라 인증 실패
+        assertThrows(
+                JwtException.class,
+                () -> jwtDecoder.decode(firstToken)
+        );
+
+        // 새로운 JWT는 정상적으로 인증됨
+        Jwt secondJwt = jwtDecoder.decode(secondToken);
+
+        assertEquals(
+                2L,
+                ((Number) secondJwt.getClaim("loginVersion")).longValue()
+        );
+
+        verify(userRepository, times(3)).findById(userId);
+    }
+
+    // ========================================
+    // 5. loginVersion 없는 기존 JWT 검증 실패
+    // ========================================
+
+    @Test
+    void shouldRejectTokenWithoutLoginVersion() {
+
+        // given
+        when(userRepository.findById(userId))
+                .thenReturn(Optional.of(user));
+
+        String token = createTokenWithoutLoginVersion();
+
+        // when & then
         assertThrows(
                 JwtException.class,
                 () -> jwtDecoder.decode(token)
