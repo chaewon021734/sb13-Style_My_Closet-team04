@@ -46,7 +46,7 @@ public interface FollowRepository extends JpaRepository<Follow, UUID> {
     // 팔로워 수
     long countByFollowingId(UUID followingId);
 
-    // 팔로잉 첫 페이지 조회 (팔로우 대상 이름 검색)
+    // 팔로잉 첫 페이지 조회
     @Query("""
             SELECT f
             FROM Follow f, User u
@@ -54,8 +54,8 @@ public interface FollowRepository extends JpaRepository<Follow, UUID> {
               AND u.id = f.followingId
               AND (
                   :nameLike IS NULL
-                  OR LOWER(u.name) LIKE LOWER(
-                      CONCAT('%', :nameLike, '%')
+                  OR LOWER(u.name) LIKE CONCAT(
+                      '%', LOWER(CAST(:nameLike AS string)), '%'
                   )
               )
             ORDER BY f.createdAt DESC, f.id DESC
@@ -74,8 +74,8 @@ public interface FollowRepository extends JpaRepository<Follow, UUID> {
               AND u.id = f.followingId
               AND (
                   :nameLike IS NULL
-                  OR LOWER(u.name) LIKE LOWER(
-                      CONCAT('%', :nameLike, '%')
+                  OR LOWER(u.name) LIKE CONCAT(
+                      '%', LOWER(CAST(:nameLike AS string)), '%'
                   )
               )
               AND (
@@ -103,8 +103,8 @@ public interface FollowRepository extends JpaRepository<Follow, UUID> {
               AND u.id = f.followingId
               AND (
                   :nameLike IS NULL
-                  OR LOWER(u.name) LIKE LOWER(
-                      CONCAT('%', :nameLike, '%')
+                  OR LOWER(u.name) LIKE CONCAT(
+                      '%', LOWER(CAST(:nameLike AS string)), '%'
                   )
               )
             """)
@@ -113,7 +113,7 @@ public interface FollowRepository extends JpaRepository<Follow, UUID> {
             @Param("nameLike") String nameLike
     );
 
-    // 팔로워 첫 페이지 조회 (팔로워 이름 검색)
+    // 팔로워 첫 페이지 조회
     @Query("""
             SELECT f
             FROM Follow f, User u
@@ -121,8 +121,8 @@ public interface FollowRepository extends JpaRepository<Follow, UUID> {
               AND u.id = f.followerId
               AND (
                   :nameLike IS NULL
-                  OR LOWER(u.name) LIKE LOWER(
-                      CONCAT('%', :nameLike, '%')
+                  OR LOWER(u.name) LIKE CONCAT(
+                      '%', LOWER(CAST(:nameLike AS string)), '%'
                   )
               )
             ORDER BY f.createdAt DESC, f.id DESC
@@ -141,8 +141,8 @@ public interface FollowRepository extends JpaRepository<Follow, UUID> {
               AND u.id = f.followerId
               AND (
                   :nameLike IS NULL
-                  OR LOWER(u.name) LIKE LOWER(
-                      CONCAT('%', :nameLike, '%')
+                  OR LOWER(u.name) LIKE CONCAT(
+                      '%', LOWER(CAST(:nameLike AS string)), '%'
                   )
               )
               AND (
@@ -170,8 +170,8 @@ public interface FollowRepository extends JpaRepository<Follow, UUID> {
               AND u.id = f.followerId
               AND (
                   :nameLike IS NULL
-                  OR LOWER(u.name) LIKE LOWER(
-                      CONCAT('%', :nameLike, '%')
+                  OR LOWER(u.name) LIKE CONCAT(
+                      '%', LOWER(CAST(:nameLike AS string)), '%'
                   )
               )
             """)

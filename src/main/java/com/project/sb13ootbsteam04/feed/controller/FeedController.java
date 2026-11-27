@@ -1,4 +1,3 @@
-
 package com.project.sb13ootbsteam04.feed.controller;
 
 import com.project.sb13ootbsteam04.feed.dto.CreateFeedRequest;
@@ -6,52 +5,45 @@ import com.project.sb13ootbsteam04.feed.dto.FeedPageResponse;
 import com.project.sb13ootbsteam04.feed.dto.FeedResponse;
 import com.project.sb13ootbsteam04.feed.dto.UpdateFeedRequest;
 import com.project.sb13ootbsteam04.feed.service.FeedService;
-import jakarta.validation.Valid;
-import jakarta.validation.constraints.Min;
+import io.swagger.v3.oas.annotations.Operation;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.validation.annotation.Validated;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import java.net.URI;
 import java.util.UUID;
+import com.project.sb13ootbsteam04.global.security.JwtUserIdResolver;
 
 @RestController
 @RequestMapping("/api/feeds")
 @RequiredArgsConstructor
-@Validated
 public class FeedController {
 
     private final FeedService feedService;
+    private final JwtUserIdResolver jwtUserIdResolver;
 
+    // ========================================
     // 피드 목록 조회
-    // GET /api/feeds
+    // ========================================
+
+    @Operation(summary = "피드 목록 조회", description = "좋아요 수(likeCount) 정렬은 각 요청 시점의 값을 기준으로 합니다. 페이지 조회 사이에 좋아요 수가 변경되면 피드가 중복되거나 누락될 수 있으며, 페이지 간 정렬 일관성을 보장하지 않습니다.")
     @GetMapping
     public ResponseEntity<FeedPageResponse> getFeeds(
             @RequestParam(required = false) String cursor,
             @RequestParam(required = false) UUID idAfter,
-            @RequestParam @Min(1) int limit,
+            @RequestParam @Min(1) @Max(100) int limit,
             @RequestParam String sortBy,
             @RequestParam String sortDirection,
             @RequestParam(required = false) String keywordLike,
             @RequestParam(required = false) String skyStatusEqual,
             @RequestParam(required = false) String precipitationTypeEqual,
-            @RequestParam(required = false) UUID authorIdEqual
+            @RequestParam(required = false) UUID authorIdEqual,
+            Authentication authentication
     ) {
-
-        if (skyStatusEqual != null && !skyStatusEqual.isBlank()) {
-            throw new IllegalArgumentException(
-                    "skyStatusEqual 필터는 아직 지원하지 않습니다."
-            );
-        }
-
-        if (precipitationTypeEqual != null
-                && !precipitationTypeEqual.isBlank()) {
-            throw new IllegalArgumentException(
-                    "precipitationTypeEqual 필터는 아직 지원하지 않습니다."
-            );
-        }
+        UUID currentUserId = jwtUserIdResolver.resolve(authentication);
 
         FeedPageResponse response = feedService.getFeedPage(
                 cursor,
@@ -60,56 +52,72 @@ public class FeedController {
                 sortBy,
                 sortDirection,
                 keywordLike,
-                authorIdEqual
+                skyStatusEqual,
+                precipitationTypeEqual,
+                authorIdEqual,
+                currentUserId
         );
 
         return ResponseEntity.ok(response);
     }
 
-    // 피드 등록
-    // POST /api/feeds
+    // ========================================
+    // 피드 생성
+    // ========================================
+
     @PostMapping
     public ResponseEntity<FeedResponse> createFeed(
-            @Valid @RequestBody CreateFeedRequest request
+            @RequestBody CreateFeedRequest request,
+            Authentication authentication
     ) {
+        UUID currentUserId = jwtUserIdResolver.resolve(authentication);
 
-        UUID feedId = feedService.createFeed(request);
+        UUID feedId = feedService.createFeed(request, currentUserId);
 
-        FeedResponse response = feedService.getFeedResponse(feedId);
-
-        URI location = URI.create("/api/feeds/" + feedId);
+        FeedResponse response = feedService.getFeedResponse(
+                feedId,
+                currentUserId
+        );
 
         return ResponseEntity
-                .status(HttpStatus.CREATED)
-                .location(location)
+                .created(URI.create("/api/feeds/" + feedId))
                 .body(response);
     }
 
+    // ========================================
     // 피드 수정
-    // PATCH /api/feeds/{feedId}
+    // ========================================
+
     @PatchMapping("/{feedId}")
     public ResponseEntity<FeedResponse> updateFeed(
             @PathVariable UUID feedId,
-            @Valid @RequestBody UpdateFeedRequest request
+            @RequestBody UpdateFeedRequest request,
+            Authentication authentication
     ) {
+        UUID currentUserId = jwtUserIdResolver.resolve(authentication);
 
-        // 피드 내용 수정
-        feedService.updateFeed(feedId, request);
+        feedService.updateFeed(feedId, request, currentUserId);
 
-        // 수정된 피드 정보 조회
-        FeedResponse response = feedService.getFeedResponse(feedId);
+        FeedResponse response = feedService.getFeedResponse(
+                feedId,
+                currentUserId
+        );
 
         return ResponseEntity.ok(response);
     }
 
+    // ========================================
     // 피드 삭제
-    // DELETE /api/feeds/{feedId}
+    // ========================================
+
     @DeleteMapping("/{feedId}")
     public ResponseEntity<Void> deleteFeed(
-            @PathVariable UUID feedId
+            @PathVariable UUID feedId,
+            Authentication authentication
     ) {
+        UUID currentUserId = jwtUserIdResolver.resolve(authentication);
 
-        feedService.deleteFeed(feedId);
+        feedService.deleteFeed(feedId, currentUserId);
 
         return ResponseEntity.noContent().build();
     }
