@@ -17,7 +17,7 @@ public record ClothesCreateRequest(
     @NotNull(message = "의상 소유자 ID는 필수입니다")
     UUID ownerId,
 
-    @Schema(description = "의상 이름", requiredMode = Schema.RequiredMode.REQUIRED)
+    @Schema(description = "의상 이름", maxLength = 255, requiredMode = Schema.RequiredMode.REQUIRED)
     @Size(max = 255, message = "의상 이름은 255자까지만 입력 가능합니다.")
     @NotBlank(message = "의상 이름은 필수입니다")
     String name,
