@@ -25,14 +25,27 @@ public class SecurityConfig {
     ) throws Exception {
 
         http
-                // JWT 기반 REST API
-                .csrf(csrf -> csrf.disable())
+                // SPA 프론트엔드 환경에 맞는 CSRF 보호 설정
+                // XSRF-TOKEN 쿠키 발급
+                // X-XSRF-TOKEN 요청 헤더 검증
+                .csrf(csrf -> csrf.spa())
 
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
 
                 .authorizeHttpRequests(auth -> auth
+
+                        // 프론트엔드 정적 리소스 접근 허용
+                        // 로그인 이전에도 HTML, JavaScript, CSS, 이미지 접근 가능
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/",
+                                "/index.html",
+                                "/assets/**",
+                                "/logo_symbol.svg",
+                                "/vite.svg"
+                        ).permitAll()
 
                         // 오류 경로
                         .requestMatchers("/error").permitAll()
@@ -51,10 +64,18 @@ public class SecurityConfig {
                                 "/api/users"
                         ).permitAll()
 
-                        // 로그인
+                        // 기존 로그인 API 및 프론트엔드 로그인 API 허용
                         .requestMatchers(
                                 HttpMethod.POST,
-                                "/api/auth/login"
+                                "/api/auth/login",
+                                "/api/auth/sign-in"
+                        ).permitAll()
+
+                        // CSRF 토큰 발급 API
+                        // 로그인 이전에도 접근할 수 있도록 허용
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/api/auth/csrf-token"
                         ).permitAll()
 
                         // PR C - 임시 비밀번호 발급

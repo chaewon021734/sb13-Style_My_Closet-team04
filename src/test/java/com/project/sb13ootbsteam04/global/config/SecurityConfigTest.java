@@ -1,9 +1,12 @@
 package com.project.sb13ootbsteam04.global.config;
 
+import com.project.sb13ootbsteam04.auth.controller.CsrfController;
 import com.project.sb13ootbsteam04.auth.service.AuthService;
 import com.project.sb13ootbsteam04.clothes.controller.ClothesAttributeDefController;
 import com.project.sb13ootbsteam04.clothes.mapper.ClothesAttributeDefMapper;
 import com.project.sb13ootbsteam04.clothes.service.ClothesAttributeDefService;
+
+import jakarta.servlet.http.Cookie;
 
 import org.junit.jupiter.api.Test;
 
@@ -23,6 +26,9 @@ import org.springframework.web.bind.annotation.RestController;
 import java.time.Instant;
 import java.util.UUID;
 
+import static com.project.sb13ootbsteam04.global.support.CsrfTestSupport.issueCsrfCookie;
+import static com.project.sb13ootbsteam04.global.support.CsrfTestSupport.withCsrf;
+
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -31,7 +37,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Import({
         SecurityConfig.class,
         SecurityConfigTest.TestController.class,
-        ClothesAttributeDefController.class
+        ClothesAttributeDefController.class,
+        CsrfController.class
 })
 class SecurityConfigTest {
 
@@ -62,6 +69,9 @@ class SecurityConfigTest {
         UUID definitionId = UUID.randomUUID();
         String definitionPath = definitionsPath + "/" + definitionId;
 
+        // 실제 CSRF 토큰 발급
+        Cookie csrfCookie = issueCsrfCookie(mockMvc);
+
         when(jwtDecoder.decode("member-token"))
                 .thenReturn(roleToken("member-token", "USER"));
 
@@ -70,41 +80,60 @@ class SecurityConfigTest {
 
         String memberAuthorization = "Bearer member-token";
 
-        // 인증 없이 삭제 요청 시 401
-        mockMvc.perform(delete(definitionPath))
-                .andExpect(status().isUnauthorized())
-                .andExpect(content().string(""));
+        // 정상 CSRF 토큰이 있더라도 인증 없이 삭제 요청 시 401
+        mockMvc.perform(
+                withCsrf(delete(definitionPath), csrfCookie)
+        ).andExpect(status().isUnauthorized())
+         .andExpect(content().string(""));
+
+        // USER 권한으로 생성 요청 시 403
+        mockMvc.perform(
+                withCsrf(post(definitionsPath), csrfCookie)
+                        .header(
+                                HttpHeaders.AUTHORIZATION,
+                                memberAuthorization
+                        )
+        ).andExpect(status().isForbidden());
 
         // USER 권한으로 변경 요청 시 403
         mockMvc.perform(
-                post(definitionsPath)
-                        .header(HttpHeaders.AUTHORIZATION, memberAuthorization)
+                withCsrf(patch(definitionPath), csrfCookie)
+                        .header(
+                                HttpHeaders.AUTHORIZATION,
+                                memberAuthorization
+                        )
         ).andExpect(status().isForbidden());
 
+        // USER 권한으로 삭제 요청 시 403
         mockMvc.perform(
-                patch(definitionPath)
-                        .header(HttpHeaders.AUTHORIZATION, memberAuthorization)
-        ).andExpect(status().isForbidden());
-
-        mockMvc.perform(
-                delete(definitionPath)
-                        .header(HttpHeaders.AUTHORIZATION, memberAuthorization)
+                withCsrf(delete(definitionPath), csrfCookie)
+                        .header(
+                                HttpHeaders.AUTHORIZATION,
+                                memberAuthorization
+                        )
         ).andExpect(status().isForbidden())
-                .andExpect(content().string(""));
+         .andExpect(content().string(""));
+
+        // USER의 쓰기 요청 3개가 JWT 인증까지 진행되었는지 확인
+        verify(jwtDecoder, times(3)).decode("member-token");
 
         verifyNoInteractions(clothesService);
 
         // USER 권한으로 조회 가능
+        // GET 요청에는 CSRF 토큰이 필요하지 않음
         mockMvc.perform(
                 get(definitionsPath)
                         .param("sortBy", "name")
                         .param("sortDirection", "ASCENDING")
-                        .header(HttpHeaders.AUTHORIZATION, memberAuthorization)
+                        .header(
+                                HttpHeaders.AUTHORIZATION,
+                                memberAuthorization
+                        )
         ).andExpect(status().isOk());
 
         // ADMIN 권한으로 삭제 가능
         mockMvc.perform(
-                delete(definitionPath)
+                withCsrf(delete(definitionPath), csrfCookie)
                         .header(
                                 HttpHeaders.AUTHORIZATION,
                                 "Bearer admin-token"

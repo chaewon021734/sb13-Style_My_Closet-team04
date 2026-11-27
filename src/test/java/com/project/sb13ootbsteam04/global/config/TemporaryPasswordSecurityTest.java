@@ -1,5 +1,6 @@
 package com.project.sb13ootbsteam04.global.config;
 
+import com.project.sb13ootbsteam04.auth.controller.CsrfController;
 import com.project.sb13ootbsteam04.auth.controller.PasswordResetController;
 import com.project.sb13ootbsteam04.auth.controller.TemporaryPasswordController;
 import com.project.sb13ootbsteam04.auth.exception.TemporaryPasswordRateLimitException;
@@ -8,6 +9,9 @@ import com.project.sb13ootbsteam04.auth.service.PasswordResetService;
 import com.project.sb13ootbsteam04.auth.service.TemporaryPasswordService;
 import com.project.sb13ootbsteam04.global.exception.GlobalExceptionHandler;
 
+import jakarta.servlet.http.Cookie;
+
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,6 +30,9 @@ import org.springframework.web.bind.annotation.RestController;
 import java.time.Instant;
 import java.util.UUID;
 
+import static com.project.sb13ootbsteam04.global.support.CsrfTestSupport.issueCsrfCookie;
+import static com.project.sb13ootbsteam04.global.support.CsrfTestSupport.withCsrf;
+
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -34,6 +41,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @WebMvcTest(controllers = {
         PasswordResetController.class,
         TemporaryPasswordController.class,
+        CsrfController.class,
         TemporaryPasswordSecurityTest.TestController.class
 })
 @Import({
@@ -66,6 +74,15 @@ class TemporaryPasswordSecurityTest {
 
     private static final String CLIENT_IP = "192.0.2.10";
 
+    private Cookie csrfCookie;
+
+    // 각 테스트 실행 전에 실제 CSRF 토큰 발급
+    @BeforeEach
+    void setUp() throws Exception {
+
+        csrfCookie = issueCsrfCookie(mockMvc);
+    }
+
     // 1. 임시 JWT로 비밀번호 재설정 가능
     @Test
     void shouldAllowTemporaryJwtForPasswordReset() throws Exception {
@@ -81,7 +98,10 @@ class TemporaryPasswordSecurityTest {
                 ));
 
         mockMvc.perform(
-                patch("/api/auth/password")
+                withCsrf(
+                        patch("/api/auth/password"),
+                        csrfCookie
+                )
                         .header(
                                 HttpHeaders.AUTHORIZATION,
                                 "Bearer temporary-token"
@@ -109,7 +129,10 @@ class TemporaryPasswordSecurityTest {
                 ));
 
         mockMvc.perform(
-                patch("/api/auth/password")
+                withCsrf(
+                        patch("/api/auth/password"),
+                        csrfCookie
+                )
                         .header(
                                 HttpHeaders.AUTHORIZATION,
                                 "Bearer normal-token"
@@ -117,6 +140,9 @@ class TemporaryPasswordSecurityTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(PASSWORD_REQUEST)
         ).andExpect(status().isForbidden());
+
+        // CSRF 필터가 아닌 JWT 권한 검증 단계까지 진행됐는지 확인
+        verify(jwtDecoder).decode("normal-token");
 
         verifyNoInteractions(passwordResetService);
     }
@@ -168,7 +194,10 @@ class TemporaryPasswordSecurityTest {
     void shouldRejectAnonymousPasswordReset() throws Exception {
 
         mockMvc.perform(
-                patch("/api/auth/password")
+                withCsrf(
+                        patch("/api/auth/password"),
+                        csrfCookie
+                )
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(PASSWORD_REQUEST)
         ).andExpect(status().isUnauthorized());
@@ -181,7 +210,10 @@ class TemporaryPasswordSecurityTest {
     void shouldAllowAnonymousTemporaryPasswordRequest() throws Exception {
 
         mockMvc.perform(
-                post("/api/auth/temporary-password")
+                withCsrf(
+                        post("/api/auth/temporary-password"),
+                        csrfCookie
+                )
                         .with(request -> {
                             request.setRemoteAddr(CLIENT_IP);
                             return request;
@@ -204,7 +236,10 @@ class TemporaryPasswordSecurityTest {
     void shouldRejectInvalidEmail() throws Exception {
 
         mockMvc.perform(
-                post("/api/auth/temporary-password")
+                withCsrf(
+                        post("/api/auth/temporary-password"),
+                        csrfCookie
+                )
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"email\":\"invalid-email\"}")
         ).andExpect(status().isBadRequest());
@@ -228,7 +263,10 @@ class TemporaryPasswordSecurityTest {
                 ));
 
         mockMvc.perform(
-                patch("/api/auth/password")
+                withCsrf(
+                        patch("/api/auth/password"),
+                        csrfCookie
+                )
                         .header(
                                 HttpHeaders.AUTHORIZATION,
                                 "Bearer temporary-token"
@@ -249,7 +287,10 @@ class TemporaryPasswordSecurityTest {
                 .checkAndRecord("test@example.com", CLIENT_IP);
 
         mockMvc.perform(
-                post("/api/auth/temporary-password")
+                withCsrf(
+                        post("/api/auth/temporary-password"),
+                        csrfCookie
+                )
                         .with(request -> {
                             request.setRemoteAddr(CLIENT_IP);
                             return request;
@@ -274,7 +315,10 @@ class TemporaryPasswordSecurityTest {
                 .checkAndRecord("test@example.com", CLIENT_IP);
 
         mockMvc.perform(
-                post("/api/auth/temporary-password")
+                withCsrf(
+                        post("/api/auth/temporary-password"),
+                        csrfCookie
+                )
                         .with(request -> {
                             request.setRemoteAddr(CLIENT_IP);
                             return request;
@@ -296,7 +340,10 @@ class TemporaryPasswordSecurityTest {
                 .checkAndRecord("test@example.com", CLIENT_IP);
 
         mockMvc.perform(
-                post("/api/auth/temporary-password")
+                withCsrf(
+                        post("/api/auth/temporary-password"),
+                        csrfCookie
+                )
                         .with(request -> {
                             request.setRemoteAddr(CLIENT_IP);
                             return request;

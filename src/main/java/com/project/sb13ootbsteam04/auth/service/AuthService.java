@@ -3,6 +3,7 @@ package com.project.sb13ootbsteam04.auth.service;
 import com.project.sb13ootbsteam04.auth.dto.LoginRequest;
 import com.project.sb13ootbsteam04.auth.dto.LoginResponse;
 import com.project.sb13ootbsteam04.auth.jwt.JwtTokenProvider;
+import com.project.sb13ootbsteam04.user.dto.response.UserDto;
 import com.project.sb13ootbsteam04.user.entity.User;
 import com.project.sb13ootbsteam04.user.repository.UserRepository;
 
@@ -90,10 +91,14 @@ public class AuthService {
                     jwtTokenProvider.generateAccessToken(user);
         }
 
-        // 8. 로그인 응답
+        // 8. 프론트엔드에서 사용하는 사용자 정보 변환
+        UserDto userDto = UserDto.from(user);
+
+        // 9. JWT 및 사용자 정보 반환
         return new LoginResponse(
                 accessToken,
-                "Bearer"
+                "Bearer",
+                userDto
         );
     }
 }
