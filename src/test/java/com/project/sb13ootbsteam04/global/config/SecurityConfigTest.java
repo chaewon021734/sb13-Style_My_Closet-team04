@@ -11,7 +11,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.request.RequestPostProcessor;
+import org.springframework.http.HttpHeaders;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -24,7 +24,6 @@ import java.time.Instant;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -61,17 +60,26 @@ class SecurityConfigTest {
         String definitionsPath = "/api/clothes/attribute-defs";
         UUID definitionId = UUID.randomUUID();
         String definitionPath = definitionsPath + "/" + definitionId;
-        RequestPostProcessor member = user("member").roles("USER");
+
+        // 디코딩 이후 운영 필터와 동일한 경로에서 role 클레임을 권한으로 변환한다.
+        when(jwtDecoder.decode("member-token")).thenReturn(roleToken("member-token", "USER"));
+        when(jwtDecoder.decode("admin-token")).thenReturn(roleToken("admin-token", "ADMIN"));
+        String memberAuthorization = "Bearer member-token";
 
         // when & then
         mockMvc.perform(delete(definitionPath)).andExpect(status().isUnauthorized()).andExpect(content().string(""));
-        mockMvc.perform(post(definitionsPath).with(member)).andExpect(status().isForbidden());
-        mockMvc.perform(patch(definitionPath).with(member)).andExpect(status().isForbidden());
-        mockMvc.perform(delete(definitionPath).with(member)).andExpect(status().isForbidden()).andExpect(content().string(""));
+        mockMvc.perform(post(definitionsPath).header(HttpHeaders.AUTHORIZATION, memberAuthorization)).andExpect(status().isForbidden());
+        mockMvc.perform(patch(definitionPath).header(HttpHeaders.AUTHORIZATION, memberAuthorization)).andExpect(status().isForbidden());
+        mockMvc.perform(delete(definitionPath).header(HttpHeaders.AUTHORIZATION, memberAuthorization)).andExpect(status().isForbidden()).andExpect(content().string(""));
         verifyNoInteractions(clothesService);
-        mockMvc.perform(get(definitionsPath).param("sortBy", "name").param("sortDirection", "ASCENDING").with(member)).andExpect(status().isOk());
-        mockMvc.perform(delete(definitionPath).with(user("admin").roles("ADMIN"))).andExpect(status().isNoContent());
+        mockMvc.perform(get(definitionsPath).param("sortBy", "name").param("sortDirection", "ASCENDING").header(HttpHeaders.AUTHORIZATION, memberAuthorization)).andExpect(status().isOk());
+        mockMvc.perform(delete(definitionPath).header(HttpHeaders.AUTHORIZATION, "Bearer admin-token")).andExpect(status().isNoContent());
         verify(clothesService).delete(definitionId);
+    }
+
+    private Jwt roleToken(String token, String role) {
+        return Jwt.withTokenValue(token).header("alg", "HS256")
+                .subject(UUID.randomUUID().toString()).claim("role", role).build();
     }
 
     // 테스트 전용 API
