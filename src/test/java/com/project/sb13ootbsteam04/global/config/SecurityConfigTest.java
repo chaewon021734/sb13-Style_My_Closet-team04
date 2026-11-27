@@ -11,6 +11,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -28,6 +29,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(controllers = SecurityConfigTest.TestController.class)
@@ -56,21 +58,20 @@ class SecurityConfigTest {
     @Test
     void attributeDefinitionsRequireAdminForWrites() throws Exception {
         // given
-        String collection = "/api/clothes/attribute-defs";
-        UUID id = UUID.randomUUID();
-        String item = collection + "/" + id;
-        var user = user("member").roles("USER");
+        String definitionsPath = "/api/clothes/attribute-defs";
+        UUID definitionId = UUID.randomUUID();
+        String definitionPath = definitionsPath + "/" + definitionId;
+        RequestPostProcessor member = user("member").roles("USER");
 
         // when & then
-        mockMvc.perform(delete(item)).andExpect(status().isUnauthorized());
-        mockMvc.perform(post(collection).with(user)).andExpect(status().isForbidden());
-        mockMvc.perform(patch(item).with(user)).andExpect(status().isForbidden());
-        mockMvc.perform(delete(item).with(user)).andExpect(status().isForbidden());
+        mockMvc.perform(delete(definitionPath)).andExpect(status().isUnauthorized()).andExpect(content().string(""));
+        mockMvc.perform(post(definitionsPath).with(member)).andExpect(status().isForbidden());
+        mockMvc.perform(patch(definitionPath).with(member)).andExpect(status().isForbidden());
+        mockMvc.perform(delete(definitionPath).with(member)).andExpect(status().isForbidden()).andExpect(content().string(""));
         verifyNoInteractions(clothesService);
-        mockMvc.perform(get(collection).param("sortBy", "name").param("sortDirection", "ASCENDING").with(user))
-                .andExpect(status().isOk());
-        mockMvc.perform(delete(item).with(user("admin").roles("ADMIN"))).andExpect(status().isNoContent());
-        verify(clothesService).delete(id);
+        mockMvc.perform(get(definitionsPath).param("sortBy", "name").param("sortDirection", "ASCENDING").with(member)).andExpect(status().isOk());
+        mockMvc.perform(delete(definitionPath).with(user("admin").roles("ADMIN"))).andExpect(status().isNoContent());
+        verify(clothesService).delete(definitionId);
     }
 
     // 테스트 전용 API
