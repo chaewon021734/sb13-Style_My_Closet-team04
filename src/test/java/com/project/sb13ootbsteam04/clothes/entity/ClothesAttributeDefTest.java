@@ -9,6 +9,7 @@ import java.util.Collections;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.util.ReflectionTestUtils;
 
 @DisplayName("의상 속성 정의 엔티티")
 class ClothesAttributeDefTest {
@@ -127,6 +128,22 @@ class ClothesAttributeDefTest {
         () -> assertEquals(255, definition.getName().length()),
         () -> assertEquals(100, definition.getSelectableValues().get(0).length())
     );
+  }
+
+  @Test
+  @DisplayName("이전 중복 기준으로 저장된 선택지를 그대로 보내면 기존 정의의 이름만 수정할 수 있다")
+  void 기존_선택지_유지하고_이름만_수정() {
+    // given
+    ClothesAttributeDef definition = ClothesAttributeDef.create("색상", List.of("KIRMIZI"));
+    // 이전 버전에서 저장할 수 있었던 선택지 목록을 복원한다.
+    ReflectionTestUtils.setField(definition, "selectableValues", List.of("KIRMIZI", "kırmızı"));
+
+    // when
+    definition.update("색상명", List.of("KIRMIZI", "kırmızı"));
+
+    // then
+    assertEquals("색상명", definition.getName());
+    assertEquals(List.of("KIRMIZI", "kırmızı"), definition.getSelectableValues());
   }
 
   @Test
