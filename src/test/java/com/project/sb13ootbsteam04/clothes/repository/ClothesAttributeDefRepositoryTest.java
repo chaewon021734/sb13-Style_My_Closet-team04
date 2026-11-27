@@ -35,6 +35,21 @@ class ClothesAttributeDefRepositoryTest {
   private EntityManager entityManager;
 
   @Test
+  @DisplayName("속성 정의 이름은 대소문자가 다르면 각각 저장할 수 있다")
+  void 속성_정의_이름_대소문자_구분() {
+    // given
+    ClothesAttributeDef lowerCase = ClothesAttributeDef.create("color", List.of("red"));
+    ClothesAttributeDef upperCase = ClothesAttributeDef.create("Color", List.of("Red", "s"));
+
+    // when
+    clothesAttributeDefRepository.saveAllAndFlush(List.of(lowerCase, upperCase));
+    entityManager.clear();
+
+    // then
+    assertThat(clothesAttributeDefRepository.findAll()).extracting(ClothesAttributeDef::getName).containsExactlyInAnyOrder("color", "Color");
+  }
+
+  @Test
   @DisplayName("속성 정의와 선택 가능한 값을 저장하고 다시 조회한다")
   void 속성_정의_JSONB_저장_조회() {
     // given
