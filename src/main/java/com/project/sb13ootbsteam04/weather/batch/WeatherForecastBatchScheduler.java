@@ -6,6 +6,7 @@ import org.springframework.batch.core.job.Job;
 import org.springframework.batch.core.job.parameters.JobParametersBuilder;
 import org.springframework.batch.core.launch.JobOperator;
 import org.springframework.batch.core.repository.JobRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -31,6 +32,8 @@ public class WeatherForecastBatchScheduler {
     private final JobRepository jobRepository;
     private final Clock clock;
 
+    // Spring Bean 생성 시 사용할 생성자 명시
+    @Autowired
     public WeatherForecastBatchScheduler(
             JobOperator jobOperator,
             @Qualifier(WeatherForecastBatchConfig.JOB_NAME) Job weatherForecastCollectionJob,

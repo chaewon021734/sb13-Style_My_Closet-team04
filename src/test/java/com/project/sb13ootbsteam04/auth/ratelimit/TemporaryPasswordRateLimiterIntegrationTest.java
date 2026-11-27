@@ -1,10 +1,14 @@
 package com.project.sb13ootbsteam04.auth.ratelimit;
 
+import com.project.sb13ootbsteam04.auth.controller.CsrfController;
 import com.project.sb13ootbsteam04.auth.controller.TemporaryPasswordController;
 import com.project.sb13ootbsteam04.auth.service.TemporaryPasswordService;
 import com.project.sb13ootbsteam04.global.config.SecurityConfig;
 import com.project.sb13ootbsteam04.global.exception.GlobalExceptionHandler;
 
+import jakarta.servlet.http.Cookie;
+
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -18,13 +22,19 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 
+import static com.project.sb13ootbsteam04.global.support.CsrfTestSupport.issueCsrfCookie;
+import static com.project.sb13ootbsteam04.global.support.CsrfTestSupport.withCsrf;
+
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(
-        controllers = TemporaryPasswordController.class
+        controllers = {
+                TemporaryPasswordController.class,
+                CsrfController.class
+        }
 )
 @Import({
         SecurityConfig.class,
@@ -56,6 +66,15 @@ class TemporaryPasswordRateLimiterIntegrationTest {
 
     @MockitoBean
     private TemporaryPasswordService temporaryPasswordService;
+
+    private Cookie csrfCookie;
+
+    // 각 테스트 실행 전에 실제 CSRF 토큰 발급
+    @BeforeEach
+    void setUp() throws Exception {
+
+        csrfCookie = issueCsrfCookie(mockMvc);
+    }
 
     @Test
     @DisplayName("동일 이메일의 3회 요청은 202, 4번째 요청은 429를 반환한다")
@@ -218,13 +237,14 @@ class TemporaryPasswordRateLimiterIntegrationTest {
                 .issueTemporaryPassword(EMAIL);
     }
 
+    // 실제 CSRF 쿠키 및 헤더를 포함하여 임시 비밀번호 요청
     private ResultActions requestTemporaryPassword(
             String email,
             String ipAddress
     ) throws Exception {
 
         return mockMvc.perform(
-                post(URL)
+                withCsrf(post(URL), csrfCookie)
                         .with(request -> {
                             request.setRemoteAddr(ipAddress);
                             return request;
