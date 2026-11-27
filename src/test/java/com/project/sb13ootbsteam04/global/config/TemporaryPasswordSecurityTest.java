@@ -2,8 +2,11 @@ package com.project.sb13ootbsteam04.global.config;
 
 import com.project.sb13ootbsteam04.auth.controller.PasswordResetController;
 import com.project.sb13ootbsteam04.auth.controller.TemporaryPasswordController;
+import com.project.sb13ootbsteam04.auth.exception.TemporaryPasswordRateLimitException;
+import com.project.sb13ootbsteam04.auth.ratelimit.TemporaryPasswordRateLimiter;
 import com.project.sb13ootbsteam04.auth.service.PasswordResetService;
 import com.project.sb13ootbsteam04.auth.service.TemporaryPasswordService;
+import com.project.sb13ootbsteam04.global.exception.GlobalExceptionHandler;
 
 import org.junit.jupiter.api.Test;
 
@@ -35,6 +38,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 })
 @Import({
         SecurityConfig.class,
+        GlobalExceptionHandler.class,
         TemporaryPasswordSecurityTest.TestController.class
 })
 class TemporaryPasswordSecurityTest {
@@ -51,11 +55,16 @@ class TemporaryPasswordSecurityTest {
     @MockitoBean
     private TemporaryPasswordService temporaryPasswordService;
 
+    @MockitoBean
+    private TemporaryPasswordRateLimiter rateLimiter;
+
     private static final String PASSWORD_REQUEST =
             "{\"newPassword\":\"NewPassword123!\"}";
 
     private static final String EMAIL_REQUEST =
             "{\"email\":\"test@example.com\"}";
+
+    private static final String CLIENT_IP = "192.0.2.10";
 
     // 1. 임시 JWT로 비밀번호 재설정 가능
     @Test
@@ -173,9 +182,18 @@ class TemporaryPasswordSecurityTest {
 
         mockMvc.perform(
                 post("/api/auth/temporary-password")
+                        .with(request -> {
+                            request.setRemoteAddr(CLIENT_IP);
+                            return request;
+                        })
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(EMAIL_REQUEST)
         ).andExpect(status().isAccepted());
+
+        verify(rateLimiter).checkAndRecord(
+                "test@example.com",
+                CLIENT_IP
+        );
 
         verify(temporaryPasswordService)
                 .issueTemporaryPassword("test@example.com");
@@ -191,7 +209,10 @@ class TemporaryPasswordSecurityTest {
                         .content("{\"email\":\"invalid-email\"}")
         ).andExpect(status().isBadRequest());
 
-        verifyNoInteractions(temporaryPasswordService);
+        verifyNoInteractions(
+                rateLimiter,
+                temporaryPasswordService
+        );
     }
 
     // 8. 새 비밀번호가 8자 미만이면 400
@@ -217,6 +238,74 @@ class TemporaryPasswordSecurityTest {
         ).andExpect(status().isBadRequest());
 
         verifyNoInteractions(passwordResetService);
+    }
+
+    // 9. 이메일 요청 제한 초과 시 HTTP 429
+    @Test
+    void shouldReturn429WhenEmailRateLimitExceeded() throws Exception {
+
+        doThrow(new TemporaryPasswordRateLimitException())
+                .when(rateLimiter)
+                .checkAndRecord("test@example.com", CLIENT_IP);
+
+        mockMvc.perform(
+                post("/api/auth/temporary-password")
+                        .with(request -> {
+                            request.setRemoteAddr(CLIENT_IP);
+                            return request;
+                        })
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(EMAIL_REQUEST)
+        ).andExpect(status().isTooManyRequests())
+         .andExpect(jsonPath("$.exceptionName")
+                 .value("TemporaryPasswordRateLimitException"))
+         .andExpect(jsonPath("$.message")
+                 .value("임시 비밀번호 요청 횟수를 초과했습니다. 잠시 후 다시 시도해 주세요."));
+
+        verifyNoInteractions(temporaryPasswordService);
+    }
+
+    // 10. IP 요청 제한 초과 시 HTTP 429
+    @Test
+    void shouldReturn429WhenIpRateLimitExceeded() throws Exception {
+
+        doThrow(new TemporaryPasswordRateLimitException())
+                .when(rateLimiter)
+                .checkAndRecord("test@example.com", CLIENT_IP);
+
+        mockMvc.perform(
+                post("/api/auth/temporary-password")
+                        .with(request -> {
+                            request.setRemoteAddr(CLIENT_IP);
+                            return request;
+                        })
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(EMAIL_REQUEST)
+        ).andExpect(status().isTooManyRequests());
+
+        verify(temporaryPasswordService, never())
+                .issueTemporaryPassword(anyString());
+    }
+
+    // 11. 제한 초과 시 발급 서비스 실행 차단
+    @Test
+    void shouldNotIssuePasswordWhenRateLimitExceeded() throws Exception {
+
+        doThrow(new TemporaryPasswordRateLimitException())
+                .when(rateLimiter)
+                .checkAndRecord("test@example.com", CLIENT_IP);
+
+        mockMvc.perform(
+                post("/api/auth/temporary-password")
+                        .with(request -> {
+                            request.setRemoteAddr(CLIENT_IP);
+                            return request;
+                        })
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(EMAIL_REQUEST)
+        ).andExpect(status().isTooManyRequests());
+
+        verifyNoInteractions(temporaryPasswordService);
     }
 
     private Jwt createToken(
