@@ -3,10 +3,12 @@ package com.project.sb13ootbsteam04.clothes.service.impl;
 import com.project.sb13ootbsteam04.clothes.entity.Clothes;
 import com.project.sb13ootbsteam04.clothes.entity.ClothesAttribute;
 import com.project.sb13ootbsteam04.clothes.entity.ClothesAttributeDef;
+import com.project.sb13ootbsteam04.clothes.exception.ClothesAccessException;
 import com.project.sb13ootbsteam04.clothes.exception.ClothesAttributeDefinitionNotFoundException;
+import com.project.sb13ootbsteam04.clothes.exception.ClothesNotFoundException;
+import com.project.sb13ootbsteam04.clothes.exception.ClothesOwnerNotFoundException;
 import com.project.sb13ootbsteam04.clothes.exception.DuplicateClothesAttributeException;
 import com.project.sb13ootbsteam04.clothes.exception.InvalidClothesAttributeValueException;
-import com.project.sb13ootbsteam04.clothes.exception.ClothesOwnerNotFoundException;
 import com.project.sb13ootbsteam04.clothes.mapper.ClothesMapper;
 import com.project.sb13ootbsteam04.clothes.repository.ClothesAttributeDefRepository;
 import com.project.sb13ootbsteam04.clothes.repository.ClothesRepository;
@@ -18,6 +20,7 @@ import com.project.sb13ootbsteam04.clothes.service.dto.ClothesCreateCommand;
 import com.project.sb13ootbsteam04.clothes.service.dto.ClothesCursorResult;
 import com.project.sb13ootbsteam04.clothes.service.dto.ClothesResult;
 import com.project.sb13ootbsteam04.clothes.service.dto.ClothesSearchCommand;
+import com.project.sb13ootbsteam04.clothes.service.dto.ClothesUpdateCommand;
 import com.project.sb13ootbsteam04.clothes.storage.ClothesImageStorage;
 import com.project.sb13ootbsteam04.clothes.storage.StoredImage;
 import com.project.sb13ootbsteam04.user.entity.User;
@@ -35,6 +38,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionOperations;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Slf4j
 @RequiredArgsConstructor
@@ -55,21 +60,8 @@ public class ClothesServiceImpl implements ClothesService {
   @Override
   public ClothesResult create(ClothesCreateCommand command) {
     User owner = findOwner(command.ownerId());
-    Map<UUID, ClothesAttributeDef> definitions = loadDefinitions(command.attributes());
-
     Clothes clothes = Clothes.create(owner, command.name(), command.type(), null);
-
-    for (ClothesAttributeCommand attribute : command.attributes()) {
-      try {
-        ClothesAttribute.create(clothes, definitions.get(attribute.definitionId()), attribute.value());
-      } catch (IllegalArgumentException exception) {
-        throw new InvalidClothesAttributeValueException(
-            attribute.definitionId(),
-            attribute.value(),
-            exception
-        );
-      }
-    }
+    applyAttributes(clothes, command.attributes());
 
     StoredImage storedImage = null;
 
@@ -135,6 +127,55 @@ public class ClothesServiceImpl implements ClothesService {
     }
   }
 
+  @Transactional
+  @Override
+  public ClothesResult update(UUID actorId, ClothesUpdateCommand command) {
+    Clothes clothes = clothesRepository.findByIdForUpdate(command.clothesId())
+        .orElseThrow(() -> new ClothesNotFoundException(command.clothesId()));
+
+    // 잠금 조회한 소유자를 기준으로 변경과 이미지 업로드 전에 거부한다.
+    if (!clothes.getOwner().getId().equals(actorId)) {
+      throw ClothesAccessException.forbidden();
+    }
+    clothes.update(command.name(), command.type());
+    applyAttributes(clothes, command.attributes());
+    if (command.image() != null) {
+      StoredImage uploaded = clothesImageStorage.upload(command.image());
+      deleteOnRollback(command.clothesId(), uploaded.objectKey());
+      clothes.updateImageUrl(uploaded.url());
+    }
+
+    return clothesMapper.toResult(clothes);
+  }
+
+  private void applyAttributes(Clothes clothes, List<ClothesAttributeCommand> requested) {
+    // 등록 시 선택값이 없거나 수정 시 속성이 생략되면 조회와 쓰기가 모두 필요 없다.
+    if (requested == null || requested.isEmpty()) {
+      return;
+    }
+
+    Map<UUID, ClothesAttributeDef> definitions = loadDefinitions(requested);
+    // 새 옷은 기존 속성이 없어 반복문을 건너뛰고, 수정 시에는 정의 ID로 기존 행을 찾는다.
+    Map<UUID, ClothesAttribute> existing = new LinkedHashMap<>();
+    for (ClothesAttribute attribute : clothes.getAttributes()) {
+      existing.put(attribute.getDefinition().getId(), attribute);
+    }
+
+    for (ClothesAttributeCommand item : requested) {
+      ClothesAttribute attribute = existing.get(item.definitionId());
+      try {
+        if (attribute == null) {
+          // 이 옷에서 처음 선택한 정의이므로 옷과 정의를 연결하는 속성 행을 만든다.
+          ClothesAttribute.create(clothes, definitions.get(item.definitionId()), item.value());
+        } else if (!attribute.getValue().equals(item.value())) {
+          attribute.changeValue(item.value());
+        }
+      } catch (IllegalArgumentException exception) {
+        throw new InvalidClothesAttributeValueException(item.definitionId(), item.value(), exception);
+      }
+    }
+  }
+
   private User findOwner(UUID ownerId) {
     return userRepository.findById(ownerId)
         .orElseThrow(() -> new ClothesOwnerNotFoundException(ownerId));
@@ -150,10 +191,6 @@ public class ClothesServiceImpl implements ClothesService {
       }
     }
 
-    if (definitionIds.isEmpty()) {
-      return Map.of();
-    }
-
     Map<UUID, ClothesAttributeDef> definitions = new LinkedHashMap<>();
     clothesAttributeDefRepository.findAllById(definitionIds)
         .forEach(definition -> definitions.put(definition.getId(), definition));
@@ -167,6 +204,21 @@ public class ClothesServiceImpl implements ClothesService {
     }
 
     return definitions;
+  }
+
+  private void deleteOnRollback(UUID clothesId, String objectKey) {
+    // 실제 트랜잭션이 끝날 때까지 파일 본문 대신 이번 수정 업로드의 키만 보관한다.
+    TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+      @Override
+      public void afterCompletion(int status) {
+        if (status == STATUS_ROLLED_BACK) {
+          deleteImageSafely(objectKey);
+        } else if (status == STATUS_UNKNOWN) {
+          // DB에 새 URL이 커밋됐을 수 있으므로 이미지는 보존하고 확인할 키를 경고 로그로 기록한다.
+          log.warn("의상 수정 커밋 결과 확인 필요. clothesId={}, objectKey={}", clothesId, objectKey);
+        }
+      }
+    });
   }
 
   private void deleteImageSafely(String objectKey) {
