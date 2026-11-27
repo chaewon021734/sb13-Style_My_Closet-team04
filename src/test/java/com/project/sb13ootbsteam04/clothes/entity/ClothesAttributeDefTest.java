@@ -88,7 +88,7 @@ class ClothesAttributeDefTest {
   @DisplayName("선택 가능한 값은 공백과 대소문자를 무시하고 중복될 수 없다")
   void 선택_가능한_값_중복_실패() {
     // given
-    List<String> duplicatedValues = List.of("Black", " black ");
+    List<String> duplicatedValues = List.of("KIRMIZI", " kırmızı ");
 
     // when & then
     assertThrows(
