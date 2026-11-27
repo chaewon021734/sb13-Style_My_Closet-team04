@@ -1,4 +1,3 @@
-
 package com.project.sb13ootbsteam04.global.config;
 
 import org.springframework.context.annotation.Bean;
@@ -56,10 +55,25 @@ public class SecurityConfig {
                                 "/api/auth/login"
                         ).permitAll()
 
-                        // 속성 정의 조회는 인증 사용자에게 열고 변경만 관리자에게 허용한다.
-                        .requestMatchers(HttpMethod.POST, "/api/clothes/attribute-defs").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.PATCH, "/api/clothes/attribute-defs/*").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.DELETE, "/api/clothes/attribute-defs/*").hasRole("ADMIN")
+                        // 관리자 API는 ADMIN 권한만 접근 가능
+                        .requestMatchers("/api/admin/**")
+                        .hasRole("ADMIN")
+
+                        // 의상 속성 정의 변경은 관리자만 허용
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/api/clothes/attribute-defs"
+                        ).hasRole("ADMIN")
+
+                        .requestMatchers(
+                                HttpMethod.PATCH,
+                                "/api/clothes/attribute-defs/*"
+                        ).hasRole("ADMIN")
+
+                        .requestMatchers(
+                                HttpMethod.DELETE,
+                                "/api/clothes/attribute-defs/*"
+                        ).hasRole("ADMIN")
 
                         // 나머지 API는 JWT 인증 필수
                         .anyRequest().authenticated()
@@ -86,7 +100,6 @@ public class SecurityConfig {
 
         converter.setJwtGrantedAuthoritiesConverter(jwt -> {
 
-            // JWT에서 role 값 가져오기
             String role = jwt.getClaimAsString("role");
 
             // role이 없거나 비어 있으면 권한 부여하지 않음
