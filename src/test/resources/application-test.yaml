@@ -17,3 +17,8 @@ spring:
 jwt:
   secret: AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=
   access-token-expiration: 3600000
+
+weather:
+  batch:
+    schedule:
+      enabled: false

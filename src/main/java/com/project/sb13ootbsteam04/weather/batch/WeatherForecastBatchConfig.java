@@ -8,8 +8,10 @@ import org.springframework.batch.core.step.Step;
 import org.springframework.batch.core.step.builder.StepBuilder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 @Configuration
+@EnableScheduling
 public class WeatherForecastBatchConfig {
 
     public static final String JOB_NAME = "weatherForecastCollectionJob";
