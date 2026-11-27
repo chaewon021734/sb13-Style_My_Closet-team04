@@ -74,6 +74,27 @@ class ClothesOpenApiTest {
   }
 
   @Test
+  @DisplayName("옷 수정 문서는 JSON 요청 파트만 필수로 지정하고 이미지와 수정 필드는 선택으로 둔다")
+  void 의상_수정_OpenAPI_계약() throws Exception {
+    // given
+    String patch = "$.paths['/api/clothes/{clothesId}'].patch";
+    String multipart = patch + ".requestBody.content['multipart/form-data']";
+
+    // when & then
+    mockMvc.perform(get("/v3/api-docs"))
+        .andExpect(status().isOk())
+        // 인증 주체는 서버에서 결정하므로 클라이언트에는 경로 ID만 노출한다.
+        .andExpect(jsonPath(patch + ".parameters[*].name").value(contains("clothesId")))
+        .andExpect(jsonPath(patch + ".responses['200'].content['*/*'].schema['$ref']")
+            .value("#/components/schemas/ClothesDto"))
+        .andExpect(jsonPath(multipart + ".encoding.request.contentType").value("application/json"))
+        .andExpect(jsonPath(multipart + ".schema.required").value(contains("request")))
+        .andExpect(jsonPath(multipart + ".schema.properties.request['$ref']").value("#/components/schemas/ClothesUpdateRequest"))
+        .andExpect(jsonPath(multipart + ".schema.properties.image.format").value("binary"))
+        .andExpect(jsonPath("$.components.schemas.ClothesUpdateRequest.required").doesNotExist());
+  }
+
+  @Test
   @DisplayName("옷 삭제 문서는 UUID 경로 변수와 본문 없는 성공 응답을 명시한다")
   void 옷_삭제_OpenAPI_계약() throws Exception {
     // given

@@ -58,7 +58,7 @@ class ClothesRepositoryTest {
     entityManager.detach(detachedOwner);
 
     // when
-    Clothes saved = clothesRepository.saveAndFlush(Clothes.create(detachedOwner, "셔츠", ClothesType.TOP, null));
+    Clothes saved = clothesRepository.saveAndFlush(Clothes.create(detachedOwner, "셔츠", ClothesType.TOP));
     UUID clothesId = saved.getId();
     entityManager.clear();
 
@@ -78,7 +78,7 @@ class ClothesRepositoryTest {
     // given
     User owner = userRepository.saveAndFlush(new User("소유자", "duplicate-owner@example.com", "encoded-password"));
     ClothesAttributeDef definition = clothesAttributeDefRepository.saveAndFlush(ClothesAttributeDef.create("색상", List.of("블랙", "크림")));
-    Clothes clothes = Clothes.create(owner, "셔츠", ClothesType.TOP, null);
+    Clothes clothes = Clothes.create(owner, "셔츠", ClothesType.TOP);
     ClothesAttribute.create(clothes, definition, "블랙");
     ClothesAttribute.create(clothes, definition, "크림");
 

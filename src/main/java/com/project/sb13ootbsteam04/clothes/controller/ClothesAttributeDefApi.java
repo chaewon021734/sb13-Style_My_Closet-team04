@@ -35,6 +35,14 @@ public interface ClothesAttributeDefApi {
           description = "의상 속성 정의 등록 실패",
           content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
       @ApiResponse(
+          responseCode = "401",
+          description = "유효한 인증 토큰이 필요합니다.",
+          content = @Content), // 의상 속성 정의 등록·수정·삭제는 보안 필터가 컨트롤러 호출 전에 권한 검사를 진행한다.
+      @ApiResponse(
+          responseCode = "403",
+          description = "의상 속성 정의를 변경하려면 관리자 권한이 필요합니다.",
+          content = @Content),
+      @ApiResponse(
           responseCode = "409",
           description = "이미 존재하는 의상 속성 정의 이름",
           content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
@@ -62,6 +70,10 @@ public interface ClothesAttributeDefApi {
           responseCode = "400",
           description = "의상 속성 정의 목록 조회 실패",
           content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
+      @ApiResponse(
+          responseCode = "401",
+          description = "유효한 인증 토큰이 필요합니다.",
+          content = @Content),
       @ApiResponse(
           responseCode = "500",
           description = "서버 처리 실패",
@@ -95,6 +107,14 @@ public interface ClothesAttributeDefApi {
           description = "의상 속성 정의 수정 실패",
           content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
       @ApiResponse(
+          responseCode = "401",
+          description = "유효한 인증 토큰이 필요합니다.",
+          content = @Content),
+      @ApiResponse(
+          responseCode = "403",
+          description = "의상 속성 정의를 변경하려면 관리자 권한이 필요합니다.",
+          content = @Content),
+      @ApiResponse(
           responseCode = "409",
           description = "이미 존재하는 의상 속성 정의 이름",
           content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
@@ -118,5 +138,42 @@ public interface ClothesAttributeDefApi {
           required = true,
           content = @Content(schema = @Schema(implementation = ClothesAttributeDefUpdateRequest.class)))
       ClothesAttributeDefUpdateRequest request
+  );
+
+  @Operation(
+      summary = "의상 속성 정의 삭제",
+      description = "의상 속성 정의 삭제 API")
+  @ApiResponses({
+      @ApiResponse(
+          responseCode = "204",
+          description = "의상 속성 정의 삭제 성공"),
+      @ApiResponse(
+          responseCode = "400",
+          description = "의상 속성 정의 삭제 실패",
+          content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
+      @ApiResponse(
+          responseCode = "401",
+          description = "유효한 인증 토큰이 필요합니다.",
+          content = @Content),
+      @ApiResponse(
+          responseCode = "403",
+          description = "의상 속성 정의를 변경하려면 관리자 권한이 필요합니다.",
+          content = @Content),
+      @ApiResponse(
+          responseCode = "404",
+          description = "존재하지 않는 의상 속성 정의",
+          content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
+      @ApiResponse(
+          responseCode = "500",
+          description = "서버 처리 실패",
+          content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
+  })
+  ResponseEntity<Void> delete(
+      @PathVariable
+      @Parameter(
+          description = "삭제할 의상 속성 정의 ID",
+          required = true,
+          schema = @Schema(type = "string", format = "uuid")
+      ) UUID definitionId
   );
 }

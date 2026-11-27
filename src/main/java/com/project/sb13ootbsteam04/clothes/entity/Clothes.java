@@ -111,4 +111,14 @@ public class Clothes extends UpdatedAtEntity {
       throw new IllegalArgumentException(field + "는 " + IMAGE_COLUMN_LENGTH + "자 이하여야 합니다");
     }
   }
+
+  public void update(String name, ClothesType type) {
+    // PATCH에서 전달된 기본 정보만 변경한다.
+    if (name != null) {
+      this.name = normalizeName(name);
+    }
+    if (type != null) {
+      this.type = type;
+    }
+  }
 }

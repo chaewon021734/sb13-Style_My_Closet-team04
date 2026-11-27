@@ -3,6 +3,7 @@ package com.project.sb13ootbsteam04.clothes.controller;
 import com.project.sb13ootbsteam04.clothes.controller.dto.ClothesCreateRequest;
 import com.project.sb13ootbsteam04.clothes.controller.dto.ClothesDto;
 import com.project.sb13ootbsteam04.clothes.controller.dto.ClothesDtoCursorResponse;
+import com.project.sb13ootbsteam04.clothes.controller.dto.ClothesUpdateRequest;
 import com.project.sb13ootbsteam04.clothes.entity.ClothesType;
 import com.project.sb13ootbsteam04.global.exception.ApiErrorResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -86,6 +87,58 @@ public interface ClothesApi {
       @Parameter(description = "한 페이지에 조회할 의상 수 (서비스 허용 범위 1~100)") int limit,
       @Parameter(description = "필터링할 의상 종류") ClothesType typeEqual,
       @Parameter(description = "옷 소유자 ID") UUID ownerId
+  );
+
+  @Operation(
+      summary = "옷 수정",
+      description = "로그인한 사용자가 소유한 옷을 수정합니다. 이미지를 생략하면 기존 이미지를 유지합니다.")
+  @ApiResponses({
+      @ApiResponse(
+          responseCode = "200",
+          description = "옷 수정 성공",
+          content = @Content(schema = @Schema(implementation = ClothesDto.class))),
+      @ApiResponse(
+          responseCode = "400",
+          description = "옷 수정 실패",
+          content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
+      @ApiResponse(
+          responseCode = "401",
+          description = "유효한 사용자 인증이 필요합니다. 보안 필터에서 거부하면 응답 본문이 없을 수 있습니다.",
+          content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
+      @ApiResponse(
+          responseCode = "403",
+          description = "수정 권한이 없습니다. 타인 의상은 오류 본문을 반환하며 보안 필터에서 거부하면 본문이 없을 수 있습니다.",
+          content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
+      @ApiResponse(
+          responseCode = "404",
+          description = "의상 또는 의상 속성 정의를 찾을 수 없음",
+          content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
+      @ApiResponse(
+          responseCode = "413",
+          description = "이미지 크기 제한 초과",
+          content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
+      @ApiResponse(
+          responseCode = "415",
+          description = "지원하지 않는 이미지 형식",
+          content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
+      @ApiResponse(
+          responseCode = "500",
+          description = "이미지 저장소 또는 서버 처리 실패",
+          content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
+  })
+  ResponseEntity<ClothesDto> update(
+      UUID clothesId,
+      @Parameter(
+          description = "옷 수정 요청",
+          required = true,
+          content = @Content(
+              mediaType = MediaType.APPLICATION_JSON_VALUE,
+              schema = @Schema(implementation = ClothesUpdateRequest.class)
+          )
+      )
+      ClothesUpdateRequest request,
+      MultipartFile image,
+      @Parameter(hidden = true) Authentication authentication
   );
 
   @Operation(

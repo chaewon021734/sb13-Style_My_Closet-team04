@@ -5,6 +5,7 @@ import com.project.sb13ootbsteam04.clothes.service.dto.ClothesAttributeDefResult
 import com.project.sb13ootbsteam04.clothes.service.dto.ClothesAttributeDefSearchCommand;
 import java.util.List;
 import com.project.sb13ootbsteam04.clothes.service.dto.ClothesAttributeDefUpdateCommand;
+import java.util.UUID;
 
 public interface ClothesAttributeDefService {
 
@@ -13,4 +14,6 @@ public interface ClothesAttributeDefService {
   List<ClothesAttributeDefResult> findAll(ClothesAttributeDefSearchCommand command);
 
   ClothesAttributeDefResult update(ClothesAttributeDefUpdateCommand command);
+
+  void delete(UUID definitionId);
 }

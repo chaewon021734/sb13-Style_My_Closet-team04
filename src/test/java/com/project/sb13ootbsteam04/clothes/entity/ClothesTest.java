@@ -89,11 +89,11 @@ class ClothesTest {
     assertAll(
         () -> assertThrows(
             IllegalArgumentException.class,
-            () -> Clothes.create(owner, "가".repeat(256), ClothesType.TOP, null)
+            () -> Clothes.create(owner, "가".repeat(256), ClothesType.TOP)
         ),
         () -> assertThrows(
             IllegalArgumentException.class,
-            () -> Clothes.create(owner, "셔츠", ClothesType.TOP, "a".repeat(501))
+            () -> clothes().updateImage("a".repeat(501), "clothes/test")
         )
     );
   }
@@ -106,7 +106,8 @@ class ClothesTest {
     String maxLengthImageUrl = "a".repeat(500);
 
     // when
-    Clothes clothes = Clothes.create(owner(), maxLengthName, ClothesType.TOP, maxLengthImageUrl);
+    Clothes clothes = Clothes.create(owner(), maxLengthName, ClothesType.TOP);
+    clothes.updateImage(maxLengthImageUrl, "clothes/test");
 
     // then
     assertAll(

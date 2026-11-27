@@ -3,6 +3,7 @@ package com.project.sb13ootbsteam04.clothes.controller;
 import com.project.sb13ootbsteam04.clothes.controller.dto.ClothesCreateRequest;
 import com.project.sb13ootbsteam04.clothes.controller.dto.ClothesDto;
 import com.project.sb13ootbsteam04.clothes.controller.dto.ClothesDtoCursorResponse;
+import com.project.sb13ootbsteam04.clothes.controller.dto.ClothesUpdateRequest;
 import com.project.sb13ootbsteam04.clothes.entity.ClothesType;
 import com.project.sb13ootbsteam04.clothes.exception.ClothesAccessException;
 import com.project.sb13ootbsteam04.clothes.exception.InvalidClothesImageException;
@@ -13,6 +14,7 @@ import com.project.sb13ootbsteam04.clothes.service.dto.ClothesCursorResult;
 import com.project.sb13ootbsteam04.clothes.service.dto.ClothesImageCommand;
 import com.project.sb13ootbsteam04.clothes.service.dto.ClothesResult;
 import com.project.sb13ootbsteam04.clothes.service.dto.ClothesSearchCommand;
+import com.project.sb13ootbsteam04.clothes.service.dto.ClothesUpdateCommand;
 import jakarta.validation.Valid;
 import java.io.IOException;
 import java.util.UUID;
@@ -22,8 +24,12 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -74,6 +80,22 @@ public class ClothesController implements ClothesApi {
     ClothesSearchCommand command = new ClothesSearchCommand(cursor, idAfter, limit, typeEqual, ownerId);
     ClothesCursorResult result = clothesService.search(command);
     return ResponseEntity.status(HttpStatus.OK).body(clothesMapper.toDto(result));
+  }
+
+  @Override
+  @PatchMapping(value = "/{clothesId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+  public ResponseEntity<ClothesDto> update(
+      @PathVariable UUID clothesId,
+      @Valid @RequestPart("request") ClothesUpdateRequest request,
+      @RequestPart(value = "image", required = false) MultipartFile image, Authentication authentication) {
+    UUID actorId = authenticatedUserId(authentication);
+
+    // 경로 ID와 두 multipart 파트를 하나의 수정 명령으로 전달한다.
+    ClothesUpdateCommand command = clothesMapper.toCommand(clothesId, request, toImageCommand(image));
+    ClothesResult result = clothesService.update(actorId, command);
+    ClothesDto response = clothesMapper.toDto(result);
+
+    return ResponseEntity.status(HttpStatus.OK).body(response);
   }
 
   @Override
