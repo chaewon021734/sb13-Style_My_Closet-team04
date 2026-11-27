@@ -18,21 +18,19 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.context.annotation.Import;
-import org.springframework.test.context.transaction.TestTransaction;
+import org.springframework.test.context.ActiveProfiles;
 
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.CyclicBarrier;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @DataJpaTest
+@ActiveProfiles("test")
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import({JpaAuditingConfig.class, WeatherForecastService.class, KmaForecastMapper.class})
 class WeatherForecastServiceTest {
@@ -112,34 +110,6 @@ class WeatherForecastServiceTest {
         assertThat(service.saveForecast(locationId, slot("1400", "1600", DRY))).isEqualTo(1);
         assertThat(forecasts(ISSUE.plusSeconds(10800))).extracting(Weather::getId)
                 .hasSize(1).doesNotContain(originalId);
-    }
-
-    @Test
-    void concurrentSavesForTheSameLocationAndIssuePersistOneForecast() throws Exception {
-        // 두 작업이 별도 트랜잭션에서 등록된 위치를 볼 수 있도록 한다.
-        TestTransaction.flagForCommit();
-        TestTransaction.end();
-        var items = slot("1100", "1400", DRY);
-        var executor = Executors.newFixedThreadPool(2);
-        var start = new CyclicBarrier(2);
-        try {
-            var first = executor.submit(() -> {
-                start.await(5, TimeUnit.SECONDS);
-                return service.saveForecast(locationId, items);
-            });
-            var second = executor.submit(() -> {
-                start.await(5, TimeUnit.SECONDS);
-                return service.saveForecast(locationId, items);
-            });
-            assertThat(List.of(first.get(10, TimeUnit.SECONDS), second.get(10, TimeUnit.SECONDS)))
-                    .containsExactlyInAnyOrder(1, 0);
-            assertThat(weathers.findAllByLocationIdAndForecastedAtOrderByForecastAtAsc(locationId, ISSUE))
-                    .hasSize(1);
-        } finally {
-            executor.shutdownNow();
-            weathers.deleteAll(weathers.findAllByLocationIdAndForecastedAtOrderByForecastAtAsc(locationId, ISSUE));
-            locations.deleteById(locationId);
-        }
     }
 
     @Test

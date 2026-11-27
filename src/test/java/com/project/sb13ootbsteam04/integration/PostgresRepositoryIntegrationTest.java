@@ -34,9 +34,7 @@ class PostgresRepositoryIntegrationTest {
 
     @DynamicPropertySource
     static void configureTestSchema(DynamicPropertyRegistry registry) {
-        registry.add("spring.jpa.properties.hibernate.default_schema", () -> TEST_SCHEMA);
-        registry.add("spring.jpa.properties.hibernate.hbm2ddl.create_namespaces", () -> true);
-        registry.add("spring.jpa.hibernate.ddl-auto", () -> "create-drop");
+        PostgresTestDatabaseConfig.register(registry, TEST_SCHEMA);
     }
 
     @Autowired private UserRepository userRepository;
