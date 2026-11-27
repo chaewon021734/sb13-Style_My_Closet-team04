@@ -13,11 +13,13 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 @SpringBootTest
+@ActiveProfiles("test")
 @DisplayName("의상 관리 OpenAPI 문서")
 class ClothesOpenApiTest {
 
@@ -70,4 +72,32 @@ class ClothesOpenApiTest {
         .andExpect(jsonPath(CREATE_MULTIPART_PATH + ".schema.properties.image.type").value("string"))
         .andExpect(jsonPath(CREATE_MULTIPART_PATH + ".schema.properties.image.format").value("binary"));
   }
+
+  @Test
+  @DisplayName("옷 삭제 문서는 UUID 경로 변수와 본문 없는 성공 응답을 명시한다")
+  void 옷_삭제_OpenAPI_계약() throws Exception {
+    // given
+    String operation = "$.paths['/api/clothes/{clothesId}'].delete";
+
+    // when & then
+    mockMvc.perform(get("/v3/api-docs"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath(operation + ".parameters[*].name").value(contains("clothesId")))
+        .andExpect(jsonPath(operation + ".parameters[0].in").value("path"))
+        .andExpect(jsonPath(operation + ".parameters[0].required").value(true))
+        .andExpect(jsonPath(operation + ".parameters[0].schema.format").value("uuid"))
+        .andExpect(jsonPath(operation + ".responses['204']").exists())
+        .andExpect(jsonPath(operation + ".responses['204'].content").doesNotExist())
+        .andExpect(jsonPath(operation + ".responses['400'].content['*/*'].schema['$ref']")
+            .value("#/components/schemas/ErrorResponse"))
+        .andExpect(jsonPath(operation + ".responses['401'].content['*/*'].schema['$ref']")
+            .value("#/components/schemas/ErrorResponse"))
+        .andExpect(jsonPath(operation + ".responses['403'].content['*/*'].schema['$ref']")
+            .value("#/components/schemas/ErrorResponse"))
+        .andExpect(jsonPath(operation + ".responses['404'].content['*/*'].schema['$ref']")
+            .value("#/components/schemas/ErrorResponse"))
+        .andExpect(jsonPath(operation + ".responses['500'].content['*/*'].schema['$ref']")
+            .value("#/components/schemas/ErrorResponse"));
+  }
+
 }
