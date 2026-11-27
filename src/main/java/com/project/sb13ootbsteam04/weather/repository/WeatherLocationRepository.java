@@ -7,10 +7,13 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 public interface WeatherLocationRepository extends JpaRepository<WeatherLocation, UUID> {
+
+    List<WeatherLocation> findAllByOrderByIdAsc();
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select location from WeatherLocation location where location.id = :id")

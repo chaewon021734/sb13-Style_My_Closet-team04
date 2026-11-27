@@ -68,7 +68,7 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-validation'
 
     // 배치와 모니터링
-    implementation 'org.springframework.boot:spring-boot-starter-batch'
+    implementation 'org.springframework.boot:spring-boot-starter-batch-jdbc'
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
 
     // Spring Security와 JWT 토큰 검증
