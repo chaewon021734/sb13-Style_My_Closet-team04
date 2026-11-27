@@ -10,9 +10,12 @@ import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.inOrder;
 
 import com.project.sb13ootbsteam04.clothes.entity.Clothes;
+import com.project.sb13ootbsteam04.clothes.entity.ClothesAttribute;
 import com.project.sb13ootbsteam04.clothes.entity.ClothesAttributeDef;
 import com.project.sb13ootbsteam04.clothes.entity.ClothesType;
+import com.project.sb13ootbsteam04.clothes.exception.ClothesAccessException;
 import com.project.sb13ootbsteam04.clothes.exception.ClothesAttributeDefinitionNotFoundException;
+import com.project.sb13ootbsteam04.clothes.exception.ClothesNotFoundException;
 import com.project.sb13ootbsteam04.clothes.exception.ClothesOwnerNotFoundException;
 import com.project.sb13ootbsteam04.clothes.exception.DuplicateClothesAttributeException;
 import com.project.sb13ootbsteam04.clothes.exception.InvalidClothesAttributeValueException;
@@ -28,6 +31,7 @@ import com.project.sb13ootbsteam04.clothes.service.dto.ClothesCursorResult;
 import com.project.sb13ootbsteam04.clothes.service.dto.ClothesImageCommand;
 import com.project.sb13ootbsteam04.clothes.service.dto.ClothesResult;
 import com.project.sb13ootbsteam04.clothes.service.dto.ClothesSearchCommand;
+import com.project.sb13ootbsteam04.clothes.service.dto.ClothesUpdateCommand;
 import com.project.sb13ootbsteam04.clothes.service.impl.ClothesServiceImpl;
 import com.project.sb13ootbsteam04.clothes.storage.ClothesImageStorage;
 import com.project.sb13ootbsteam04.clothes.storage.StoredImage;
@@ -37,20 +41,21 @@ import com.project.sb13ootbsteam04.user.repository.UserRepository;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mapstruct.factory.Mappers;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.InOrder;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
-import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.TransactionOperations;
-import org.springframework.transaction.support.TransactionCallback;
 
 @DisplayName("의상 서비스")
 @ExtendWith(MockitoExtension.class)
@@ -68,11 +73,13 @@ class ClothesServiceTest {
   @Mock
   private ClothesImageStorage clothesImageStorage;
 
-  @Mock
-  private ClothesMapper clothesMapper;
+  // 등록과 수정 모두 실제 MapStruct 구현으로 결과를 매핑한다.
+  @Spy
+  private ClothesMapper clothesMapper = Mappers.getMapper(ClothesMapper.class);
 
-  @Mock
-  private TransactionOperations transactionOperations;
+  // DB 없이 콜백을 실행하면서 업로드와 트랜잭션 진입 순서를 검증한다.
+  @Spy
+  private TransactionOperations transactionOperations = TransactionOperations.withoutTransaction();
 
   @InjectMocks
   private ClothesServiceImpl clothesService;
@@ -113,7 +120,8 @@ class ClothesServiceTest {
         "테스트 의상",
         "https://cdn.example.com/clothes/image.png",
         ClothesType.DRESS,
-        List.of()
+        List.of(new ClothesAttributeResult(colorId, "색상", List.of("블랙", "크림"), "블랙"),
+            new ClothesAttributeResult(sizeId, "사이즈", List.of("S", "L"), "S"))
     );
 
     givenOwnerExists();
@@ -122,13 +130,7 @@ class ClothesServiceTest {
         "clothes/image.png",
         "https://cdn.example.com/clothes/image.png"
     ));
-    given(clothesRepository.save(any(Clothes.class))).willAnswer(invocation -> {
-      Clothes clothes = invocation.getArgument(0);
-      ReflectionTestUtils.setField(clothes, "id", clothesId);
-      return clothes;
-    });
-    given(clothesMapper.toResult(any(Clothes.class))).willReturn(expected);
-    givenTransactionExecution();
+    givenSavedClothesId(clothesId);
 
     ClothesResult result = clothesService.create(command);
 
@@ -250,9 +252,7 @@ class ClothesServiceTest {
         List.of()
     );
     givenOwnerExists();
-    given(clothesRepository.save(any(Clothes.class))).willAnswer(invocation -> invocation.getArgument(0));
-    given(clothesMapper.toResult(any(Clothes.class))).willReturn(expected);
-    givenTransactionExecution();
+    givenSavedClothesId(expected.id());
 
     ClothesResult result = clothesService.create(command);
 
@@ -307,7 +307,6 @@ class ClothesServiceTest {
     givenOwnerExists();
     given(clothesImageStorage.upload(image)).willReturn(storedImage);
     given(clothesRepository.save(any(Clothes.class))).willThrow(saveFailure);
-    givenTransactionExecution();
 
     assertThatThrownBy(() -> clothesService.create(command))
         .isSameAs(saveFailure);
@@ -318,7 +317,6 @@ class ClothesServiceTest {
         () -> then(clothesMapper).shouldHaveNoInteractions()
     );
   }
-
 
   @Test
   @DisplayName("커서 기반 페이징으로 의상을 조회할 수 있다")
@@ -425,6 +423,92 @@ class ClothesServiceTest {
     then(clothesRepository).shouldHaveNoInteractions();
   }
 
+  @Test
+  @DisplayName("수정 화면에서 이름만 바꾸면 기존 속성값과 이미지 URL을 유지한다")
+  void 기존_속성값을_그대로_전송하면_속성과_이미지를_유지한다() {
+    // given
+    UUID sizeId = UUID.randomUUID();
+    List<String> sizes = List.of("S", "M");
+    ClothesAttributeDef size = definition(sizeId, "사이즈", sizes);
+    Clothes clothes = existingClothesWithSize(size);
+    given(clothesAttributeDefRepository.findAllById(Set.of(sizeId))).willReturn(List.of(size));
+    String originalUrl = clothes.getImageUrl();
+    // 수정 화면은 변경하지 않은 선택값도 다시 보낸다.
+    ClothesUpdateCommand command = new ClothesUpdateCommand(clothes.getId(), "수정된 스카프",
+        ClothesType.SCARF, List.of(new ClothesAttributeCommand(sizeId, "S")), null);
+
+    // when
+    ClothesResult result = clothesService.update(ownerId, command);
+
+    // then
+    assertAll(
+        () -> assertThat(clothes.getImageUrl()).isEqualTo(originalUrl),
+        () -> assertThat(clothes.getAttributes()).extracting(ClothesAttribute::getValue).containsExactly("S"),
+        () -> assertThat(result).isEqualTo(new ClothesResult(command.clothesId(), ownerId, "수정된 스카프",
+            originalUrl, ClothesType.SCARF, List.of(new ClothesAttributeResult(sizeId, "사이즈", sizes, "S"))))
+    );
+    then(clothesImageStorage).shouldHaveNoInteractions();
+  }
+
+  @Test
+  @DisplayName("PATCH 요청에 이름만 포함하면 기존 종류·속성·이미지를 보존한다")
+  void 수정_필드를_생략하면_기존_값을_유지한다() {
+    // given
+    ClothesAttributeDef size = definition(UUID.randomUUID(), "사이즈", List.of("S", "M"));
+    Clothes clothes = existingClothesWithSize(size);
+    ClothesUpdateCommand command = new ClothesUpdateCommand(clothes.getId(), "새 이름", null, null, null);
+    ClothesResult expected = new ClothesResult(clothes.getId(), ownerId, "새 이름", clothes.getImageUrl(), ClothesType.SCARF,
+        List.of(new ClothesAttributeResult(size.getId(), "사이즈", size.getSelectableValues(), "S")));
+
+    // when
+    ClothesResult result = clothesService.update(ownerId, command);
+
+    // then
+    assertThat(result).isEqualTo(expected);
+    then(clothesImageStorage).shouldHaveNoInteractions();
+  }
+
+  @Test
+  @DisplayName("수정할 옷이 없으면 해당 ID를 담은 예외를 던지고 이미지를 업로드하지 않는다")
+  void 수정할_옷이_없으면_옷_ID를_반환하고_이미지는_업로드하지_않는다() {
+    // given
+    UUID id = UUID.randomUUID();
+    ClothesUpdateCommand command = new ClothesUpdateCommand(id, null, null, null, pngImage());
+    given(clothesRepository.findByIdForUpdate(id)).willReturn(Optional.empty());
+
+    // when & then
+    assertThatThrownBy(() -> clothesService.update(ownerId, command))
+        .isInstanceOfSatisfying(ClothesNotFoundException.class, exception -> assertAll(
+            () -> assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.CLOTHES_NOT_FOUND),
+            () -> assertThat(exception.getDetails()).containsEntry("clothesId", id.toString())));
+    then(clothesImageStorage).shouldHaveNoInteractions();
+  }
+
+  @Test
+  @DisplayName("타인의 의상 수정은 필드 변경 및 이미지 업로드 전에 거부한다")
+  void 타인_의상_수정_거부() {
+    // given
+    Clothes clothes = clothes(UUID.randomUUID(), "기존 이름", Instant.now());
+    given(clothesRepository.findByIdForUpdate(clothes.getId())).willReturn(Optional.of(clothes));
+    ClothesUpdateCommand command = new ClothesUpdateCommand(clothes.getId(), "새 이름", null, null, pngImage());
+
+    // when & then
+    assertThatThrownBy(() -> clothesService.update(UUID.randomUUID(), command))
+        .isInstanceOfSatisfying(ClothesAccessException.class,
+            ex -> assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.CLOTHES_UPDATE_FORBIDDEN));
+    assertThat(clothes.getName()).isEqualTo("기존 이름");
+    then(clothesImageStorage).shouldHaveNoInteractions();
+  }
+
+  private Clothes existingClothesWithSize(ClothesAttributeDef size) {
+    Clothes clothes = Clothes.create(owner, "기존 스카프", ClothesType.SCARF, "https://cdn.example.com/clothes/old.png");
+    UUID id = UUID.randomUUID();
+    ReflectionTestUtils.setField(clothes, "id", id);
+    ClothesAttribute.create(clothes, size, "S");
+    given(clothesRepository.findByIdForUpdate(id)).willReturn(Optional.of(clothes));
+    return clothes;
+  }
+
   private Clothes clothes(UUID id, String name, Instant createdAt) {
     Clothes clothes = Clothes.create(owner, name, ClothesType.DRESS, null);
     ReflectionTestUtils.setField(clothes, "id", id);
@@ -458,10 +542,12 @@ class ClothesServiceTest {
     given(userRepository.findById(ownerId)).willReturn(Optional.of(owner));
   }
 
-  private void givenTransactionExecution() {
-    given(transactionOperations.execute(any())).willAnswer(invocation -> {
-      TransactionCallback<?> callback = invocation.getArgument(0);
-      return callback.doInTransaction((TransactionStatus) null);
+  private void givenSavedClothesId(UUID id) {
+    // 저장소가 발급하는 ID만 재현한다.
+    given(clothesRepository.save(any(Clothes.class))).willAnswer(invocation -> {
+      Clothes clothes = invocation.getArgument(0);
+      ReflectionTestUtils.setField(clothes, "id", id);
+      return clothes;
     });
   }
 

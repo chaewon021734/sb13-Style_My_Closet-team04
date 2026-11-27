@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -13,10 +14,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.project.sb13ootbsteam04.clothes.controller.dto.ClothesAttributeDto;
 import com.project.sb13ootbsteam04.clothes.controller.dto.ClothesCreateRequest;
-import com.project.sb13ootbsteam04.clothes.controller.dto.ClothesDto;
 import com.project.sb13ootbsteam04.clothes.entity.ClothesType;
+import com.project.sb13ootbsteam04.clothes.exception.ClothesAccessException;
 import com.project.sb13ootbsteam04.clothes.exception.ClothesImageStorageException;
 import com.project.sb13ootbsteam04.clothes.mapper.ClothesMapper;
+import com.project.sb13ootbsteam04.clothes.mapper.ClothesMapperImpl;
 import com.project.sb13ootbsteam04.clothes.service.ClothesService;
 import com.project.sb13ootbsteam04.clothes.service.dto.ClothesAttributeCommand;
 import com.project.sb13ootbsteam04.clothes.service.dto.ClothesAttributeResult;
@@ -24,20 +26,24 @@ import com.project.sb13ootbsteam04.clothes.service.dto.ClothesCreateCommand;
 import com.project.sb13ootbsteam04.clothes.service.dto.ClothesCursorResult;
 import com.project.sb13ootbsteam04.clothes.service.dto.ClothesResult;
 import com.project.sb13ootbsteam04.clothes.service.dto.ClothesSearchCommand;
+import com.project.sb13ootbsteam04.clothes.service.dto.ClothesUpdateCommand;
 import com.project.sb13ootbsteam04.global.exception.GlobalExceptionHandler;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mapstruct.factory.Mappers;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
@@ -50,9 +56,8 @@ class ClothesControllerTest {
   @Mock
   private ClothesService clothesService;
 
-  // 목록 응답은 실제 매퍼를 사용하고 등록 테스트의 기존 스텁도 지원한다.
   @Spy
-  private ClothesMapper clothesMapper = Mappers.getMapper(ClothesMapper.class);
+  private ClothesMapper clothesMapper = new ClothesMapperImpl();
 
   private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -81,22 +86,7 @@ class ClothesControllerTest {
         ClothesType.TOP,
         List.of(new ClothesAttributeDto(definitionId, "블랙"))
     );
-    ClothesCreateCommand mappedCommand = new ClothesCreateCommand(
-        ownerId,
-        "검정 셔츠",
-        ClothesType.TOP,
-        List.of(new ClothesAttributeCommand(definitionId, "블랙")),
-        null
-    );
     ClothesResult result = new ClothesResult(
-        clothesId,
-        ownerId,
-        "검정 셔츠",
-        "https://cdn.example.com/clothes/image.png",
-        ClothesType.TOP,
-        List.of()
-    );
-    ClothesDto response = new ClothesDto(
         clothesId,
         ownerId,
         "검정 셔츠",
@@ -106,9 +96,7 @@ class ClothesControllerTest {
     );
     MockMultipartFile requestPart = requestPart(request);
     MockMultipartFile imagePart = pngImagePart();
-    given(clothesMapper.toCommand(any(ClothesCreateRequest.class))).willReturn(mappedCommand);
     given(clothesService.create(any(ClothesCreateCommand.class))).willReturn(result);
-    given(clothesMapper.toDto(result)).willReturn(response);
 
     mockMvc.perform(multipart("/api/clothes").file(requestPart).file(imagePart))
         .andExpect(status().isCreated())
@@ -137,14 +125,6 @@ class ClothesControllerTest {
         ClothesType.TOP,
         List.of()
     );
-    ClothesCreateCommand requestCommand = new ClothesCreateCommand(
-        ownerId,
-        "검정 셔츠",
-        ClothesType.TOP,
-        List.of(),
-        null
-    );
-    given(clothesMapper.toCommand(any(ClothesCreateRequest.class))).willReturn(requestCommand);
     given(clothesService.create(any(ClothesCreateCommand.class))).willThrow(
         ClothesImageStorageException.uploadFailed(new IllegalStateException("S3 unavailable"))
     );
@@ -342,7 +322,111 @@ class ClothesControllerTest {
     then(clothesService).should().search(command);
   }
 
-  private MockMultipartFile requestPart(ClothesCreateRequest request) throws Exception {
+  @Test
+  @DisplayName("이미지를 첨부해 의상을 수정하면 이미지와 속성을 전달한다")
+  void 이미지_첨부_의상을_수정_성공() throws Exception {
+    // given: 정적 프런트가 보내는 JSON 필드명을 그대로 사용한다.
+    UUID clothesId = UUID.randomUUID();
+    UUID ownerId = UUID.randomUUID();
+    UUID definitionId = UUID.randomUUID();
+    Map<String, Object> request = Map.of(
+        "name", "수정된 가방",
+        "type", "BAG",
+        "attributes", List.of(Map.of("definitionId", definitionId, "value", "핑크"))
+    );
+    MockMultipartFile image = pngImagePart();
+    String imageUrl = "https://cdn.example.com/clothes/bag.png";
+    ClothesResult result = new ClothesResult(clothesId, ownerId, "수정된 가방", imageUrl, ClothesType.BAG,
+        List.of(new ClothesAttributeResult(definitionId, "색상", List.of("블랙", "핑크"), "핑크")));
+    given(clothesService.update(eq(ownerId), any(ClothesUpdateCommand.class))).willReturn(result);
+
+    // when & then: 실제 매퍼를 거쳐 프런트가 읽는 중첩 필드까지 검증한다.
+    mockMvc.perform(multipart(HttpMethod.PATCH, "/api/clothes/{clothesId}", clothesId)
+            .file(requestPart(request)).file(image).principal(login(ownerId)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.id").value(clothesId.toString()))
+        .andExpect(jsonPath("$.ownerId").value(ownerId.toString()))
+        .andExpect(jsonPath("$.name").value("수정된 가방"))
+        .andExpect(jsonPath("$.imageUrl").value(imageUrl))
+        .andExpect(jsonPath("$.type").value("BAG"))
+        .andExpect(jsonPath("$.attributes[0].definitionId").value(definitionId.toString()))
+        .andExpect(jsonPath("$.attributes[0].definitionName").value("색상"))
+        .andExpect(jsonPath("$.attributes[0].selectableValues").value(contains("블랙", "핑크")))
+        .andExpect(jsonPath("$.attributes[0].value").value("핑크"));
+
+    ArgumentCaptor<ClothesUpdateCommand> captor = ArgumentCaptor.forClass(ClothesUpdateCommand.class);
+    then(clothesService).should().update(eq(ownerId), captor.capture());
+    ClothesUpdateCommand command = captor.getValue();
+    assertThat(command.clothesId()).isEqualTo(clothesId);
+    assertThat(command.name()).isEqualTo("수정된 가방");
+    assertThat(command.type()).isEqualTo(ClothesType.BAG);
+    assertThat(command.attributes()).containsExactly(new ClothesAttributeCommand(definitionId, "핑크"));
+    assertThat(command.image()).isNotNull();
+    assertThat(command.image().contentType()).isEqualTo(image.getContentType());
+    assertThat(command.image().content()).containsExactly(image.getBytes());
+  }
+
+  @Test
+  @DisplayName("이미지 없이 이름만 수정하면 생략한 필드는 null로 전달한다")
+  void 이미지_미첨부_이름만_수정() throws Exception {
+    // given
+    UUID clothesId = UUID.randomUUID();
+    String existingUrl = "https://cdn.example.com/clothes/original.png";
+    ClothesUpdateCommand expected = new ClothesUpdateCommand(clothesId, "새 이름", null, null, null);
+    ClothesResult result = new ClothesResult(clothesId, UUID.randomUUID(), "새 이름", existingUrl, ClothesType.BAG, List.of());
+    given(clothesService.update(result.ownerId(), expected)).willReturn(result);
+
+    // when & then: 이미지 파트를 보내지 않아도 서비스가 반환한 기존 URL을 응답한다.
+    mockMvc.perform(multipart(HttpMethod.PATCH, "/api/clothes/{clothesId}", clothesId)
+            .file(requestPart(Map.of("name", "새 이름"))).principal(login(result.ownerId())))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.imageUrl").value(existingUrl));
+    then(clothesService).should().update(result.ownerId(), expected);
+  }
+
+  @Test
+  @DisplayName("의상 수정 시 request part를 누락하면 400을 반환한다")
+  void 의상_수정_request_part_누락() throws Exception {
+    // given
+    UUID clothesId = UUID.randomUUID();
+
+    // when & then
+    mockMvc.perform(multipart(HttpMethod.PATCH, "/api/clothes/{clothesId}", clothesId).file(pngImagePart()))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.details.request").value("필수 항목입니다"));
+    then(clothesService).shouldHaveNoInteractions();
+  }
+
+
+  @Test
+  @DisplayName("로그인 없이 옷을 수정하면 401이고 서비스가 호출되지 않는다")
+  void 미인증_수정_거부() throws Exception {
+    // when & then
+    mockMvc.perform(multipart(HttpMethod.PATCH, "/api/clothes/{id}", UUID.randomUUID())
+            .file(requestPart(Map.of("name", "새 이름"))))
+        .andExpect(status().isUnauthorized());
+    then(clothesService).shouldHaveNoInteractions();
+  }
+
+  @Test
+  @DisplayName("의상 소유권 오류는 403으로 반환한다")
+  void 소유권_오류_응답() throws Exception {
+    // given
+    UUID actorId = UUID.randomUUID();
+    given(clothesService.update(eq(actorId), any())).willThrow(ClothesAccessException.forbidden());
+
+    // when & then
+    mockMvc.perform(multipart(HttpMethod.PATCH, "/api/clothes/{id}", UUID.randomUUID())
+            .file(requestPart(Map.of("name", "새 이름"))).principal(login(actorId)))
+        .andExpect(status().isForbidden());
+  }
+
+  private JwtAuthenticationToken login(UUID actorId) {
+    Jwt jwt = Jwt.withTokenValue("test-token").header("alg", "HS256").subject(actorId.toString()).build();
+    return new JwtAuthenticationToken(jwt, List.of());
+  }
+
+  private MockMultipartFile requestPart(Object request) throws Exception {
     return new MockMultipartFile(
         "request",
         "request.json",
