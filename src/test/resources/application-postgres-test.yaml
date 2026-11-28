@@ -12,3 +12,7 @@ spring:
 
   flyway:
     enabled: false
+
+jwt:
+  refresh-token-cleanup:
+    enabled: false
