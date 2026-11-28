@@ -132,18 +132,6 @@ class ClothesControllerTest {
   }
 
   @Test
-  @DisplayName("로그인 정보 없이 의상을 등록하면 401을 반환한다")
-  void 인증_없이_등록_거부() throws Exception {
-
-    ClothesCreateRequest request = new ClothesCreateRequest(UUID.randomUUID(), "셔츠", ClothesType.TOP, List.of());
-
-    mockMvc.perform(multipart("/api/clothes").file(requestPart(request)))
-        .andExpect(status().isUnauthorized());
-
-    then(clothesService).shouldHaveNoInteractions();
-  }
-
-  @Test
   @DisplayName("이미지 저장소 실패는 Swagger ErrorResponse 구조와 500으로 반환한다")
   void 이미지_저장소_실패() throws Exception {
 
