@@ -2,6 +2,7 @@ package com.project.sb13ootbsteam04.weather.controller;
 
 import com.project.sb13ootbsteam04.weather.dto.WeatherLocationResponse;
 import com.project.sb13ootbsteam04.weather.exception.WeatherLocationException;
+import com.project.sb13ootbsteam04.weather.service.WeatherForecastInitializer;
 import com.project.sb13ootbsteam04.weather.service.WeatherLocationService;
 import com.project.sb13ootbsteam04.weather.service.WeatherQueryService;
 import com.project.sb13ootbsteam04.weather.service.condition.WeatherLocationCondition;
@@ -24,12 +25,28 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class WeatherControllerTest {
 
     private final WeatherLocationService service = mock(WeatherLocationService.class);
+    private final WeatherQueryService queryService = mock(WeatherQueryService.class);
+    private final WeatherForecastInitializer forecastInitializer = mock(WeatherForecastInitializer.class);
     private MockMvc mvc;
 
     @BeforeEach
     void setUp() {
-        mvc = MockMvcBuilders.standaloneSetup(new WeatherController(service, mock(WeatherQueryService.class)))
+        mvc = MockMvcBuilders.standaloneSetup(new WeatherController(service, queryService, forecastInitializer))
                 .setControllerAdvice(new GlobalExceptionHandler()).build();
+    }
+
+    @Test
+    void preparesForecastBeforeQueryingWeather() throws Exception {
+        var condition = new WeatherLocationCondition(37.5665, 126.978);
+        when(queryService.getWeather(condition)).thenReturn(List.of());
+
+        mvc.perform(get("/api/weathers").param("longitude", "126.978").param("latitude", "37.5665"))
+                .andExpect(status().isOk());
+
+        // 예보 준비 후 조회해야 첫 요청에도 날씨가 응답된다
+        var order = inOrder(forecastInitializer, queryService);
+        order.verify(forecastInitializer).ensureForecast(condition);
+        order.verify(queryService).getWeather(condition);
     }
 
     @Test
