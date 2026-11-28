@@ -1,5 +1,6 @@
 package com.project.sb13ootbsteam04.clothes.service;
 
+import org.springframework.context.ApplicationEventPublisher;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertAll;
@@ -49,6 +50,9 @@ class ClothesAttributeDefServiceTest {
 
   @Mock
   private ClothesAttributeRepository clothesAttributeRepository;
+
+  @Mock
+  private ApplicationEventPublisher eventPublisher;
 
   @InjectMocks
   private ClothesAttributeDefServiceImpl clothesAttributeDefService;

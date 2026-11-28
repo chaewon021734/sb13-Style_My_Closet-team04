@@ -1,6 +1,7 @@
 
 package com.project.sb13ootbsteam04.feed.service;
 
+import org.springframework.context.ApplicationEventPublisher;
 import com.project.sb13ootbsteam04.feed.dto.CommentPageResponse;
 import com.project.sb13ootbsteam04.feed.dto.CommentResponse;
 import com.project.sb13ootbsteam04.feed.dto.CreateCommentRequest;
@@ -45,6 +46,9 @@ class CommentServiceTest {
 
     @Mock
     private CommentAuthorService commentAuthorService;
+
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
 
     @InjectMocks
     private CommentService commentService;
@@ -298,6 +302,9 @@ class CommentServiceTest {
 
         when(feedRepository.findById(feedId))
                 .thenReturn(Optional.of(feed));
+
+        UUID feedAuthorId = UUID.randomUUID();
+        when(feed.getUserId()).thenReturn(feedAuthorId);
 
         when(saved.getId()).thenReturn(commentId);
 

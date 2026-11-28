@@ -1,6 +1,7 @@
 
 package com.project.sb13ootbsteam04.feed.service;
 
+import org.springframework.context.ApplicationEventPublisher;
 import com.project.sb13ootbsteam04.feed.entity.Feed;
 import com.project.sb13ootbsteam04.feed.entity.FeedLike;
 import com.project.sb13ootbsteam04.feed.repository.FeedLikeRepository;
@@ -28,6 +29,9 @@ class FeedLikeServiceTest {
     @Mock
     private FeedLikeRepository feedLikeRepository;
 
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+
     @InjectMocks
     private FeedLikeService feedLikeService;
 
@@ -44,6 +48,9 @@ class FeedLikeServiceTest {
 
         when(feedRepository.findById(feedId))
                 .thenReturn(Optional.of(feed));
+
+        UUID feedAuthorId = UUID.randomUUID();
+        when(feed.getUserId()).thenReturn(feedAuthorId);
 
         when(feedLikeRepository.existsByFeed_IdAndUserId(
                 feedId, userId

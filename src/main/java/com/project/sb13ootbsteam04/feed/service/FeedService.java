@@ -1,6 +1,8 @@
 
 package com.project.sb13ootbsteam04.feed.service;
 
+import com.project.sb13ootbsteam04.feed.event.FeedCreatedEvent;
+import org.springframework.context.ApplicationEventPublisher;
 import com.project.sb13ootbsteam04.clothes.entity.Clothes;
 import com.project.sb13ootbsteam04.clothes.repository.ClothesRepository;
 import com.project.sb13ootbsteam04.feed.dto.CreateFeedRequest;
@@ -43,6 +45,7 @@ public class FeedService {
     private final FeedResponseService feedResponseService;
     private final ClothesRepository clothesRepository;
     private final WeatherRepository weatherRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     // ========================================
     // 피드 생성
@@ -119,6 +122,10 @@ public class FeedService {
                 .toList();
 
         feedClothesRepository.saveAll(feedClothes);
+
+        // 커밋 후 작성자의 팔로워에게 알림
+        eventPublisher.publishEvent(new FeedCreatedEvent(savedFeed.getId(), currentUserId));
+
         return savedFeed.getId();
     }
 

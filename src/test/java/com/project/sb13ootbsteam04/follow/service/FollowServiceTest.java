@@ -1,6 +1,7 @@
 
 package com.project.sb13ootbsteam04.follow.service;
 
+import org.springframework.context.ApplicationEventPublisher;
 import com.project.sb13ootbsteam04.follow.dto.CreateFollowRequest;
 import com.project.sb13ootbsteam04.follow.dto.FollowPageResponse;
 import com.project.sb13ootbsteam04.follow.dto.FollowResponse;
@@ -39,6 +40,9 @@ class FollowServiceTest {
 
     @Mock
     private FollowResponseService followResponseService;
+
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
 
     @InjectMocks
     private FollowService followService;

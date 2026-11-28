@@ -1,6 +1,8 @@
 
 package com.project.sb13ootbsteam04.follow.service;
 
+import com.project.sb13ootbsteam04.follow.event.FollowCreatedEvent;
+import org.springframework.context.ApplicationEventPublisher;
 import com.project.sb13ootbsteam04.follow.dto.CreateFollowRequest;
 import com.project.sb13ootbsteam04.follow.dto.FollowPageResponse;
 import com.project.sb13ootbsteam04.follow.dto.FollowResponse;
@@ -29,6 +31,7 @@ public class FollowService {
     private final FollowRepository followRepository;
     private final UserRepository userRepository;
     private final FollowResponseService followResponseService;
+    private final ApplicationEventPublisher eventPublisher;
 
     // 팔로우 생성
     @Transactional
@@ -42,6 +45,11 @@ public class FollowService {
         );
 
         Follow savedFollow = followRepository.saveAndFlush(follow);
+
+        // 커밋 후 팔로우 대상에게 알림
+        eventPublisher.publishEvent(
+                new FollowCreatedEvent(request.followerId(), request.followeeId())
+        );
 
         return savedFollow.getId();
     }

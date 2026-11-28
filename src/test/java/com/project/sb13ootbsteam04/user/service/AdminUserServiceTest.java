@@ -1,5 +1,6 @@
 package com.project.sb13ootbsteam04.user.service;
 
+import org.springframework.context.ApplicationEventPublisher;
 import com.project.sb13ootbsteam04.global.exception.ErrorCode;
 import com.project.sb13ootbsteam04.user.dto.response.UserDto;
 import com.project.sb13ootbsteam04.user.entity.AdminOperationLock;
@@ -35,6 +36,9 @@ class AdminUserServiceTest {
 
     @Mock
     private AdminOperationLockRepository lockRepository;
+
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
 
     @InjectMocks
     private AdminUserService adminUserService;

@@ -1,6 +1,8 @@
 
 package com.project.sb13ootbsteam04.feed.service;
 
+import com.project.sb13ootbsteam04.feed.event.FeedLikedEvent;
+import org.springframework.context.ApplicationEventPublisher;
 import com.project.sb13ootbsteam04.feed.entity.Feed;
 import com.project.sb13ootbsteam04.feed.entity.FeedLike;
 import com.project.sb13ootbsteam04.feed.repository.FeedLikeRepository;
@@ -18,6 +20,7 @@ public class FeedLikeService {
 
     private final FeedRepository feedRepository;
     private final FeedLikeRepository feedLikeRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     // 좋아요 등록
     @Transactional
@@ -38,6 +41,9 @@ public class FeedLikeService {
 
         FeedLike feedLike = new FeedLike(feed, userId);
         feedLikeRepository.save(feedLike);
+
+        // 커밋 후 피드 작성자에게 알림
+        eventPublisher.publishEvent(new FeedLikedEvent(feedId, feed.getUserId(), userId));
     }
 
     // 좋아요 취소

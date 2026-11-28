@@ -1,5 +1,6 @@
 package com.project.sb13ootbsteam04.feed.service;
 
+import org.springframework.context.ApplicationEventPublisher;
 import com.project.sb13ootbsteam04.feed.dto.*;
 import com.project.sb13ootbsteam04.feed.entity.*;
 import com.project.sb13ootbsteam04.feed.repository.*;
@@ -40,6 +41,9 @@ class FeedServiceAdditionalTest {
     ClothesRepository clothesRepository;
     @Mock
     WeatherRepository weatherRepository;
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+
     @InjectMocks
     FeedService service;
     UUID user = UUID.randomUUID(), weather = UUID.randomUUID(), id = UUID.randomUUID(), clothes = UUID.randomUUID();
