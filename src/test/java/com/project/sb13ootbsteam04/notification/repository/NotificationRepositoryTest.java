@@ -62,19 +62,24 @@ class NotificationRepositoryTest {
     @DisplayName("커서 다음 페이지는 같은 시각이면 id가 작은 알림부터 이어서 조회한다")
     void findsNextPageAfterCursor() {
         var first = save(receiver, "알림1", "2026-11-28T02:00:00Z");
-        var sameTimeA = save(receiver, "알림2", "2026-11-28T01:00:00Z");
-        var sameTimeB = save(receiver, "알림3", "2026-11-28T01:00:00Z");
+        save(receiver, "알림2", "2026-11-28T01:00:00Z");
+        save(receiver, "알림3", "2026-11-28T01:00:00Z");
         var last = save(receiver, "알림4", "2026-11-28T00:00:00Z");
-        var sameTime = sameTimeA.getId().compareTo(sameTimeB.getId()) > 0
-                ? new Notification[]{sameTimeA, sameTimeB}
-                : new Notification[]{sameTimeB, sameTimeA};
+        // 같은 시각의 순서는 DB의 UUID 비교 기준을 따르므로 첫 페이지 결과로 정한다
+        // (Java UUID.compareTo는 부호 있는 비교라 DB 정렬과 다를 수 있다)
+        var firstPage = notificationRepository.findFirstPage(receiver.getId(), PageRequest.of(0, 2));
+        var cursorItem = firstPage.get(1);
+        var allInOrder = notificationRepository.findFirstPage(receiver.getId(), PageRequest.of(0, 10));
 
         var next = notificationRepository.findNextPage(receiver.getId(),
-                Instant.parse("2026-11-28T01:00:00Z"), sameTime[0].getId(), PageRequest.of(0, 10));
+                cursorItem.getCreatedAt(), cursorItem.getId(), PageRequest.of(0, 10));
 
+        // 첫 페이지 2건 뒤의 나머지를 같은 순서로 이어서 조회한다
+        assertThat(firstPage.get(0).getId()).isEqualTo(first.getId());
         assertThat(next).extracting(Notification::getId)
-                .containsExactly(sameTime[1].getId(), last.getId());
-        assertThat(next).extracting(Notification::getId).doesNotContain(first.getId());
+                .containsExactlyElementsOf(allInOrder.subList(2, 4).stream().map(Notification::getId).toList());
+        assertThat(next.get(next.size() - 1).getId()).isEqualTo(last.getId());
+        assertThat(next).extracting(Notification::getId).doesNotContain(first.getId(), cursorItem.getId());
     }
 
     private Notification save(User user, String title, String createdAt) {
