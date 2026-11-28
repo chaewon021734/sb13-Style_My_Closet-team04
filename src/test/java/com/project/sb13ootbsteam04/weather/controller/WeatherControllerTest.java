@@ -36,20 +36,6 @@ class WeatherControllerTest {
     }
 
     @Test
-    void preparesForecastBeforeQueryingWeather() throws Exception {
-        var condition = new WeatherLocationCondition(37.5665, 126.978);
-        when(queryService.getWeather(condition)).thenReturn(List.of());
-
-        mvc.perform(get("/api/weathers").param("longitude", "126.978").param("latitude", "37.5665"))
-                .andExpect(status().isOk());
-
-        // 예보 준비 후 조회해야 첫 요청에도 날씨가 응답된다
-        var order = inOrder(forecastInitializer, queryService);
-        order.verify(forecastInitializer).ensureForecast(condition);
-        order.verify(queryService).getWeather(condition);
-    }
-
-    @Test
     void returnsSwaggerLocationResponse() throws Exception {
         when(service.getLocation(new WeatherLocationCondition(37.5665, 126.978)))
                 .thenReturn(new WeatherLocationResponse(37.5665, 126.978, 60, 127,

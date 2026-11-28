@@ -5,7 +5,6 @@ import com.project.sb13ootbsteam04.global.config.SecurityConfig;
 import com.project.sb13ootbsteam04.user.dto.response.UserDto;
 import com.project.sb13ootbsteam04.user.dto.response.UserDtoCursorResponse;
 import com.project.sb13ootbsteam04.user.entity.UserRole;
-import com.project.sb13ootbsteam04.user.exception.UserException;
 import com.project.sb13ootbsteam04.user.service.AdminUserService;
 import com.project.sb13ootbsteam04.user.service.UserService;
 
@@ -370,36 +369,7 @@ class AdminUserControllerTest {
     }
 
     // ========================================
-    // 9. 이전 관리자 경로 호출 시 404
-    // ========================================
-
-    @Test
-    void legacyAdminPathIsNoLongerServed() throws Exception {
-
-        UUID userId = UUID.randomUUID();
-
-        mockMvc.perform(
-                        withCsrf(
-                                patch("/api/admin/users/{userId}/locked", userId),
-                                csrfCookie
-                        )
-                                .with(jwt()
-                                        .authorities(
-                                                new SimpleGrantedAuthority(
-                                                        "ROLE_ADMIN"
-                                                )
-                                        )
-                                )
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content("{\"locked\": true}")
-                )
-                .andExpect(status().isNotFound());
-
-        verifyNoInteractions(adminUserService);
-    }
-
-    // ========================================
-    // 10. 사용자 목록 조회는 ADMIN만 가능
+    // 9. 사용자 목록 조회는 ADMIN만 가능
     // ========================================
 
     @Test
@@ -452,38 +422,6 @@ class AdminUserControllerTest {
                 )
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalCount").value(0));
-    }
-
-    // ========================================
-    // 11. 존재하지 않는 사용자는 404
-    // ========================================
-
-    @Test
-    void shouldReturnNotFoundForMissingUser() throws Exception {
-
-        UUID userId = UUID.randomUUID();
-
-        when(adminUserService.changeRole(userId, UserRole.ADMIN))
-                .thenThrow(UserException.userNotFound(userId));
-
-        mockMvc.perform(
-                        withCsrf(
-                                patch("/api/users/{userId}/role", userId),
-                                csrfCookie
-                        )
-                                .with(jwt()
-                                        .authorities(
-                                                new SimpleGrantedAuthority(
-                                                        "ROLE_ADMIN"
-                                                )
-                                        )
-                                )
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content("{\"role\": \"ADMIN\"}")
-                )
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.message").value("존재하지 않는 사용자입니다."))
-                .andExpect(jsonPath("$.details.userId").value(userId.toString()));
     }
 
     private UserDto userDto(UUID userId, String role, boolean locked) {

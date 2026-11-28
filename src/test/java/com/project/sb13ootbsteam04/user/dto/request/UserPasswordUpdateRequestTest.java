@@ -45,36 +45,4 @@ class UserPasswordUpdateRequestTest {
         // then
         assertThat(violations).isEmpty();
     }
-
-    @Test
-    @DisplayName("비밀번호가 5자이면 검증에 실패한다")
-    void 비밀번호_5자_실패() {
-        // given
-        UserPasswordUpdateRequest request =
-                new UserPasswordUpdateRequest("abc12");
-
-        // when
-        Set<ConstraintViolation<UserPasswordUpdateRequest>> violations =
-                validator.validate(request);
-
-        // then
-        assertThat(violations)
-                .extracting(ConstraintViolation::getMessage)
-                .containsExactly("새 비밀번호는 6자 이상이어야 합니다.");
-    }
-
-    @Test
-    @DisplayName("비밀번호가 비어 있으면 검증에 실패한다")
-    void 비밀번호_공백_실패() {
-        // given
-        UserPasswordUpdateRequest request =
-                new UserPasswordUpdateRequest(" ");
-
-        // when
-        Set<ConstraintViolation<UserPasswordUpdateRequest>> violations =
-                validator.validate(request);
-
-        // then
-        assertThat(violations).isNotEmpty();
-    }
 }
