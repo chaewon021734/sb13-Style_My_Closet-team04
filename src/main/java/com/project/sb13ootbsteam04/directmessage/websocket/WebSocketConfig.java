@@ -20,8 +20,6 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
   @Override
   public void registerStompEndpoints(StompEndpointRegistry registry) {
     registry.addEndpoint("/ws").withSockJS();
-    // 같은 연결에서 보낸 메시지를 보낸 순서대로 처리(빠른 연속 전송의 저장 순서 보장)
-    registry.setPreserveReceiveOrder(true);
   }
 
   @Override
