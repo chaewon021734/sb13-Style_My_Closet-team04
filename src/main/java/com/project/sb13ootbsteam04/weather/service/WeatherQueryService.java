@@ -57,12 +57,21 @@ public class WeatherQueryService {
                 LinkedHashMap::new, Collectors.toList()));
         var result = new ArrayList<WeatherDto>();
         for (var daily : forecastsByDate.values()) {
+            // 예보 범위 끝처럼 오전 자료만 있는 날은 하루 칸으로 쓰지 않는다
+            if (!result.isEmpty() && !reachesNoon(daily)) {
+                continue;
+            }
             // 첫날은 가장 가까운 예보, 이후 날짜는 정오에 가장 가까운 예보
             var representative = result.isEmpty() ? daily.get(0) : closestToNoon(daily);
             result.add(WeatherDto.from(representative, responseLocation)
                     .withTemperatureRange(dailyMin(daily), dailyMax(daily)));
         }
         return result;
+    }
+
+    private boolean reachesNoon(List<Weather> daily) {
+        return daily.stream().anyMatch(weather ->
+                weather.getForecastAt().atZone(KMA_ZONE).getHour() >= REPRESENTATIVE_HOUR);
     }
 
     private Weather closestToNoon(List<Weather> daily) {
