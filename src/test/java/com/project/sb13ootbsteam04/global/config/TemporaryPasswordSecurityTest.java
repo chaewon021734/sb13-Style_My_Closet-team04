@@ -112,7 +112,8 @@ class TemporaryPasswordSecurityTest {
 
         verify(passwordResetService).resetPassword(
                 userId,
-                "NewPassword123!"
+                "NewPassword123!",
+                1L
         );
     }
 

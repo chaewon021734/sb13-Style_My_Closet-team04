@@ -11,6 +11,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import org.springframework.http.HttpStatus;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.oauth2.jwt.Jwt;
 
@@ -39,6 +40,7 @@ class PasswordResetControllerTest {
 
         when(jwt.getSubject())
                 .thenReturn(userId.toString());
+        when(jwt.getClaim("loginVersion")).thenReturn(7L);
 
         PasswordResetRequest request =
                 new PasswordResetRequest("NewPassword123!");
@@ -55,7 +57,7 @@ class PasswordResetControllerTest {
 
         verify(passwordResetService).resetPassword(
                 userId,
-                "NewPassword123!"
+                "NewPassword123!", 7L
         );
     }
 
@@ -67,6 +69,7 @@ class PasswordResetControllerTest {
 
         when(jwt.getSubject())
                 .thenReturn(authenticatedUserId.toString());
+        when(jwt.getClaim("loginVersion")).thenReturn(7L);
 
         PasswordResetRequest request =
                 new PasswordResetRequest("ChangedPassword123!");
@@ -75,7 +78,7 @@ class PasswordResetControllerTest {
 
         verify(passwordResetService).resetPassword(
                 authenticatedUserId,
-                "ChangedPassword123!"
+                "ChangedPassword123!", 7L
         );
 
         verifyNoMoreInteractions(passwordResetService);
@@ -89,17 +92,41 @@ class PasswordResetControllerTest {
 
         when(jwt.getSubject())
                 .thenReturn(userId.toString());
+        when(jwt.getClaim("loginVersion")).thenReturn(7L);
 
         PasswordResetRequest request =
                 new PasswordResetRequest("NewPassword123!");
 
         doThrow(new IllegalStateException("비밀번호 변경 실패"))
                 .when(passwordResetService)
-                .resetPassword(userId, "NewPassword123!");
+                .resetPassword(userId, "NewPassword123!", 7L);
 
         assertThrows(
                 IllegalStateException.class,
                 () -> controller.resetPassword(jwt, request)
         );
+    }
+
+    @Test
+    void shouldRejectMissingLoginVersion() {
+        assertInvalidVersion(null);
+    }
+
+    @Test
+    void shouldRejectStringLoginVersion() {
+        assertInvalidVersion("7");
+    }
+
+    @Test
+    void shouldRejectFractionalLoginVersion() {
+        assertInvalidVersion(7.5);
+    }
+
+    private void assertInvalidVersion(Object version) {
+        when(jwt.getSubject()).thenReturn(UUID.randomUUID().toString());
+        when(jwt.getClaim("loginVersion")).thenReturn(version);
+        assertThrows(BadCredentialsException.class,
+                () -> controller.resetPassword(jwt, new PasswordResetRequest("NewPassword123!")));
+        verifyNoInteractions(passwordResetService);
     }
 }
