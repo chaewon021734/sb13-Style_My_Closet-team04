@@ -1,5 +1,6 @@
 package com.project.sb13ootbsteam04.directmessage.websocket;
 
+import com.project.sb13ootbsteam04.auth.jwt.JwtAccountStatusValidator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
@@ -16,16 +17,21 @@ import org.springframework.stereotype.Component;
 
 import java.security.Principal;
 import java.util.List;
+import java.util.Map;
 
 // STOMP 연결 시 Authorization 헤더의 JWT로 사용자를 확인하고,
-// 구독은 자신이 참여한 대화 채널만 허용한다.
+// 구독은 자신이 참여한 대화 채널만, 전송은 /pub 경로만 허용한다.
+// 전송할 때마다 계정 상태(잠금·권한 변경·로그아웃)를 다시 확인한다.
 @Component
 @RequiredArgsConstructor
 public class StompAuthInterceptor implements ChannelInterceptor {
 
   private static final String BEARER_PREFIX = "Bearer ";
+  private static final String APPLICATION_PREFIX = "/pub/";
+  private static final String JWT_ATTRIBUTE = "jwt";
 
   private final JwtDecoder jwtDecoder;
+  private final JwtAccountStatusValidator accountStatusValidator;
 
   @Override
   public Message<?> preSend(Message<?> message, MessageChannel channel) {
@@ -35,16 +41,38 @@ public class StompAuthInterceptor implements ChannelInterceptor {
     }
     StompCommand command = accessor.getCommand();
     if (command == StompCommand.CONNECT) {
-      accessor.setUser(authenticate(accessor.getFirstNativeHeader("Authorization")));
+      Jwt jwt = authenticate(accessor.getFirstNativeHeader("Authorization"));
+      sessionAttributes(accessor).put(JWT_ATTRIBUTE, jwt);
+      accessor.setUser(new UsernamePasswordAuthenticationToken(jwt.getSubject(), null, List.of()));
     } else if (command == StompCommand.SUBSCRIBE) {
       checkSubscription(accessor.getUser(), accessor.getDestination());
-    } else if (command == StompCommand.SEND && accessor.getUser() == null) {
-      throw new MessageDeliveryException("인증되지 않은 연결입니다.");
+    } else if (command == StompCommand.SEND) {
+      checkSend(accessor);
     }
     return message;
   }
 
-  private Principal authenticate(String authorization) {
+  // 구독 경로(/sub)로 직접 보내면 서버를 거치지 않고 구독자에게 전달되므로 막는다
+  private void checkSend(StompHeaderAccessor accessor) {
+    String destination = accessor.getDestination();
+    if (destination == null || !destination.startsWith(APPLICATION_PREFIX)) {
+      throw new MessageDeliveryException("전송할 수 없는 경로입니다.");
+    }
+    if (!(sessionAttributes(accessor).get(JWT_ATTRIBUTE) instanceof Jwt jwt)
+        || accountStatusValidator.validate(jwt).hasErrors()) {
+      throw new MessageDeliveryException("인증 정보가 더 이상 유효하지 않습니다.");
+    }
+  }
+
+  private Map<String, Object> sessionAttributes(StompHeaderAccessor accessor) {
+    Map<String, Object> attributes = accessor.getSessionAttributes();
+    if (attributes == null) {
+      throw new MessageDeliveryException("세션 정보가 없습니다.");
+    }
+    return attributes;
+  }
+
+  private Jwt authenticate(String authorization) {
     if (authorization == null || !authorization.startsWith(BEARER_PREFIX)) {
       throw new MessageDeliveryException("인증 토큰이 필요합니다.");
     }
@@ -59,7 +87,7 @@ public class StompAuthInterceptor implements ChannelInterceptor {
     if ("TEMPORARY".equals(jwt.getClaimAsString("authType"))) {
       throw new MessageDeliveryException("임시 로그인으로는 DM을 사용할 수 없습니다.");
     }
-    return new UsernamePasswordAuthenticationToken(jwt.getSubject(), null, List.of());
+    return jwt;
   }
 
   private void checkSubscription(Principal user, String destination) {

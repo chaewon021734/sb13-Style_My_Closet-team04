@@ -116,8 +116,9 @@ public class DirectMessageService {
         .toList();
 
     DirectMessage lastMessage = messages.isEmpty() ? null : messages.get(messages.size() - 1);
-    String nextCursor = lastMessage == null ? null : lastMessage.getCreatedAt().toString();
-    UUID nextIdAfter = lastMessage == null ? null : lastMessage.getId();
+    // 다음 페이지가 없으면 커서를 비운다
+    String nextCursor = hasNext ? lastMessage.getCreatedAt().toString() : null;
+    UUID nextIdAfter = hasNext ? lastMessage.getId() : null;
 
     long totalCount = directMessageRepository.countMessagesBetweenUsers(
         userId,

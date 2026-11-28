@@ -30,6 +30,11 @@ public abstract class RedisChannelSubscriber implements MessageListener, SmartLi
     container.afterPropertiesSet();
   }
 
+  // 지금 채널 메시지를 받고 있는지 (Redis 재연결 중이면 false)
+  public boolean isListening() {
+    return container.isListening();
+  }
+
   // 받은 메시지 본문(JSON) 처리
   protected abstract void handle(String body);
 
