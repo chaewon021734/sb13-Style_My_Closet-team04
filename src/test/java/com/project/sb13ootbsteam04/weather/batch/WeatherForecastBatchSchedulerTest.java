@@ -1,5 +1,11 @@
 package com.project.sb13ootbsteam04.weather.batch;
 
+import org.junit.jupiter.api.BeforeEach;
+import org.springframework.data.redis.RedisConnectionFailureException;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
+import java.time.Duration;
+import static org.mockito.ArgumentMatchers.anyString;
 import org.junit.jupiter.api.Test;
 import org.springframework.batch.core.BatchStatus;
 import org.springframework.batch.core.job.Job;
@@ -31,6 +37,41 @@ class WeatherForecastBatchSchedulerTest {
     private final JobOperator jobOperator = mock(JobOperator.class);
     private final Job job = mock(Job.class);
     private final JobRepository jobRepository = mock(JobRepository.class);
+    private final StringRedisTemplate redisTemplate = mock(StringRedisTemplate.class);
+    @SuppressWarnings("unchecked")
+    private final ValueOperations<String, String> valueOperations = mock(ValueOperations.class);
+
+    // 기본은 이 인스턴스가 실행 잠금을 얻은 상태
+    @BeforeEach
+    void givenLockAcquired() {
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        when(valueOperations.setIfAbsent(anyString(), anyString(), any(Duration.class))).thenReturn(true);
+    }
+
+    @Test
+    void skipsWhenAnotherInstanceHoldsTheLock() throws Exception {
+        when(valueOperations.setIfAbsent(anyString(), anyString(), any(Duration.class))).thenReturn(false);
+
+        scheduler().collectForecasts();
+
+        verify(jobOperator, never()).start(any(Job.class), any(JobParameters.class));
+    }
+
+    @Test
+    void runsWhenRedisIsUnavailable() throws Exception {
+        when(valueOperations.setIfAbsent(anyString(), anyString(), any(Duration.class)))
+                .thenThrow(new RedisConnectionFailureException("연결 실패"));
+        when(jobRepository.findRunningJobExecutions(WeatherForecastBatchConfig.JOB_NAME))
+                .thenReturn(Set.of());
+        var execution = mock(JobExecution.class);
+        when(execution.getStatus()).thenReturn(BatchStatus.COMPLETED);
+        when(jobOperator.start(any(Job.class), any(JobParameters.class))).thenReturn(execution);
+
+        scheduler().collectForecasts();
+
+        // 저장 로직이 중복을 막으므로 수집이 멈추는 것보다 실행이 낫다
+        verify(jobOperator).start(any(Job.class), any(JobParameters.class));
+    }
 
     @Test
     void startsJobWithScheduledKstIssueParameters() throws Exception {
@@ -81,6 +122,6 @@ class WeatherForecastBatchSchedulerTest {
 
     private WeatherForecastBatchScheduler scheduler() {
         return new WeatherForecastBatchScheduler(
-                jobOperator, job, jobRepository, SCHEDULED_TIME);
+                jobOperator, job, jobRepository, redisTemplate, SCHEDULED_TIME);
     }
 }
