@@ -56,6 +56,13 @@ spring:
 jwt:
   secret: ${JWT_SECRET}
   access-token-expiration: ${JWT_ACCESS_TOKEN_EXPIRATION:3600000}
+  refresh-token-cookie-secure: ${JWT_REFRESH_TOKEN_COOKIE_SECURE:true}
+
+  # 만료된 Refresh Token 자동 정리
+  refresh-token-cleanup:
+    enabled: ${JWT_REFRESH_TOKEN_CLEANUP_ENABLED:true}
+    initial-delay-ms: ${JWT_REFRESH_TOKEN_CLEANUP_INITIAL_DELAY_MS:60000}
+    fixed-delay-ms: ${JWT_REFRESH_TOKEN_CLEANUP_FIXED_DELAY_MS:3600000}
 
 # 날씨 API 설정
 weather:

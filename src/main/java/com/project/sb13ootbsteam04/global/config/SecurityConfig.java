@@ -2,6 +2,7 @@ package com.project.sb13ootbsteam04.global.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -18,7 +19,53 @@ import java.util.List;
 @Configuration
 public class SecurityConfig {
 
+    // ========================================
+    // 1. Refresh Token 갱신 및 로그아웃 전용 보안 설정
+    // ========================================
+
+    // 만료된 Access Token이 전달되더라도 JWT 인증 필터를 적용하지 않음
     @Bean
+    @Order(1)
+    public SecurityFilterChain refreshTokenSecurityFilterChain(
+            HttpSecurity http
+    ) throws Exception {
+
+        http
+                .securityMatcher(
+                        "/api/auth/refresh",
+                        "/api/auth/sign-out"
+                )
+
+                // 쿠키 기반 인증 요청이므로 CSRF 보호 유지
+                .csrf(csrf -> csrf.spa())
+
+                .sessionManagement(session -> session
+                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+                )
+
+                .authorizeHttpRequests(auth -> auth
+
+                        // Refresh Token 갱신 및 로그아웃 허용
+                        // 실제 토큰 유효성 검증은 Service에서 처리
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/api/auth/refresh",
+                                "/api/auth/sign-out"
+                        ).permitAll()
+
+                        // 허용된 POST 요청 이외의 접근 차단
+                        .anyRequest().denyAll()
+                );
+
+        return http.build();
+    }
+
+    // ========================================
+    // 2. 기존 JWT 기반 인증 및 인가 설정
+    // ========================================
+
+    @Bean
+    @Order(2)
     public SecurityFilterChain securityFilterChain(
             HttpSecurity http,
             JwtAuthenticationConverter jwtAuthenticationConverter
@@ -37,7 +84,6 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
 
                         // 프론트엔드 정적 리소스 접근 허용
-                        // 로그인 이전에도 HTML, JavaScript, CSS, 이미지 접근 가능
                         .requestMatchers(
                                 HttpMethod.GET,
                                 "/",
@@ -75,7 +121,6 @@ public class SecurityConfig {
                         ).permitAll()
 
                         // CSRF 토큰 발급 API
-                        // 로그인 이전에도 접근할 수 있도록 허용
                         .requestMatchers(
                                 HttpMethod.GET,
                                 "/api/auth/csrf-token"
@@ -120,11 +165,13 @@ public class SecurityConfig {
                         // 임시 JWT로는 접근 불가
                         .anyRequest().access((authentication, context) -> {
 
-                            Authentication current = authentication.get();
+                            Authentication current =
+                                    authentication.get();
 
                             if (current == null
                                     || !current.isAuthenticated()
                                     || current instanceof AnonymousAuthenticationToken) {
+
                                 return new AuthorizationDecision(false);
                             }
 
@@ -134,6 +181,7 @@ public class SecurityConfig {
                                         .getClaimAsString("authType");
 
                                 if ("TEMPORARY".equals(authType)) {
+
                                     return new AuthorizationDecision(false);
                                 }
                             }
@@ -153,7 +201,10 @@ public class SecurityConfig {
         return http.build();
     }
 
-    // JWT의 인증 유형과 역할을 Spring Security 권한으로 변환
+    // ========================================
+    // 3. JWT 인증 유형 및 역할 변환
+    // ========================================
+
     @Bean
     public JwtAuthenticationConverter jwtAuthenticationConverter() {
 
@@ -167,6 +218,7 @@ public class SecurityConfig {
 
             // 임시 JWT에는 사용자 및 관리자 권한을 부여하지 않음
             if ("TEMPORARY".equals(authType)) {
+
                 return List.of(
                         new SimpleGrantedAuthority("PASSWORD_RESET")
                 );
@@ -176,6 +228,7 @@ public class SecurityConfig {
             String role = jwt.getClaimAsString("role");
 
             if (role == null || role.isBlank()) {
+
                 return List.of();
             }
 
