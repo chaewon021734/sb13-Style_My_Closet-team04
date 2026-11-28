@@ -109,6 +109,8 @@ class WeatherQueryIntegrationTest {
         items.addAll(slot(location, "20261110", "1100", "9", Map.of()));
         items.addAll(slot(location, "20261110", "1300", "11", Map.of()));
         items.addAll(slot(location, "20261110", "1500", "13", Map.of("TMX", "14.0")));
+        // 예보 범위 끝의 자정 자료만 있는 날은 하루 칸으로 쓰지 않는다
+        items.addAll(slot(location, "20261111", "0000", "7", Map.of()));
         forecastService.saveForecast(location.getId(), items);
 
         mvc.perform(get("/api/weathers").param("latitude", "37.5665").param("longitude", "126.978"))
