@@ -27,6 +27,9 @@ dependencies {
     // REST API 및 내장 Tomcat 웹 서버
     implementation 'org.springframework.boot:spring-boot-starter-webmvc'
 
+    // DM 실시간 송수신 (SockJS + STOMP)
+    implementation 'org.springframework.boot:spring-boot-starter-websocket'
+
     // PR C - 임시 비밀번호 이메일 발송
     implementation 'org.springframework.boot:spring-boot-starter-mail'
 

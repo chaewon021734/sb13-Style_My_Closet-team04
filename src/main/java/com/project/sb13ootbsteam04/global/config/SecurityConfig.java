@@ -75,7 +75,8 @@ public class SecurityConfig {
                 // SPA 프론트엔드 환경에 맞는 CSRF 보호 설정
                 // XSRF-TOKEN 쿠키 발급
                 // X-XSRF-TOKEN 요청 헤더 검증
-                .csrf(csrf -> csrf.spa())
+                // DM(SockJS)은 쿠키가 아니라 STOMP 연결 헤더의 JWT로 인증하므로 CSRF 검사에서 제외
+                .csrf(csrf -> csrf.spa().ignoringRequestMatchers("/ws/**"))
 
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
@@ -95,6 +96,8 @@ public class SecurityConfig {
 
                         // 오류 경로
                         .requestMatchers("/error").permitAll()
+                        // DM 연결(SockJS). 인증은 STOMP CONNECT 헤더의 JWT로 한다
+                        .requestMatchers("/ws/**").permitAll()
                         // ALB와 ECS가 토큰 없이 상태를 확인하는 두 경로만 허용한다.
                         .requestMatchers(HttpMethod.GET, "/actuator/health/liveness",
                                 "/actuator/health/readiness").permitAll()
