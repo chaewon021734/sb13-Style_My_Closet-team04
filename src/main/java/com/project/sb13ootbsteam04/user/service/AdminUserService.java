@@ -4,6 +4,7 @@ import com.project.sb13ootbsteam04.user.dto.response.UserDto;
 import com.project.sb13ootbsteam04.user.entity.AdminOperationLock;
 import com.project.sb13ootbsteam04.user.entity.User;
 import com.project.sb13ootbsteam04.user.entity.UserRole;
+import com.project.sb13ootbsteam04.user.exception.UserException;
 import com.project.sb13ootbsteam04.user.repository.AdminOperationLockRepository;
 import com.project.sb13ootbsteam04.user.repository.UserRepository;
 
@@ -44,11 +45,7 @@ public class AdminUserService {
 
         // 잠금 획득 후 대상 사용자 조회
         User user = userRepository.findByIdForUpdate(userId)
-                .orElseThrow(() ->
-                        new IllegalArgumentException(
-                                "존재하지 않는 사용자입니다."
-                        )
-                );
+                .orElseThrow(() -> UserException.userNotFound(userId));
 
         // 동일 권한이면 변경하지 않음
         if (user.getRole() == newRole) {
@@ -115,11 +112,7 @@ public class AdminUserService {
 
         // 잠금 획득 후 대상 사용자 조회
         User user = userRepository.findByIdForUpdate(userId)
-                .orElseThrow(() ->
-                        new IllegalArgumentException(
-                                "존재하지 않는 사용자입니다."
-                        )
-                );
+                .orElseThrow(() -> UserException.userNotFound(userId));
 
         // 동일한 상태면 변경하지 않음
         if (user.isLocked() == locked) {
