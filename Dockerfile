@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # ---------- 1단계: 빌드 스테이지 ----------
-FROM eclipse-temurin:17-jdk-jammy AS build
+FROM eclipse-temurin:25-jdk-jammy AS build
 WORKDIR /workspace
 
 # Gradle 설정과 wrapper를 먼저 복사해 소스 변경 시에도 Docker 레이어 캐시를 활용합니다.
@@ -15,7 +15,7 @@ COPY src src
 RUN --mount=type=cache,target=/root/.gradle ./gradlew bootJar --no-daemon
 
 # ---------- 2단계: 실행 스테이지 ----------
-FROM eclipse-temurin:17-jre-jammy AS runtime
+FROM eclipse-temurin:25-jre-jammy AS runtime
 WORKDIR /app
 
 # 애플리케이션은 최소 권한의 전용 사용자로 실행합니다.
