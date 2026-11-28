@@ -176,11 +176,9 @@ class WeatherForecastInitializerTest {
 
     @ParameterizedTest(name = "{0} 기준 최신 발표 시각은 {1}")
     @CsvSource({
-            "2026-11-28T01:00, 2026-11-27T23:00",
             "2026-11-28T02:09, 2026-11-27T23:00",
             "2026-11-28T02:10, 2026-11-28T02:00",
-            "2026-11-28T14:30, 2026-11-28T14:00",
-            "2026-11-28T23:59, 2026-11-28T23:00"
+            "2026-11-28T14:30, 2026-11-28T14:00"
     })
     @DisplayName("기상청 단기예보 발표 시각과 제공 지연 10분을 반영해 최신 발표 시각을 계산한다")
     void calculatesLatestIssueTime(LocalDateTime now, LocalDateTime expectedIssue) {

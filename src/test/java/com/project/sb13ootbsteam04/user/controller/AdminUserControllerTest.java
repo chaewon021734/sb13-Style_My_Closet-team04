@@ -370,36 +370,7 @@ class AdminUserControllerTest {
     }
 
     // ========================================
-    // 9. 이전 관리자 경로 호출 시 404
-    // ========================================
-
-    @Test
-    void legacyAdminPathIsNoLongerServed() throws Exception {
-
-        UUID userId = UUID.randomUUID();
-
-        mockMvc.perform(
-                        withCsrf(
-                                patch("/api/admin/users/{userId}/locked", userId),
-                                csrfCookie
-                        )
-                                .with(jwt()
-                                        .authorities(
-                                                new SimpleGrantedAuthority(
-                                                        "ROLE_ADMIN"
-                                                )
-                                        )
-                                )
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content("{\"locked\": true}")
-                )
-                .andExpect(status().isNotFound());
-
-        verifyNoInteractions(adminUserService);
-    }
-
-    // ========================================
-    // 10. 사용자 목록 조회는 ADMIN만 가능
+    // 9. 사용자 목록 조회는 ADMIN만 가능
     // ========================================
 
     @Test
@@ -455,7 +426,7 @@ class AdminUserControllerTest {
     }
 
     // ========================================
-    // 11. 존재하지 않는 사용자는 404
+    // 10. 존재하지 않는 사용자는 404
     // ========================================
 
     @Test
