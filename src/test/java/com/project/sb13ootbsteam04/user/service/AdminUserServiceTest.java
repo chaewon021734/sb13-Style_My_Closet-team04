@@ -1,5 +1,6 @@
 package com.project.sb13ootbsteam04.user.service;
 
+import com.project.sb13ootbsteam04.user.dto.response.UserDto;
 import com.project.sb13ootbsteam04.user.entity.AdminOperationLock;
 import com.project.sb13ootbsteam04.user.entity.User;
 import com.project.sb13ootbsteam04.user.entity.UserRole;
@@ -78,10 +79,14 @@ class AdminUserServiceTest {
         when(userRepository.findByIdForUpdate(userId))
                 .thenReturn(Optional.of(user));
 
-        adminUserService.changeRole(userId, UserRole.ADMIN);
+        UserDto result = adminUserService.changeRole(userId, UserRole.ADMIN);
 
         assertEquals(UserRole.ADMIN, user.getRole());
         assertEquals(1L, user.getLoginVersion());
+
+        // 변경된 사용자 정보 반환
+        assertEquals("ADMIN", result.role());
+        assertEquals("user@example.com", result.email());
 
         // 고정 잠금 이후 대상 사용자 조회
         InOrder order = inOrder(
@@ -198,10 +203,13 @@ class AdminUserServiceTest {
         when(userRepository.findByIdForUpdate(userId))
                 .thenReturn(Optional.of(user));
 
-        adminUserService.changeRole(userId, UserRole.USER);
+        UserDto result = adminUserService.changeRole(userId, UserRole.USER);
 
         assertEquals(UserRole.USER, user.getRole());
         assertEquals(0L, user.getLoginVersion());
+
+        // 같은 권한이어도 현재 사용자 정보 반환
+        assertEquals("USER", result.role());
 
         verify(userRepository, never())
                 .findAllByRoleForUpdate(any());
@@ -239,12 +247,15 @@ class AdminUserServiceTest {
         when(userRepository.findByIdForUpdate(userId))
                 .thenReturn(Optional.of(user));
 
-        adminUserService.changeLocked(
+        UserDto result = adminUserService.changeLocked(
                 userId, true, UUID.randomUUID()
         );
 
         assertTrue(user.isLocked());
         assertEquals(1L, user.getLoginVersion());
+
+        // 변경된 사용자 정보 반환
+        assertTrue(result.locked());
 
         verify(lockRepository)
                 .findByIdForUpdate(AdminOperationLock.LOCK_ID);
