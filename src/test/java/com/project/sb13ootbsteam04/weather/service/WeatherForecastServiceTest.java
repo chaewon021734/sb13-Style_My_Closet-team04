@@ -78,7 +78,7 @@ class WeatherForecastServiceTest {
         assertThat(dry.getPrecipitationType()).isEqualTo(PrecipitationType.NONE);
         assertThat(dry.getPrecipitationAmountRaw()).isEqualTo("강수없음");
         assertThat(dry.getPrecipitationAmount()).isZero();
-        assertThat(dry.getPrecipitationProbability()).isEqualTo(0.20);
+        assertThat(dry.getPrecipitationProbability()).isEqualTo(20);
         assertThat(dry.getHumidityCurrent()).isEqualTo(60);
         assertThat(dry.getTemperatureCurrent()).isEqualTo(12);
         assertThat(dry.getTemperatureMin()).isNull();
@@ -92,6 +92,41 @@ class WeatherForecastServiceTest {
         assertThat(rain.getPrecipitationAmount()).isEqualTo(2.0);
         assertThat(rain.getTemperatureMax()).isEqualTo(13);
         assertThat(rain.getWindSpeedAsWord()).isEqualTo(WindStrength.MODERATE);
+    }
+
+    @Test
+    @org.junit.jupiter.api.DisplayName("같은 발표 안에 하루 전 같은 시각 예보가 있으면 기온·습도 차이를 저장한다")
+    void storesDifferenceFromSameTimeOnPreviousDayInSameIssue() {
+        var items = new ArrayList<>(slot("1100", "20261109", "1400", values("5", "40")));
+        items.addAll(slot("1100", "20261110", "1400", values("13", "75")));
+
+        service.saveForecast(locationId, items);
+
+        var tomorrow = forecasts(ISSUE).get(1);
+        assertThat(tomorrow.getTemperatureComparedToDayBefore()).isEqualTo(8);
+        assertThat(tomorrow.getHumidityComparedToDayBefore()).isEqualTo(35);
+    }
+
+    @Test
+    @org.junit.jupiter.api.DisplayName("새 발표에 하루 전 시각이 없으면 이전 발표의 그 시각 예보와 비교한다")
+    void comparesWithPreviousIssueWhenDayBeforeIsNotInThisIssue() {
+        service.saveForecast(locationId, slot("1100", "20261109", "2300", values("4", "60")));
+
+        service.saveForecast(locationId, slot("1400", "20261110", "2300", values("2", "50")));
+
+        var today = forecasts(ISSUE.plusSeconds(10800)).get(0);
+        assertThat(today.getTemperatureComparedToDayBefore()).isEqualTo(-2);
+        assertThat(today.getHumidityComparedToDayBefore()).isEqualTo(-10);
+    }
+
+    @Test
+    @org.junit.jupiter.api.DisplayName("하루 전 예보가 어디에도 없으면 전날 대비 값은 비워 둔다")
+    void leavesComparisonEmptyWithoutPreviousDayForecast() {
+        service.saveForecast(locationId, slot("1100", "20261109", "1400", values("5", "40")));
+
+        var saved = forecasts(ISSUE).get(0);
+        assertThat(saved.getTemperatureComparedToDayBefore()).isNull();
+        assertThat(saved.getHumidityComparedToDayBefore()).isNull();
     }
 
     @Test
@@ -171,6 +206,11 @@ class WeatherForecastServiceTest {
                 WeatherChangeType.PRECIPITATION_STARTED,
                 WeatherChangeType.STRONG_WIND_STARTED,
                 WeatherChangeType.TEMPERATURE_CHANGED_SIGNIFICANTLY);
+    }
+
+    private static Map<String, String> values(String temperature, String humidity) {
+        return Map.of("SKY", "1", "PTY", "0", "PCP", "강수없음", "POP", "0", "REH", humidity,
+                "TMP", temperature, "WSD", "1.0");
     }
 
     private List<KmaForecastItem> slot(String baseTime, String forecastTime, Map<String, String> values) {
