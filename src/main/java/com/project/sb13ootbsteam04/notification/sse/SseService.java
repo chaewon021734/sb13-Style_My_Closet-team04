@@ -4,6 +4,7 @@ import com.project.sb13ootbsteam04.notification.dto.NotificationDto;
 import com.project.sb13ootbsteam04.notification.repository.NotificationRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,16 +21,17 @@ import java.util.UUID;
 public class SseService {
 
   private static final String EVENT_NAME = "notifications";
-  // 끊기면 프론트가 다시 연결한다
-  private static final long TIMEOUT_MILLIS = Duration.ofMinutes(30).toMillis();
-
   private final SseEmitterRegistry registry;
   private final NotificationRepository notificationRepository;
+
+  // 연결 유지 시간. 끝나면 프론트가 다시 연결한다.
+  @Value("${otboo.sse.timeout:30m}")
+  private Duration timeout = Duration.ofMinutes(30);
 
   // 연결을 등록하고, 끊긴 사이에 저장된 알림이 있으면 다시 보낸다
   @Transactional(readOnly = true)
   public SseEmitter connect(UUID userId, UUID lastEventId) {
-    SseEmitter emitter = new SseEmitter(TIMEOUT_MILLIS);
+    SseEmitter emitter = new SseEmitter(timeout.toMillis());
     registry.add(userId, emitter);
 
     // 연결 직후 한 번 보내 응답을 시작한다

@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
+import org.springframework.web.context.request.async.AsyncRequestTimeoutException;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.UUID;
@@ -34,8 +35,9 @@ public class SseController {
     return sseService.connect(currentUserId, firstValidId(lastEventId, swaggerLastEventId, lastEventIdHeader));
   }
 
-  // 사용자가 연결을 끊은 경우: 응답을 보낼 수 없으므로 오류로 처리하지 않고 끝낸다
-  @ExceptionHandler(AsyncRequestNotUsableException.class)
+  // 사용자가 연결을 끊었거나 연결 유지 시간이 끝난 경우: 정상 종료이므로 오류로 처리하지 않는다
+  // (프론트는 연결이 끝나면 다시 연결한다)
+  @ExceptionHandler({AsyncRequestNotUsableException.class, AsyncRequestTimeoutException.class})
   public void handleDisconnected() {
   }
 
