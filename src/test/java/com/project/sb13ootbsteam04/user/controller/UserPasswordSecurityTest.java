@@ -208,11 +208,11 @@ class UserPasswordSecurityTest {
         verifyNoMoreInteractions(passwordResetService);
     }
 
-    // 10. 8자 미만 비밀번호 차단
+    // 10. 6자 미만 비밀번호 차단
     @Test
     void shouldRejectShortPassword() throws Exception {
 
-        assertBadPassword("{\"password\":\"1234567\"}");
+        assertBadPassword("{\"password\":\"12345\"}");
     }
 
     // 11. 공백 비밀번호 차단

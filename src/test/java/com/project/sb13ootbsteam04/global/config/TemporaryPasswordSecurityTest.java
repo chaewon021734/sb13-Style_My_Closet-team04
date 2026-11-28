@@ -251,7 +251,7 @@ class TemporaryPasswordSecurityTest {
         );
     }
 
-    // 8. 새 비밀번호가 8자 미만이면 400
+    // 8. 새 비밀번호가 6자 미만이면 400
     @Test
     void shouldRejectShortNewPassword() throws Exception {
 

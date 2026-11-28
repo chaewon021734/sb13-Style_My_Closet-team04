@@ -7,8 +7,8 @@ public record PasswordResetRequest(
 
         @NotBlank(message = "새 비밀번호는 필수입니다.")
         @Size(
-                min = 8,
-                message = "새 비밀번호는 8자 이상이어야 합니다."
+                min = 6,
+                message = "새 비밀번호는 6자 이상이어야 합니다."
         )
         String newPassword
 
