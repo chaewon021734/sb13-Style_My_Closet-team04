@@ -63,6 +63,7 @@ public enum ErrorCode {
 
   // USER
   USER_NOT_FOUND("USR_001", HttpStatus.NOT_FOUND, "존재하지 않는 사용자입니다."),
+  PROFILE_FORBIDDEN("USR_002", HttpStatus.FORBIDDEN, "본인의 프로필만 수정할 수 있습니다."),
 
   // NOTIFICATION
   NOTIFICATION_NOT_FOUND("NTF_001", HttpStatus.NOT_FOUND, "존재하지 않는 알림입니다."),

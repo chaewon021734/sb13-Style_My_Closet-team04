@@ -11,6 +11,13 @@ public final class UserException extends OtbooException {
     super(errorCode, details);
   }
 
+  public static UserException profileForbidden(UUID userId) {
+    return new UserException(
+        ErrorCode.PROFILE_FORBIDDEN,
+        Map.of("userId", userId.toString())
+    );
+  }
+
   public static UserException userNotFound(UUID userId) {
     return new UserException(
         ErrorCode.USER_NOT_FOUND,
