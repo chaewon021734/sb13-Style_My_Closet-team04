@@ -1,6 +1,8 @@
 
 package com.project.sb13ootbsteam04.feed.service;
 
+import com.project.sb13ootbsteam04.feed.event.FeedCommentedEvent;
+import org.springframework.context.ApplicationEventPublisher;
 import com.project.sb13ootbsteam04.feed.dto.CommentPageResponse;
 import com.project.sb13ootbsteam04.feed.dto.CommentResponse;
 import com.project.sb13ootbsteam04.feed.dto.CreateCommentRequest;
@@ -31,6 +33,7 @@ public class CommentService {
     private final FeedRepository feedRepository;
     private final UserRepository userRepository;
     private final CommentAuthorService commentAuthorService;
+    private final ApplicationEventPublisher eventPublisher;
 
     // 댓글 등록
     @Transactional
@@ -101,6 +104,11 @@ public class CommentService {
         );
 
         Comment savedComment = commentRepository.save(comment);
+
+        // 커밋 후 피드 작성자에게 알림
+        eventPublisher.publishEvent(new FeedCommentedEvent(
+                feedId, feed.getUserId(), currentUserId, request.content()
+        ));
 
         return savedComment.getId();
     }

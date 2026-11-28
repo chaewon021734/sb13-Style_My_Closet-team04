@@ -1,5 +1,7 @@
 package com.project.sb13ootbsteam04.user.service;
 
+import com.project.sb13ootbsteam04.user.event.UserRoleChangedEvent;
+import org.springframework.context.ApplicationEventPublisher;
 import com.project.sb13ootbsteam04.user.dto.response.UserDto;
 import com.project.sb13ootbsteam04.user.entity.AdminOperationLock;
 import com.project.sb13ootbsteam04.user.entity.User;
@@ -22,6 +24,7 @@ public class AdminUserService {
 
     private final UserRepository userRepository;
     private final AdminOperationLockRepository adminOperationLockRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     // ========================================
     // 1. 사용자 권한 변경
@@ -75,6 +78,9 @@ public class AdminUserService {
 
         // User.changeRole()에서 loginVersion 증가
         user.changeRole(newRole);
+
+        // 커밋 후 대상 사용자에게 알림
+        eventPublisher.publishEvent(new UserRoleChangedEvent(userId, newRole));
 
         return UserDto.from(user);
     }

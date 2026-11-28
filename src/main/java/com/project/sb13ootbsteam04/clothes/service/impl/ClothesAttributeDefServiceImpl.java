@@ -1,5 +1,7 @@
 package com.project.sb13ootbsteam04.clothes.service.impl;
 
+import com.project.sb13ootbsteam04.clothes.event.ClothesAttributeDefCreatedEvent;
+import org.springframework.context.ApplicationEventPublisher;
 import com.project.sb13ootbsteam04.clothes.entity.ClothesAttributeDef;
 import com.project.sb13ootbsteam04.clothes.exception.ClothesAttributeDefinitionNotFoundException;
 import com.project.sb13ootbsteam04.clothes.exception.DuplicateClothesAttributeDefNameException;
@@ -33,6 +35,7 @@ public class ClothesAttributeDefServiceImpl implements ClothesAttributeDefServic
 
   private final ClothesAttributeDefRepository clothesAttributeDefRepository;
   private final ClothesAttributeRepository clothesAttributeRepository;
+  private final ApplicationEventPublisher eventPublisher;
 
   @Override
   @Transactional
@@ -43,6 +46,8 @@ public class ClothesAttributeDefServiceImpl implements ClothesAttributeDefServic
     try {
       // UNIQUE 제약을 즉시 확인해 추가 조회 없이 동시 등록까지 동일하게 처리한다.
       ClothesAttributeDef saved = clothesAttributeDefRepository.saveAndFlush(definition);
+      // 커밋 후 전체 사용자에게 알림
+      eventPublisher.publishEvent(new ClothesAttributeDefCreatedEvent(saved.getId(), saved.getName()));
       return toResult(saved);
 
     } catch (DataIntegrityViolationException exception) {

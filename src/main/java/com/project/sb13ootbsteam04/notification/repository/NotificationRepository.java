@@ -47,4 +47,7 @@ public interface NotificationRepository extends JpaRepository<Notification, UUID
 
   // 수신자의 전체 알림 개수
   long countByReceiver_Id(UUID receiverId);
+
+  // 같은 내용의 알림이 이미 있는지 확인 (날씨 변화 중복 방지)
+  boolean existsByReceiver_IdAndContent(UUID receiverId, String content);
 }
