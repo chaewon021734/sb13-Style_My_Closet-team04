@@ -102,7 +102,7 @@ class FeedLikeServiceTest {
     }
 
     @Test
-    void 이미_좋아요를_누른_피드이면_예외() {
+    void 이미_좋아요를_누른_피드이면_저장하지_않고_성공() {
         Feed feed = mock(Feed.class);
 
         when(feedRepository.findById(feedId))
@@ -112,14 +112,9 @@ class FeedLikeServiceTest {
                 feedId, userId
         )).thenReturn(true);
 
-        IllegalStateException exception = assertThrows(
-                IllegalStateException.class,
+        // 연속 요청에도 오류 없이 같은 결과 유지
+        assertDoesNotThrow(
                 () -> feedLikeService.likeFeed(feedId, userId)
-        );
-
-        assertEquals(
-                "이미 좋아요를 누른 피드입니다.",
-                exception.getMessage()
         );
 
         verify(feedLikeRepository, never())
