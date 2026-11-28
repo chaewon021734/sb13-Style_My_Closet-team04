@@ -100,7 +100,7 @@ class ClothesControllerTest {
     MockMultipartFile imagePart = pngImagePart();
     given(clothesService.create(any(ClothesCreateCommand.class))).willReturn(result);
 
-    mockMvc.perform(multipart("/api/clothes").file(requestPart).file(imagePart))
+    mockMvc.perform(multipart("/api/clothes").file(requestPart).file(imagePart).principal(login(ownerId)))
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.id").value(clothesId.toString()))
         .andExpect(jsonPath("$.ownerId").value(ownerId.toString()))
@@ -114,6 +114,33 @@ class ClothesControllerTest {
 
     assertThat(captor.getValue().image()).isNotNull();
     assertThat(captor.getValue().image().contentType()).isEqualTo("image/png");
+  }
+
+  @Test
+  @DisplayName("다른 사용자의 옷장에 의상을 등록하면 403을 반환한다")
+  void 다른_소유자로_등록_거부() throws Exception {
+
+    UUID ownerId = UUID.randomUUID();
+    UUID actorId = UUID.randomUUID();
+    ClothesCreateRequest request = new ClothesCreateRequest(ownerId, "셔츠", ClothesType.TOP, List.of());
+
+    mockMvc.perform(multipart("/api/clothes").file(requestPart(request)).principal(login(actorId)))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.message").value("의상 소유자만 이 작업을 수행할 수 있습니다"));
+
+    then(clothesService).shouldHaveNoInteractions();
+  }
+
+  @Test
+  @DisplayName("로그인 정보 없이 의상을 등록하면 401을 반환한다")
+  void 인증_없이_등록_거부() throws Exception {
+
+    ClothesCreateRequest request = new ClothesCreateRequest(UUID.randomUUID(), "셔츠", ClothesType.TOP, List.of());
+
+    mockMvc.perform(multipart("/api/clothes").file(requestPart(request)))
+        .andExpect(status().isUnauthorized());
+
+    then(clothesService).shouldHaveNoInteractions();
   }
 
   @Test
@@ -133,7 +160,8 @@ class ClothesControllerTest {
 
     mockMvc.perform(multipart("/api/clothes")
             .file(requestPart(request))
-            .file(pngImagePart()))
+            .file(pngImagePart())
+            .principal(login(ownerId)))
         .andExpect(status().isInternalServerError())
         .andExpect(jsonPath("$.exceptionName").value("ClothesImageStorageException"))
         .andExpect(jsonPath("$.message").value("의상 이미지를 저장하지 못했습니다"))
@@ -224,7 +252,7 @@ class ClothesControllerTest {
     MockMultipartFile requestPart = requestPart(request);
     MockMultipartFile imagePart = new MockMultipartFile("image", "fake.png", MediaType.IMAGE_PNG_VALUE, "not-png".getBytes());
 
-    mockMvc.perform(multipart("/api/clothes").file(requestPart).file(imagePart))
+    mockMvc.perform(multipart("/api/clothes").file(requestPart).file(imagePart).principal(login(ownerId)))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.exceptionName").value("InvalidClothesImageException"))
         .andExpect(jsonPath("$.details.image").exists());
