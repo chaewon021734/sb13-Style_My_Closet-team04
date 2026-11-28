@@ -11,7 +11,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.function.Function;
@@ -43,12 +45,28 @@ public class WeatherForecastService {
             return 0;
         }
 
-        var forecastTimes = newForecasts.stream().map(Weather::getForecastAt).toList();
-        var previousByTime = weathers.findLatestPreviousForecasts(locationId, forecastTimes, issue).stream()
-                .collect(Collectors.toMap(Weather::getForecastAt, Function.identity()));
+        var previousByTime = findLatestPreviousForecastsByTime(locationId, issue, newForecasts);
         var savedForecasts = weathers.saveAll(newForecasts);
-        savedForecasts.forEach(current -> publishChange(previousByTime.get(current.getForecastAt()), current));
+        publishDetectedChanges(previousByTime, savedForecasts);
         return savedForecasts.size();
+    }
+
+    private Map<Instant, Weather> findLatestPreviousForecastsByTime(
+            UUID locationId,
+            Instant issue,
+            List<Weather> newForecasts
+    ) {
+        var forecastTimes = newForecasts.stream().map(Weather::getForecastAt).toList();
+        return weathers.findLatestPreviousForecasts(locationId, forecastTimes, issue).stream()
+                .collect(Collectors.toMap(Weather::getForecastAt, Function.identity()));
+    }
+
+    private void publishDetectedChanges(
+            Map<Instant, Weather> previousByTime,
+            List<Weather> currentForecasts
+    ) {
+        currentForecasts.forEach(current ->
+                publishChange(previousByTime.get(current.getForecastAt()), current));
     }
 
     private void publishChange(Weather previous, Weather current) {

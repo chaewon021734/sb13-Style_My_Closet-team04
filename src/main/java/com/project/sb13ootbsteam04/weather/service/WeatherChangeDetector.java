@@ -20,18 +20,30 @@ public class WeatherChangeDetector {
         Objects.requireNonNull(current, "현재 날씨는 필수입니다.");
 
         var changes = EnumSet.noneOf(WeatherChangeType.class);
-        if (previous.getPrecipitationType() == PrecipitationType.NONE
-                && current.getPrecipitationType() != PrecipitationType.NONE) {
+        if (isPrecipitationStarting(previous, current)) {
             changes.add(WeatherChangeType.PRECIPITATION_STARTED);
         }
-        if (previous.getWindSpeedAsWord() != WindStrength.STRONG
-                && current.getWindSpeedAsWord() == WindStrength.STRONG) {
+        if (isStrongWindStarting(previous, current)) {
             changes.add(WeatherChangeType.STRONG_WIND_STARTED);
         }
-        if (Math.abs(current.getTemperatureCurrent() - previous.getTemperatureCurrent())
-                >= SIGNIFICANT_TEMPERATURE_CHANGE_CELSIUS) {
+        if (isTemperatureChangeSignificant(previous, current)) {
             changes.add(WeatherChangeType.TEMPERATURE_CHANGED_SIGNIFICANTLY);
         }
         return Set.copyOf(changes);
+    }
+
+    private boolean isPrecipitationStarting(Weather previous, Weather current) {
+        return previous.getPrecipitationType() == PrecipitationType.NONE
+                && current.getPrecipitationType() != PrecipitationType.NONE;
+    }
+
+    private boolean isStrongWindStarting(Weather previous, Weather current) {
+        return previous.getWindSpeedAsWord() != WindStrength.STRONG
+                && current.getWindSpeedAsWord() == WindStrength.STRONG;
+    }
+
+    private boolean isTemperatureChangeSignificant(Weather previous, Weather current) {
+        return Math.abs(current.getTemperatureCurrent() - previous.getTemperatureCurrent())
+                >= SIGNIFICANT_TEMPERATURE_CHANGE_CELSIUS;
     }
 }
