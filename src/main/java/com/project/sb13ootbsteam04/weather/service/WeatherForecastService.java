@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -46,9 +47,29 @@ public class WeatherForecastService {
         }
 
         var previousByTime = findLatestPreviousForecastsByTime(locationId, issue, newForecasts);
+        compareWithDayBefore(locationId, issue, forecasts, newForecasts);
         var savedForecasts = weathers.saveAll(newForecasts);
         publishDetectedChanges(previousByTime, savedForecasts);
         return savedForecasts.size();
+    }
+
+    // 하루 전 같은 시각 예보: 이번 발표 안에서 먼저 찾고, 없으면 이전 발표의 가장 최근 예보
+    private void compareWithDayBefore(UUID locationId, Instant issue, List<Weather> issueForecasts,
+                                      List<Weather> newForecasts) {
+        var thisIssueByTime = issueForecasts.stream()
+                .collect(Collectors.toMap(Weather::getForecastAt, Function.identity()));
+        var missingTimes = newForecasts.stream()
+                .map(forecast -> forecast.getForecastAt().minus(Duration.ofDays(1)))
+                .filter(time -> !thisIssueByTime.containsKey(time))
+                .toList();
+        var previousIssueByTime = missingTimes.isEmpty()
+                ? Map.<Instant, Weather>of()
+                : weathers.findLatestPreviousForecasts(locationId, missingTimes, issue).stream()
+                        .collect(Collectors.toMap(Weather::getForecastAt, Function.identity()));
+        newForecasts.forEach(forecast -> {
+            var dayBefore = forecast.getForecastAt().minus(Duration.ofDays(1));
+            forecast.compareWithDayBefore(thisIssueByTime.getOrDefault(dayBefore, previousIssueByTime.get(dayBefore)));
+        });
     }
 
     private Map<Instant, Weather> findLatestPreviousForecastsByTime(
