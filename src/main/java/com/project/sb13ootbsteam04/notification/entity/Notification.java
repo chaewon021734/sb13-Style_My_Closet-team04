@@ -6,6 +6,8 @@ import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.OnDelete;
+import org.hibernate.annotations.OnDeleteAction;
 
 @Entity
 @Table(name = "notifications")
@@ -13,8 +15,10 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Notification extends CreatedAtEntity {
 
+  // 사용자가 삭제되면 알림도 함께 삭제 (V16 마이그레이션의 ON DELETE CASCADE와 동일)
   @ManyToOne(fetch = FetchType.LAZY, optional = false)
   @JoinColumn(name = "receiver_id", nullable = false)
+  @OnDelete(action = OnDeleteAction.CASCADE)
   private User receiver;
 
   @Column(name = "title", nullable = false, length = 100)
