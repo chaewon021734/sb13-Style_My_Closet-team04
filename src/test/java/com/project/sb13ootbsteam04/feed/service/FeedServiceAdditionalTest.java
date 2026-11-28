@@ -6,6 +6,7 @@ import com.project.sb13ootbsteam04.feed.repository.*;
 import com.project.sb13ootbsteam04.clothes.entity.*;
 import com.project.sb13ootbsteam04.clothes.repository.*;
 import com.project.sb13ootbsteam04.user.repository.*;
+import com.project.sb13ootbsteam04.user.entity.User;
 import com.project.sb13ootbsteam04.weather.entity.*;
 import com.project.sb13ootbsteam04.weather.repository.*;
 import org.springframework.data.domain.PageRequest;
@@ -76,7 +77,11 @@ class FeedServiceAdditionalTest {
     void createDeduplicatesClothes() {
         when(weatherRepository.existsById(weather)).thenReturn(true);
         when(userRepository.existsById(user)).thenReturn(true);
-        when(clothesRepository.findAllById(List.of(clothes))).thenReturn(List.of(mock(Clothes.class)));
+        Clothes ownedClothes = mock(Clothes.class);
+        User owner = mock(User.class);
+        when(ownedClothes.getOwner()).thenReturn(owner);
+        when(owner.getId()).thenReturn(user);
+        when(clothesRepository.findAllById(List.of(clothes))).thenReturn(List.of(ownedClothes));
         Feed saved = mock(Feed.class);
         when(saved.getId()).thenReturn(id);
         when(feedRepository.save(any(Feed.class))).thenReturn(saved);
