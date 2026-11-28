@@ -40,6 +40,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
@@ -77,6 +78,19 @@ class NotificationEventListenerTest {
     }
 
     @Test
+    @DisplayName("알림 문구는 프론트 아이콘 판별 순서(메시지·속성·피드·좋아요·권한)에 맞는 단어를 쓴다")
+    void usesKeywordsMatchingFrontendIcons() {
+        givenName(actorId, "홍길동");
+
+        listener.handle(new FeedLikedEvent(UUID.randomUUID(), receiverId, actorId));
+
+        // 좋아요 알림에 '피드'가 들어가면 좋아요 대신 피드 아이콘이 표시된다
+        verify(notificationService).create(eq(receiverId), eq("새 좋아요"),
+                argThat(content -> !content.contains("피드") && !content.contains("속성")
+                        && !content.contains("메시지")), eq(NotificationLevel.INFO));
+    }
+
+    @Test
     @DisplayName("다른 사용자가 내 피드에 좋아요하면 피드 작성자에게 알림, 본인 좋아요는 제외")
     void notifiesFeedAuthorOnLike() {
         givenName(actorId, "홍길동");
@@ -85,7 +99,7 @@ class NotificationEventListenerTest {
         listener.handle(new FeedLikedEvent(UUID.randomUUID(), actorId, actorId));
 
         verify(notificationService).create(receiverId, "새 좋아요",
-                "홍길동님이 회원님의 피드를 좋아합니다.", NotificationLevel.INFO);
+                "홍길동님이 회원님의 게시물을 좋아합니다.", NotificationLevel.INFO);
         verify(notificationService, never()).create(eq(actorId), anyString(), anyString(), any());
     }
 
