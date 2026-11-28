@@ -9,6 +9,8 @@ import com.project.sb13ootbsteam04.weather.entity.Weather;
 import com.project.sb13ootbsteam04.weather.entity.WeatherLocation;
 import com.project.sb13ootbsteam04.weather.entity.WindStrength;
 import com.project.sb13ootbsteam04.weather.exception.WeatherForecastException;
+import com.project.sb13ootbsteam04.weather.event.WeatherChangeDetectedEvent;
+import com.project.sb13ootbsteam04.weather.event.WeatherChangeType;
 import com.project.sb13ootbsteam04.weather.repository.WeatherLocationRepository;
 import com.project.sb13ootbsteam04.weather.repository.WeatherRepository;
 import jakarta.persistence.EntityManager;
@@ -18,6 +20,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.context.annotation.Import;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.ActiveProfiles;
 
 import java.time.Instant;
@@ -28,11 +32,15 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 @DataJpaTest
 @ActiveProfiles("test")
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import({JpaAuditingConfig.class, WeatherForecastService.class, KmaForecastMapper.class})
+@Import({JpaAuditingConfig.class, WeatherForecastService.class, KmaForecastMapper.class,
+        WeatherChangeDetector.class})
 class WeatherForecastServiceTest {
 
     private static final Instant ISSUE = Instant.parse("2026-11-09T02:00:00Z");
@@ -43,6 +51,7 @@ class WeatherForecastServiceTest {
     @Autowired private WeatherLocationRepository locations;
     @Autowired private WeatherRepository weathers;
     @Autowired private EntityManager entityManager;
+    @MockitoBean private ApplicationEventPublisher eventPublisher;
 
     private UUID locationId;
 
@@ -138,6 +147,30 @@ class WeatherForecastServiceTest {
         assertThat(afterMidnight.getWindSpeedRaw()).isEqualTo("2");
         assertThat(afterMidnight.getWindSpeed()).isNull();
         assertThat(afterMidnight.getWindSpeedAsWord()).isEqualTo(WindStrength.MODERATE);
+    }
+
+    @Test
+    void publishesDetectedChangesAgainstTheLatestPreviousIssueForTheSameTarget() {
+        assertThat(service.saveForecast(locationId, slot("1100", "1600", DRY))).isEqualTo(1);
+        verifyNoInteractions(eventPublisher);
+        reset(eventPublisher);
+
+        var changed = Map.of(
+                "SKY", "4", "PTY", "1", "PCP", "2.0mm", "POP", "80", "REH", "75",
+                "TMP", "17", "WSD", "10.0");
+
+        assertThat(service.saveForecast(locationId, slot("1400", "1600", changed))).isEqualTo(1);
+
+        var eventCaptor = org.mockito.ArgumentCaptor.forClass(WeatherChangeDetectedEvent.class);
+        verify(eventPublisher).publishEvent(eventCaptor.capture());
+        assertThat(eventCaptor.getValue().locationId()).isEqualTo(locationId);
+        assertThat(eventCaptor.getValue().forecastAt()).isEqualTo(Instant.parse("2026-11-09T07:00:00Z"));
+        assertThat(eventCaptor.getValue().previousWeatherId()).isNotNull();
+        assertThat(eventCaptor.getValue().currentWeatherId()).isNotNull();
+        assertThat(eventCaptor.getValue().changes()).containsExactlyInAnyOrder(
+                WeatherChangeType.PRECIPITATION_STARTED,
+                WeatherChangeType.STRONG_WIND_STARTED,
+                WeatherChangeType.TEMPERATURE_CHANGED_SIGNIFICANTLY);
     }
 
     private List<KmaForecastItem> slot(String baseTime, String forecastTime, Map<String, String> values) {
