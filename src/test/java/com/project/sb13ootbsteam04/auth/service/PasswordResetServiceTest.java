@@ -65,7 +65,7 @@ class PasswordResetServiceTest {
         when(passwordEncoder.encode(NEW_PASSWORD))
                 .thenReturn(ENCODED_PASSWORD);
 
-        passwordResetService.resetPassword(userId, NEW_PASSWORD);
+        passwordResetService.resetPassword(userId, NEW_PASSWORD, user.getLoginVersion());
 
         assertEquals(ENCODED_PASSWORD, user.getPassword());
         assertNull(user.getTemporaryPasswordHash());
@@ -90,7 +90,7 @@ class PasswordResetServiceTest {
                 BadCredentialsException.class,
                 () -> passwordResetService.resetPassword(
                         userId,
-                        NEW_PASSWORD
+                        NEW_PASSWORD, user.getLoginVersion()
                 )
         );
 
@@ -117,7 +117,7 @@ class PasswordResetServiceTest {
                 BadCredentialsException.class,
                 () -> passwordResetService.resetPassword(
                         userId,
-                        NEW_PASSWORD
+                        NEW_PASSWORD, user.getLoginVersion()
                 )
         );
 
@@ -141,7 +141,7 @@ class PasswordResetServiceTest {
                 BadCredentialsException.class,
                 () -> passwordResetService.resetPassword(
                         userId,
-                        NEW_PASSWORD
+                        NEW_PASSWORD, user.getLoginVersion()
                 )
         );
 
@@ -159,7 +159,7 @@ class PasswordResetServiceTest {
                 BadCredentialsException.class,
                 () -> passwordResetService.resetPassword(
                         userId,
-                        NEW_PASSWORD
+                        NEW_PASSWORD, user.getLoginVersion()
                 )
         );
 
@@ -176,7 +176,7 @@ class PasswordResetServiceTest {
                 IllegalArgumentException.class,
                 () -> passwordResetService.resetPassword(
                         userId,
-                        " "
+                        " ", user.getLoginVersion()
                 )
         );
 
@@ -192,7 +192,7 @@ class PasswordResetServiceTest {
         when(passwordEncoder.encode(NEW_PASSWORD))
                 .thenReturn(ENCODED_PASSWORD);
 
-        passwordResetService.resetPassword(userId, NEW_PASSWORD);
+        passwordResetService.resetPassword(userId, NEW_PASSWORD, user.getLoginVersion());
 
         assertFalse(
                 user.isTemporaryPasswordActive(Instant.now())
@@ -201,6 +201,42 @@ class PasswordResetServiceTest {
         assertEquals(ENCODED_PASSWORD, user.getPassword());
         assertNull(user.getTemporaryPasswordHash());
         assertNull(user.getTemporaryPasswordExpiresAt());
+    }
+
+    @Test
+    void shouldRejectMismatchedLoginVersion() {
+        givenActiveTemporaryPassword();
+        long version = user.getLoginVersion();
+        assertThrows(BadCredentialsException.class,
+                () -> passwordResetService.resetPassword(userId, NEW_PASSWORD, version + 1));
+        assertEquals(version, user.getLoginVersion());
+        assertEquals("encodedOldPassword", user.getPassword());
+        verifyNoInteractions(passwordEncoder);
+    }
+
+    @Test
+    void shouldRejectOldVersionAfterTemporaryPasswordReissue() {
+        givenActiveTemporaryPassword();
+        long oldVersion = user.getLoginVersion();
+        user.issueTemporaryPassword("newTemporaryHash", Instant.now().plusSeconds(180));
+        assertThrows(BadCredentialsException.class,
+                () -> passwordResetService.resetPassword(userId, NEW_PASSWORD, oldVersion));
+        assertEquals("newTemporaryHash", user.getTemporaryPasswordHash());
+        assertEquals("encodedOldPassword", user.getPassword());
+        verifyNoInteractions(passwordEncoder);
+    }
+
+    @Test
+    void shouldRejectReusingVersionAfterSuccessfulReset() {
+        givenActiveTemporaryPassword();
+        long version = user.getLoginVersion();
+        when(passwordEncoder.encode(NEW_PASSWORD)).thenReturn(ENCODED_PASSWORD);
+        passwordResetService.resetPassword(userId, NEW_PASSWORD, version);
+        assertThrows(BadCredentialsException.class,
+                () -> passwordResetService.resetPassword(userId, "AnotherPassword123!", version));
+        assertEquals(ENCODED_PASSWORD, user.getPassword());
+        assertEquals(version + 1, user.getLoginVersion());
+        verify(passwordEncoder, times(1)).encode(anyString());
     }
 
     private void givenActiveTemporaryPassword() {

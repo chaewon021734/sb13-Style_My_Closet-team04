@@ -126,17 +126,21 @@ public class SecurityConfig {
                                 "/api/auth/csrf-token"
                         ).permitAll()
 
-                        // PR C - 임시 비밀번호 발급
+                        // PR C - 임시 비밀번호 발급 및 프론트엔드 호환 API
+                        // 비인증 접근 허용, CSRF 및 요청 횟수 제한 유지
                         .requestMatchers(
                                 HttpMethod.POST,
-                                "/api/auth/temporary-password"
+                                "/api/auth/temporary-password",
+                                "/api/auth/reset-password"
                         ).permitAll()
 
-                        // PR C - 비밀번호 재설정
+                        // PR C - 비밀번호 재설정 및 프론트엔드 호환 API
                         // 임시 JWT에만 부여되는 권한
+                        // 사용자 ID 일치 여부는 Controller에서 추가 검증
                         .requestMatchers(
                                 HttpMethod.PATCH,
-                                "/api/auth/password"
+                                "/api/auth/password",
+                                "/api/users/*/password"
                         ).hasAuthority("PASSWORD_RESET")
 
                         // PR B - 관리자 API

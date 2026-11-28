@@ -3,15 +3,20 @@ package com.project.sb13ootbsteam04.weather.service;
 import com.project.sb13ootbsteam04.weather.dto.KmaForecastItem;
 import com.project.sb13ootbsteam04.weather.entity.Weather;
 import com.project.sb13ootbsteam04.weather.exception.WeatherForecastException;
+import com.project.sb13ootbsteam04.weather.event.WeatherChangeDetectedEvent;
+import com.project.sb13ootbsteam04.weather.event.WeatherChangeEventPublisher;
 import com.project.sb13ootbsteam04.weather.repository.WeatherLocationRepository;
 import com.project.sb13ootbsteam04.weather.repository.WeatherRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.util.function.Function;
 
 import static com.project.sb13ootbsteam04.global.exception.ErrorCode.WEATHER_FORECAST_LOCATION_NOT_FOUND;
 
@@ -22,6 +27,8 @@ public class WeatherForecastService {
     private final WeatherLocationRepository locations;
     private final WeatherRepository weathers;
     private final KmaForecastMapper mapper;
+    private final WeatherChangeDetector changeDetector;
+    private final WeatherChangeEventPublisher changeEventPublisher;
 
     @Transactional
     public int saveForecast(UUID locationId, List<KmaForecastItem> items) {
@@ -34,6 +41,47 @@ public class WeatherForecastService {
                 .stream().map(Weather::getForecastAt).collect(Collectors.toSet());
         var newForecasts = forecasts.stream().filter(forecast -> !existingTimes.contains(forecast.getForecastAt()))
                 .toList();
-        return weathers.saveAll(newForecasts).size();
+        if (newForecasts.isEmpty()) {
+            return 0;
+        }
+
+        var previousByTime = findLatestPreviousForecastsByTime(locationId, issue, newForecasts);
+        var savedForecasts = weathers.saveAll(newForecasts);
+        publishDetectedChanges(previousByTime, savedForecasts);
+        return savedForecasts.size();
+    }
+
+    private Map<Instant, Weather> findLatestPreviousForecastsByTime(
+            UUID locationId,
+            Instant issue,
+            List<Weather> newForecasts
+    ) {
+        var forecastTimes = newForecasts.stream().map(Weather::getForecastAt).toList();
+        return weathers.findLatestPreviousForecasts(locationId, forecastTimes, issue).stream()
+                .collect(Collectors.toMap(Weather::getForecastAt, Function.identity()));
+    }
+
+    private void publishDetectedChanges(
+            Map<Instant, Weather> previousByTime,
+            List<Weather> currentForecasts
+    ) {
+        currentForecasts.forEach(current ->
+                publishChange(previousByTime.get(current.getForecastAt()), current));
+    }
+
+    private void publishChange(Weather previous, Weather current) {
+        if (previous == null) {
+            return;
+        }
+        var changes = changeDetector.detect(previous, current);
+        if (changes.isEmpty()) {
+            return;
+        }
+        changeEventPublisher.publish(new WeatherChangeDetectedEvent(
+                current.getLocationId(),
+                previous.getId(),
+                current.getId(),
+                current.getForecastAt(),
+                changes));
     }
 }

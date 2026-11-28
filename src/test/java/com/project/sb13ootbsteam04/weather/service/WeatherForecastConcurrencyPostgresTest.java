@@ -3,6 +3,7 @@ package com.project.sb13ootbsteam04.weather.service;
 import com.project.sb13ootbsteam04.global.config.JpaAuditingConfig;
 import com.project.sb13ootbsteam04.weather.dto.KmaForecastItem;
 import com.project.sb13ootbsteam04.weather.entity.WeatherLocation;
+import com.project.sb13ootbsteam04.weather.event.WeatherChangeEventPublisher;
 import com.project.sb13ootbsteam04.weather.repository.WeatherLocationRepository;
 import com.project.sb13ootbsteam04.weather.repository.WeatherRepository;
 
@@ -17,6 +18,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.transaction.TestTransaction;
 
 import java.time.Instant;
@@ -37,7 +39,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 @Import({
         JpaAuditingConfig.class,
         WeatherForecastService.class,
-        KmaForecastMapper.class
+        KmaForecastMapper.class,
+        WeatherChangeDetector.class
 })
 @EnabledIfEnvironmentVariable(
         named = "OTBOO_POSTGRES_TEST",
@@ -136,6 +139,9 @@ class WeatherForecastConcurrencyPostgresTest {
 
     @Autowired
     private WeatherRepository weathers;
+
+    @MockitoBean
+    private WeatherChangeEventPublisher changeEventPublisher;
 
     private UUID locationId;
 

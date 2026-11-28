@@ -6,6 +6,7 @@ import com.project.sb13ootbsteam04.weather.controller.WeatherController;
 import com.project.sb13ootbsteam04.weather.dto.KmaForecastItem;
 import com.project.sb13ootbsteam04.weather.entity.WeatherLocation;
 import com.project.sb13ootbsteam04.weather.entity.WeatherLocationName;
+import com.project.sb13ootbsteam04.weather.event.WeatherChangeEventPublisher;
 import com.project.sb13ootbsteam04.weather.repository.WeatherLocationNameRepository;
 import com.project.sb13ootbsteam04.weather.repository.WeatherLocationRepository;
 import com.project.sb13ootbsteam04.weather.repository.WeatherRepository;
@@ -32,7 +33,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import({JpaAuditingConfig.class, WeatherController.class, WeatherGridConverter.class,
-        WeatherForecastService.class, KmaForecastMapper.class, WeatherQueryService.class})
+        WeatherForecastService.class, KmaForecastMapper.class, WeatherChangeDetector.class,
+        WeatherQueryService.class})
 class WeatherQueryIntegrationTest {
 
     @Autowired private WeatherController controller;
@@ -41,6 +43,7 @@ class WeatherQueryIntegrationTest {
     @Autowired private WeatherRepository weathers;
     @Autowired private WeatherForecastService forecastService;
     @MockitoBean private WeatherLocationService locationService;
+    @MockitoBean private WeatherChangeEventPublisher changeEventPublisher;
 
     private MockMvc mvc;
 

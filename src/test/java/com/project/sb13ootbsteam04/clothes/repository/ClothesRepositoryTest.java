@@ -242,6 +242,33 @@ class ClothesRepositoryTest {
     );
   }
 
+  @Test
+  @DisplayName("추천용 의상 조회는 소유자의 의상과 속성 정의를 함께 반환한다")
+  void 추천용_소유자_의상과_속성_조회() {
+    User owner = userRepository.saveAndFlush(
+        new User("추천 사용자", "recommendation@test.com", "Test1234!@"));
+    User anotherOwner = userRepository.saveAndFlush(
+        new User("다른 사용자", "other-recommendation@test.com", "Test1234!@"));
+    ClothesAttributeDef season = clothesAttributeDefRepository.saveAndFlush(
+        ClothesAttributeDef.create("계절", List.of("여름", "겨울")));
+    Clothes winterTop = Clothes.create(owner, "겨울 상의", ClothesType.TOP);
+    ClothesAttribute.create(winterTop, season, "겨울");
+    clothesRepository.saveAndFlush(winterTop);
+    clothesRepository.saveAndFlush(Clothes.create(anotherOwner, "다른 사용자 상의", ClothesType.TOP));
+    entityManager.clear();
+
+    List<Clothes> result = clothesRepository.findAllWithAttributesByOwnerId(owner.getId());
+    entityManager.clear();
+
+    assertThat(result).singleElement().satisfies(found -> {
+      assertThat(found.getId()).isEqualTo(winterTop.getId());
+      assertThat(found.getAttributes()).singleElement().satisfies(attribute -> {
+        assertThat(attribute.getDefinition().getName()).isEqualTo("계절");
+        assertThat(attribute.getValue()).isEqualTo("겨울");
+      });
+    });
+  }
+
   private Clothes saveClothes(User owner, String name, ClothesType type) {
     return clothesRepository.saveAndFlush(Clothes.create(owner, name, type));
   }
