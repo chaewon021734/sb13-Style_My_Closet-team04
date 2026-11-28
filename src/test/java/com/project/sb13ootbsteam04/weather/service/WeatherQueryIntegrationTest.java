@@ -44,6 +44,8 @@ class WeatherQueryIntegrationTest {
     @Autowired private WeatherForecastService forecastService;
     @MockitoBean private WeatherLocationService locationService;
     @MockitoBean private WeatherChangeEventPublisher changeEventPublisher;
+    // 저장된 예보 조회만 검증하므로 외부 API 수집은 대체한다
+    @MockitoBean private WeatherForecastInitializer forecastInitializer;
 
     private MockMvc mvc;
 
@@ -71,9 +73,9 @@ class WeatherQueryIntegrationTest {
 
         mvc.perform(get("/api/weathers").param("latitude", "37.5665").param("longitude", "126.978"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(2))
+                // 같은 날짜의 시간별 예보는 가장 이른 예보 하나로 응답한다
+                .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].id").value(saved.get(0).getId().toString()))
-                .andExpect(jsonPath("$[1].id").value(saved.get(1).getId().toString()))
                 .andExpect(jsonPath("$[0].forecastedAt").value("2026-11-09T02:00:00Z"))
                 .andExpect(jsonPath("$[0].forecastAt").value("2026-11-09T05:00:00Z"))
                 .andExpect(jsonPath("$[0].location.latitude").value(37.567))
@@ -88,10 +90,41 @@ class WeatherQueryIntegrationTest {
                 .andExpect(jsonPath("$[0].precipitation.probability").value(0.2))
                 .andExpect(jsonPath("$[0].humidity.current").value(60.0))
                 .andExpect(jsonPath("$[0].temperature.current").value(12.0))
-                .andExpect(jsonPath("$[0].temperature.min").doesNotHaveJsonPath())
+                // 최저·최고 예보가 없으면 그날 시간별 기온 범위로 채운다
+                .andExpect(jsonPath("$[0].temperature.min").value(12.0))
+                .andExpect(jsonPath("$[0].temperature.max").value(12.0))
                 .andExpect(jsonPath("$[0].windSpeed.speed").value(1.2))
                 .andExpect(jsonPath("$[0].windSpeed.asWord").value("WEAK"));
         verifyNoInteractions(locationService);
+    }
+
+    @Test
+    void returnsOneForecastPerDayWithDailyTemperatureRange() throws Exception {
+        var location = locations.saveAndFlush(new WeatherLocation(37.5665, 126.978, 60, 127));
+        names.save(new WeatherLocationName(location.getId(), 0, "서울특별시"));
+        var items = new ArrayList<KmaForecastItem>();
+        items.addAll(slot(location, "20261109", "0300", "5", Map.of()));
+        items.addAll(slot(location, "20261109", "1500", "13", Map.of("TMX", "15.0")));
+        items.addAll(slot(location, "20261110", "0600", "2", Map.of("TMN", "3.0")));
+        items.addAll(slot(location, "20261110", "1100", "9", Map.of()));
+        items.addAll(slot(location, "20261110", "1300", "11", Map.of()));
+        items.addAll(slot(location, "20261110", "1500", "13", Map.of("TMX", "14.0")));
+        // 예보 범위 끝의 자정 자료만 있는 날은 하루 칸으로 쓰지 않는다
+        items.addAll(slot(location, "20261111", "0000", "7", Map.of()));
+        forecastService.saveForecast(location.getId(), items);
+
+        mvc.perform(get("/api/weathers").param("latitude", "37.5665").param("longitude", "126.978"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                // 첫날은 가장 가까운 예보, 이후 날짜는 정오에 가장 가까운 예보
+                .andExpect(jsonPath("$[0].forecastAt").value("2026-11-08T18:00:00Z"))
+                .andExpect(jsonPath("$[0].temperature.current").value(5.0))
+                .andExpect(jsonPath("$[0].temperature.min").value(5.0))
+                .andExpect(jsonPath("$[0].temperature.max").value(15.0))
+                .andExpect(jsonPath("$[1].forecastAt").value("2026-11-10T02:00:00Z"))
+                .andExpect(jsonPath("$[1].temperature.current").value(9.0))
+                .andExpect(jsonPath("$[1].temperature.min").value(3.0))
+                .andExpect(jsonPath("$[1].temperature.max").value(14.0));
     }
 
     @Test
@@ -112,6 +145,16 @@ class WeatherQueryIntegrationTest {
             mvc.perform(get("/api/weathers").param("latitude", latitude).param("longitude", "126.978"))
                     .andExpect(status().isBadRequest());
         }
+    }
+
+    private List<KmaForecastItem> slot(WeatherLocation location, String forecastDate, String forecastTime,
+                                       String temperature, Map<String, String> extra) {
+        var values = new java.util.HashMap<>(Map.of("SKY", "1", "PTY", "0", "PCP", "강수없음", "POP", "0",
+                "REH", "50", "TMP", temperature, "WSD", "1.0"));
+        values.putAll(extra);
+        return values.entrySet().stream().map(entry -> new KmaForecastItem("20261109", "0200", forecastDate,
+                        forecastTime, entry.getKey(), entry.getValue(), location.getGridX(), location.getGridY()))
+                .toList();
     }
 
     private List<KmaForecastItem> slot(WeatherLocation location, String issue, String forecastTime) {

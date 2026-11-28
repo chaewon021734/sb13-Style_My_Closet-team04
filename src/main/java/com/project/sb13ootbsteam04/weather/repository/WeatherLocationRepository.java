@@ -15,6 +15,8 @@ public interface WeatherLocationRepository extends JpaRepository<WeatherLocation
 
     List<WeatherLocation> findAllByOrderByIdAsc();
 
+    Optional<WeatherLocation> findFirstByGridXAndGridYOrderByCreatedAtAsc(int gridX, int gridY);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select location from WeatherLocation location where location.id = :id")
     Optional<WeatherLocation> findByIdForUpdate(@Param("id") UUID id);
