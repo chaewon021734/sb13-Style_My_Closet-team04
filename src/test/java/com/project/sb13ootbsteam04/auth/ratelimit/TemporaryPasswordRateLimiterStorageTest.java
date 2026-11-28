@@ -1,7 +1,7 @@
 package com.project.sb13ootbsteam04.auth.ratelimit;
 
 import com.project.sb13ootbsteam04.auth.exception.TemporaryPasswordRateLimitException;
-import com.project.sb13ootbsteam04.global.support.RedisTestSupport;
+import com.project.sb13ootbsteam04.global.support.RedisTestContainer;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -36,7 +36,7 @@ class TemporaryPasswordRateLimiterStorageTest {
 
         when(clock.instant()).thenReturn(INITIAL_TIME);
 
-        redisTemplate = RedisTestSupport.template();
+        redisTemplate = RedisTestContainer.template();
         rateLimiter = new TemporaryPasswordRateLimiter(redisTemplate, clock);
     }
 

@@ -1,7 +1,7 @@
 package com.project.sb13ootbsteam04.auth.ratelimit;
 
 import com.project.sb13ootbsteam04.auth.exception.TemporaryPasswordRateLimitException;
-import com.project.sb13ootbsteam04.global.support.RedisTestSupport;
+import com.project.sb13ootbsteam04.global.support.RedisTestContainer;
 import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 
@@ -45,7 +45,7 @@ class TemporaryPasswordRateLimiterTest {
         when(clock.instant()).thenReturn(INITIAL_TIME);
 
         // 여러 서버가 공유하는 Redis에 요청 기록을 저장
-        redisTemplate = RedisTestSupport.template();
+        redisTemplate = RedisTestContainer.template();
         rateLimiter = new TemporaryPasswordRateLimiter(redisTemplate, clock);
     }
 

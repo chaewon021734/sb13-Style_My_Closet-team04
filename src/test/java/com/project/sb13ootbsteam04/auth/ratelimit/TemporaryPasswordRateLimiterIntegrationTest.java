@@ -6,7 +6,7 @@ import com.project.sb13ootbsteam04.auth.service.TemporaryPasswordService;
 import com.project.sb13ootbsteam04.global.config.SecurityConfig;
 import com.project.sb13ootbsteam04.global.exception.GlobalExceptionHandler;
 import jakarta.servlet.http.Cookie;
-import com.project.sb13ootbsteam04.global.support.RedisTestSupport;
+import com.project.sb13ootbsteam04.global.support.RedisTestContainer;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -50,14 +50,14 @@ class TemporaryPasswordRateLimiterIntegrationTest {
     static class RedisConfig {
         @Bean
         StringRedisTemplate stringRedisTemplate() {
-            return RedisTestSupport.template();
+            return RedisTestContainer.template();
         }
     }
 
     // Docker가 없으면 컨텍스트를 띄우기 전에 건너뛴다
     @BeforeAll
     static void requireRedis() {
-        RedisTestSupport.template();
+        RedisTestContainer.template();
     }
     private Cookie csrfCookie;
 

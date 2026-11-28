@@ -9,14 +9,14 @@ import org.testcontainers.containers.GenericContainer;
 
 // 테스트 전체가 함께 쓰는 Redis 컨테이너
 // Docker를 사용할 수 없으면 Redis가 필요한 테스트만 건너뛴다.
-public final class RedisTestSupport {
+public final class RedisTestContainer {
 
     private static final int REDIS_PORT = 6379;
 
     private static GenericContainer<?> container;
     private static StringRedisTemplate template;
 
-    private RedisTestSupport() {
+    private RedisTestContainer() {
     }
 
     // 컨테이너에 연결된 템플릿 (테스트 사이 데이터는 비운다)
