@@ -48,4 +48,15 @@ public final class RedisTestContainer {
         });
         return template;
     }
+
+    // 스프링 컨텍스트를 테스트용 Redis에 연결할 때 사용 (spring.data.redis.host/port)
+    public static String host() {
+        template();
+        return container.getHost();
+    }
+
+    public static int port() {
+        template();
+        return container.getMappedPort(REDIS_PORT);
+    }
 }
