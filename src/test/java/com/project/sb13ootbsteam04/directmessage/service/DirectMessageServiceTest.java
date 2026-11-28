@@ -1,0 +1,129 @@
+
+package com.project.sb13ootbsteam04.directmessage.service;
+
+import com.project.sb13ootbsteam04.directmessage.repository.DirectMessageRepository;
+import com.project.sb13ootbsteam04.user.repository.ProfileRepository;
+import java.time.Instant;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Pageable;
+
+import static org.mockito.Mockito.verify;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.any;
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+@ExtendWith(MockitoExtension.class)
+class DirectMessageServiceTest {
+
+  @Mock
+  private DirectMessageRepository directMessageRepository;
+
+  @Mock
+  private ProfileRepository profileRepository;
+
+  @InjectMocks
+  private DirectMessageService directMessageService;
+
+  @Test
+  void getMessages_throwsException_whenLimitIsInvalid() {
+    UUID userId = UUID.randomUUID();
+    UUID targetUserId = UUID.randomUUID();
+
+    assertThatThrownBy(() ->
+        directMessageService.getMessages(
+            userId,
+            targetUserId,
+            null,
+            null,
+            0
+        )
+    ).isInstanceOf(IllegalArgumentException.class);
+  }
+
+  //
+  @Test
+  void getMessages_throwsException_whenCursorAndIdAfterAreNotBothPresent() {
+    UUID userId = UUID.randomUUID();
+    UUID targetUserId = UUID.randomUUID();
+
+    assertThatThrownBy(() ->
+        directMessageService.getMessages(
+            userId,
+            targetUserId,
+            "2026-11-25T10:00:00Z",
+            null,
+            10
+        )
+    ).isInstanceOf(IllegalArgumentException.class);
+  }
+
+  //
+  @Test
+  void getMessages_throwsException_whenCursorFormatIsInvalid() {
+    UUID userId = UUID.randomUUID();
+    UUID targetUserId = UUID.randomUUID();
+    UUID idAfter = UUID.randomUUID();
+
+    assertThatThrownBy(() ->
+        directMessageService.getMessages(
+            userId,
+            targetUserId,
+            "invalid-date",
+            idAfter,
+            10
+        )
+    ).isInstanceOf(IllegalArgumentException.class);
+  }
+
+  //
+  @Test
+  void getMessages_callsFindFirstPage_whenCursorIsNull() {
+    UUID userId = UUID.randomUUID();
+    UUID targetUserId = UUID.randomUUID();
+
+    directMessageService.getMessages(
+        userId,
+        targetUserId,
+        null,
+        null,
+        10
+    );
+
+    verify(directMessageRepository).findFirstPage(
+        eq(userId),
+        eq(targetUserId),
+        any(Pageable.class)
+    );
+  }
+
+  //
+  @Test
+  void getMessages_callsFindNextPage_whenCursorIsPresent() {
+    UUID userId = UUID.randomUUID();
+    UUID targetUserId = UUID.randomUUID();
+    UUID idAfter = UUID.randomUUID();
+    String cursor = "2026-11-25T10:00:00Z";
+
+    directMessageService.getMessages(
+        userId,
+        targetUserId,
+        cursor,
+        idAfter,
+        10
+    );
+
+    verify(directMessageRepository).findNextPage(
+        eq(userId),
+        eq(targetUserId),
+        eq(Instant.parse(cursor)),
+        eq(idAfter),
+        any(Pageable.class)
+    );
+  }
+}
