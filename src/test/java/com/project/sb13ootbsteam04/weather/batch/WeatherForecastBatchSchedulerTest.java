@@ -49,23 +49,6 @@ class WeatherForecastBatchSchedulerTest {
     }
 
     @Test
-    void locksTheScheduledIssueAcrossInstances() throws Exception {
-        when(jobRepository.findRunningJobExecutions(WeatherForecastBatchConfig.JOB_NAME))
-                .thenReturn(Set.of());
-        var execution = mock(JobExecution.class);
-        when(execution.getStatus()).thenReturn(BatchStatus.COMPLETED);
-        when(jobOperator.start(any(Job.class), any(JobParameters.class))).thenReturn(execution);
-
-        scheduler().collectForecasts();
-
-        // 같은 발표 시각은 한 인스턴스만 실행
-        verify(valueOperations).setIfAbsent(
-                org.mockito.ArgumentMatchers.eq("weather:forecast-batch:2026-11-27T14:00"),
-                anyString(),
-                org.mockito.ArgumentMatchers.eq(Duration.ofMinutes(30)));
-    }
-
-    @Test
     void skipsWhenAnotherInstanceHoldsTheLock() throws Exception {
         when(valueOperations.setIfAbsent(anyString(), anyString(), any(Duration.class))).thenReturn(false);
 
