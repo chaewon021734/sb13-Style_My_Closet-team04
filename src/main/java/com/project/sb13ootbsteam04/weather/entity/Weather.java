@@ -118,4 +118,13 @@ public class Weather extends BaseEntity {
         this.windSpeed = windSpeed;
         this.windSpeedAsWord = Objects.requireNonNull(windSpeedAsWord, "풍속 등급 필드는 필수입니다.");
     }
+
+    // 하루 전 같은 시각 예보와의 기온·습도 차이 (없으면 비워 둔다)
+    public void compareWithDayBefore(Weather dayBefore) {
+        if (dayBefore == null) {
+            return;
+        }
+        this.temperatureComparedToDayBefore = temperatureCurrent - dayBefore.getTemperatureCurrent();
+        this.humidityComparedToDayBefore = humidityCurrent - dayBefore.getHumidityCurrent();
+    }
 }
