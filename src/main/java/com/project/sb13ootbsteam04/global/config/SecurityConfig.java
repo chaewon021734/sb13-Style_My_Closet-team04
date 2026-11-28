@@ -95,6 +95,9 @@ public class SecurityConfig {
 
                         // 오류 경로
                         .requestMatchers("/error").permitAll()
+                        // ALB와 ECS가 토큰 없이 상태를 확인하는 두 경로만 허용한다.
+                        .requestMatchers(HttpMethod.GET, "/actuator/health/liveness",
+                                "/actuator/health/readiness").permitAll()
 
                         // Swagger UI 및 OpenAPI
                         .requestMatchers(
