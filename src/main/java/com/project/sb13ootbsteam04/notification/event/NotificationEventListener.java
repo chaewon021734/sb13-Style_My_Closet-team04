@@ -76,7 +76,7 @@ public class NotificationEventListener {
     notifySafely("좋아요", () -> notificationService.create(
         event.feedAuthorId(),
         "새 좋아요",
-        nameOf(event.likerId()) + "님이 회원님의 피드를 좋아합니다.",
+        nameOf(event.likerId()) + "님이 회원님의 게시물을 좋아합니다.",
         NotificationLevel.INFO
     ));
   }
