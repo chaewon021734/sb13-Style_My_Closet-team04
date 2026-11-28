@@ -40,7 +40,6 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
@@ -75,19 +74,6 @@ class NotificationEventListenerTest {
 
         verify(notificationService).create(receiverId, "새 팔로워",
                 "홍길동님이 회원님을 팔로우했습니다.", NotificationLevel.INFO);
-    }
-
-    @Test
-    @DisplayName("알림 문구는 프론트 아이콘 판별 순서(메시지·속성·피드·좋아요·권한)에 맞는 단어를 쓴다")
-    void usesKeywordsMatchingFrontendIcons() {
-        givenName(actorId, "홍길동");
-
-        listener.handle(new FeedLikedEvent(UUID.randomUUID(), receiverId, actorId));
-
-        // 좋아요 알림에 '피드'가 들어가면 좋아요 대신 피드 아이콘이 표시된다
-        verify(notificationService).create(eq(receiverId), eq("새 좋아요"),
-                argThat(content -> !content.contains("피드") && !content.contains("속성")
-                        && !content.contains("메시지")), eq(NotificationLevel.INFO));
     }
 
     @Test

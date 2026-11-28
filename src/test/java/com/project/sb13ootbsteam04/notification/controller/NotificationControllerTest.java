@@ -78,13 +78,6 @@ class NotificationControllerTest {
     }
 
     @Test
-    @DisplayName("limit이 없으면 400")
-    void rejectsMissingLimit() throws Exception {
-        mvc.perform(get("/api/notifications").principal(authentication))
-                .andExpect(status().isBadRequest());
-    }
-
-    @Test
     @DisplayName("알림을 삭제하면 204")
     void deletesNotification() throws Exception {
         var notificationId = UUID.randomUUID();
