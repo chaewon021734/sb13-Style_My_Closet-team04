@@ -1,5 +1,7 @@
 package com.project.sb13ootbsteam04.user.service;
 
+import com.project.sb13ootbsteam04.user.event.UserRoleChangedEvent;
+import org.springframework.context.ApplicationEventPublisher;
 import com.project.sb13ootbsteam04.global.exception.ErrorCode;
 import com.project.sb13ootbsteam04.user.dto.response.UserDto;
 import com.project.sb13ootbsteam04.user.entity.AdminOperationLock;
@@ -35,6 +37,9 @@ class AdminUserServiceTest {
 
     @Mock
     private AdminOperationLockRepository lockRepository;
+
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
 
     @InjectMocks
     private AdminUserService adminUserService;
@@ -85,6 +90,9 @@ class AdminUserServiceTest {
 
         assertEquals(UserRole.ADMIN, user.getRole());
         assertEquals(1L, user.getLoginVersion());
+
+        // 권한 변경 알림을 위한 이벤트 발행
+        verify(eventPublisher).publishEvent(new UserRoleChangedEvent(userId, UserRole.ADMIN));
 
         // 변경된 사용자 정보 반환
         assertEquals("ADMIN", result.role());
@@ -209,6 +217,9 @@ class AdminUserServiceTest {
 
         assertEquals(UserRole.USER, user.getRole());
         assertEquals(0L, user.getLoginVersion());
+
+        // 실제로 바뀌지 않았으면 알림 이벤트 없음
+        verifyNoInteractions(eventPublisher);
 
         // 같은 권한이어도 현재 사용자 정보 반환
         assertEquals("USER", result.role());

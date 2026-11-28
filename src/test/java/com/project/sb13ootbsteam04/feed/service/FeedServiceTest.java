@@ -1,5 +1,6 @@
 package com.project.sb13ootbsteam04.feed.service;
 
+import org.springframework.context.ApplicationEventPublisher;
 import com.project.sb13ootbsteam04.clothes.entity.Clothes;
 import com.project.sb13ootbsteam04.clothes.repository.ClothesRepository;
 import com.project.sb13ootbsteam04.feed.dto.CreateFeedRequest;
@@ -59,6 +60,9 @@ class FeedServiceTest {
 
     @Mock
     private WeatherRepository weatherRepository;
+
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
 
     @InjectMocks
     private FeedService feedService;

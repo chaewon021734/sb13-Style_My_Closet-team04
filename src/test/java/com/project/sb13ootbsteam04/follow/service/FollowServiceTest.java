@@ -1,6 +1,8 @@
 
 package com.project.sb13ootbsteam04.follow.service;
 
+import com.project.sb13ootbsteam04.follow.event.FollowCreatedEvent;
+import org.springframework.context.ApplicationEventPublisher;
 import com.project.sb13ootbsteam04.follow.dto.CreateFollowRequest;
 import com.project.sb13ootbsteam04.follow.dto.FollowPageResponse;
 import com.project.sb13ootbsteam04.follow.dto.FollowResponse;
@@ -39,6 +41,9 @@ class FollowServiceTest {
 
     @Mock
     private FollowResponseService followResponseService;
+
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
 
     @InjectMocks
     private FollowService followService;
@@ -195,6 +200,9 @@ class FollowServiceTest {
 
         assertEquals(followerId, captured.getFollowerId());
         assertEquals(followeeId, captured.getFollowingId());
+
+        // 팔로우 대상 알림을 위한 이벤트 발행
+        verify(eventPublisher).publishEvent(new FollowCreatedEvent(followerId, followeeId));
     }
 
     @Test

@@ -1,6 +1,8 @@
 
 package com.project.sb13ootbsteam04.feed.service;
 
+import com.project.sb13ootbsteam04.feed.event.FeedCommentedEvent;
+import org.springframework.context.ApplicationEventPublisher;
 import com.project.sb13ootbsteam04.feed.dto.CommentPageResponse;
 import com.project.sb13ootbsteam04.feed.dto.CommentResponse;
 import com.project.sb13ootbsteam04.feed.dto.CreateCommentRequest;
@@ -45,6 +47,9 @@ class CommentServiceTest {
 
     @Mock
     private CommentAuthorService commentAuthorService;
+
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
 
     @InjectMocks
     private CommentService commentService;
@@ -299,6 +304,9 @@ class CommentServiceTest {
         when(feedRepository.findById(feedId))
                 .thenReturn(Optional.of(feed));
 
+        UUID feedAuthorId = UUID.randomUUID();
+        when(feed.getUserId()).thenReturn(feedAuthorId);
+
         when(saved.getId()).thenReturn(commentId);
 
         when(commentRepository.save(any(Comment.class)))
@@ -320,6 +328,10 @@ class CommentServiceTest {
         assertSame(feed, captured.getFeed());
         assertEquals(userId, captured.getUserId());
         assertEquals("테스트 댓글", captured.getContent());
+
+        // 피드 작성자 알림을 위한 이벤트 발행
+        verify(eventPublisher).publishEvent(
+                new FeedCommentedEvent(feedId, feedAuthorId, userId, "테스트 댓글"));
     }
 
     // ========================================
