@@ -152,7 +152,7 @@ class NotificationServiceTest {
         assertThat(dto.receiverId()).isEqualTo(receiverId);
         assertThat(dto.title()).isEqualTo("새 팔로워");
         var captor = ArgumentCaptor.forClass(NotificationCreatedEvent.class);
-        verify(eventPublisher).publishEvent(captor.capture());
+        verify(eventPublisher).publishEvent((Object) captor.capture());
         assertThat(captor.getValue().notification()).isEqualTo(dto);
     }
 
@@ -171,7 +171,7 @@ class NotificationServiceTest {
                 NotificationLevel.INFO);
 
         assertThat(dtos).extracting(NotificationDto::receiverId).containsExactlyElementsOf(ids);
-        verify(eventPublisher, times(2)).publishEvent(argThat(e -> e instanceof NotificationCreatedEvent));
+        verify(eventPublisher, times(2)).publishEvent((Object) argThat(e -> e instanceof NotificationCreatedEvent));
     }
 
     private User user(UUID id) {
