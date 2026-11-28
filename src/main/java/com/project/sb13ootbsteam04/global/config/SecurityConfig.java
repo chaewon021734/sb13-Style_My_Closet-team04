@@ -144,6 +144,19 @@ public class SecurityConfig {
                         .requestMatchers("/api/admin/**")
                         .hasRole("ADMIN")
 
+                        // 사용자 권한 변경 및 계정 잠금
+                        .requestMatchers(
+                                HttpMethod.PATCH,
+                                "/api/users/*/role",
+                                "/api/users/*/lock"
+                        ).hasRole("ADMIN")
+
+                        // 사용자 목록 조회
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/api/users"
+                        ).hasRole("ADMIN")
+
                         // 의상 속성 정의 생성
                         .requestMatchers(
                                 HttpMethod.POST,
