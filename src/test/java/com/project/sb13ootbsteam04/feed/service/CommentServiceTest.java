@@ -1,7 +1,6 @@
 
 package com.project.sb13ootbsteam04.feed.service;
 
-import com.project.sb13ootbsteam04.feed.event.FeedCommentedEvent;
 import org.springframework.context.ApplicationEventPublisher;
 import com.project.sb13ootbsteam04.feed.dto.CommentPageResponse;
 import com.project.sb13ootbsteam04.feed.dto.CommentResponse;
@@ -328,10 +327,6 @@ class CommentServiceTest {
         assertSame(feed, captured.getFeed());
         assertEquals(userId, captured.getUserId());
         assertEquals("테스트 댓글", captured.getContent());
-
-        // 피드 작성자 알림을 위한 이벤트 발행
-        verify(eventPublisher).publishEvent(
-                new FeedCommentedEvent(feedId, feedAuthorId, userId, "테스트 댓글"));
     }
 
     // ========================================

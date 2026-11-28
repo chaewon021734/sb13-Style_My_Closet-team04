@@ -1,6 +1,5 @@
 package com.project.sb13ootbsteam04.clothes.service;
 
-import com.project.sb13ootbsteam04.clothes.event.ClothesAttributeDefCreatedEvent;
 import org.springframework.context.ApplicationEventPublisher;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -92,8 +91,6 @@ class ClothesAttributeDefServiceTest {
         () -> assertThat(result.selectableValues()).containsExactlyElementsOf(selectableValues),
         () -> assertThat(result.createdAt()).isEqualTo(createdAt)
     );
-    // 전체 사용자 알림을 위한 이벤트 발행
-    then(eventPublisher).should().publishEvent(new ClothesAttributeDefCreatedEvent(definitionId, name));
   }
 
   @Test

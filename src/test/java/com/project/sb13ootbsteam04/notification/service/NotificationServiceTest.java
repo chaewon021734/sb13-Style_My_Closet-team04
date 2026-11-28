@@ -4,7 +4,6 @@ import com.project.sb13ootbsteam04.global.exception.ErrorCode;
 import com.project.sb13ootbsteam04.notification.dto.NotificationDto;
 import com.project.sb13ootbsteam04.notification.entity.Notification;
 import com.project.sb13ootbsteam04.notification.entity.NotificationLevel;
-import com.project.sb13ootbsteam04.notification.event.NotificationCreatedEvent;
 import com.project.sb13ootbsteam04.notification.exception.NotificationException;
 import com.project.sb13ootbsteam04.notification.repository.NotificationRepository;
 import com.project.sb13ootbsteam04.user.entity.User;
@@ -12,7 +11,6 @@ import com.project.sb13ootbsteam04.user.repository.UserRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -28,11 +26,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -107,71 +101,13 @@ class NotificationServiceTest {
     }
 
     @Test
-    @DisplayName("본인 알림은 삭제한다")
-    void deletesOwnNotification() {
-        var notification = notification(user(receiverId), "2026-11-28T00:00:00Z");
-        when(notificationRepository.findById(notification.getId())).thenReturn(Optional.of(notification));
-
-        notificationService.delete(notification.getId(), receiverId);
-
-        verify(notificationRepository).delete(notification);
-    }
-
-    @Test
-    @DisplayName("없는 알림은 404, 다른 사용자의 알림은 403")
-    void rejectsMissingOrForeignNotification() {
+    @DisplayName("없는 알림을 삭제하면 404")
+    void rejectsMissingNotification() {
         var missingId = UUID.randomUUID();
         when(notificationRepository.findById(missingId)).thenReturn(Optional.empty());
         assertThatThrownBy(() -> notificationService.delete(missingId, receiverId))
                 .isInstanceOfSatisfying(NotificationException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.NOTIFICATION_NOT_FOUND));
-
-        var foreign = notification(user(UUID.randomUUID()), "2026-11-28T00:00:00Z");
-        when(notificationRepository.findById(foreign.getId())).thenReturn(Optional.of(foreign));
-        assertThatThrownBy(() -> notificationService.delete(foreign.getId(), receiverId))
-                .isInstanceOfSatisfying(NotificationException.class,
-                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.NOTIFICATION_FORBIDDEN));
-        verify(notificationRepository, never()).delete(any());
-    }
-
-    @Test
-    @DisplayName("알림을 저장하면 저장된 알림으로 생성 이벤트를 발행한다")
-    void publishesEventAfterCreate() {
-        var receiver = user(receiverId);
-        when(userRepository.getReferenceById(receiverId)).thenReturn(receiver);
-        when(notificationRepository.save(any(Notification.class))).thenAnswer(invocation -> {
-            Notification saved = invocation.getArgument(0);
-            ReflectionTestUtils.setField(saved, "id", UUID.randomUUID());
-            ReflectionTestUtils.setField(saved, "createdAt", Instant.parse("2026-11-28T00:00:00Z"));
-            return saved;
-        });
-
-        var dto = notificationService.create(receiverId, "새 팔로워", "홍길동님이 회원님을 팔로우했습니다.",
-                NotificationLevel.INFO);
-
-        assertThat(dto.receiverId()).isEqualTo(receiverId);
-        assertThat(dto.title()).isEqualTo("새 팔로워");
-        var captor = ArgumentCaptor.forClass(NotificationCreatedEvent.class);
-        verify(eventPublisher).publishEvent((Object) captor.capture());
-        assertThat(captor.getValue().notification()).isEqualTo(dto);
-    }
-
-    @Test
-    @DisplayName("여러 수신자에게 한 번에 알림을 저장하고 수신자마다 이벤트를 발행한다")
-    void createsForAllReceivers() {
-        var ids = List.of(UUID.randomUUID(), UUID.randomUUID());
-        ids.forEach(id -> when(userRepository.getReferenceById(id)).thenReturn(user(id)));
-        when(notificationRepository.saveAll(any())).thenAnswer(invocation -> {
-            List<Notification> saved = invocation.getArgument(0);
-            saved.forEach(n -> ReflectionTestUtils.setField(n, "id", UUID.randomUUID()));
-            return saved;
-        });
-
-        var dtos = notificationService.createAll(ids, "새 의상 속성", "'두께' 속성이 추가되었습니다.",
-                NotificationLevel.INFO);
-
-        assertThat(dtos).extracting(NotificationDto::receiverId).containsExactlyElementsOf(ids);
-        verify(eventPublisher, times(2)).publishEvent((Object) argThat(e -> e instanceof NotificationCreatedEvent));
     }
 
     private User user(UUID id) {

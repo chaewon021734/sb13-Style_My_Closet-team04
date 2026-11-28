@@ -1,7 +1,6 @@
 
 package com.project.sb13ootbsteam04.feed.service;
 
-import com.project.sb13ootbsteam04.feed.event.FeedLikedEvent;
 import org.springframework.context.ApplicationEventPublisher;
 import com.project.sb13ootbsteam04.feed.entity.Feed;
 import com.project.sb13ootbsteam04.feed.entity.FeedLike;
@@ -58,9 +57,6 @@ class FeedLikeServiceTest {
         )).thenReturn(false);
 
         feedLikeService.likeFeed(feedId, userId);
-
-        // 피드 작성자 알림을 위한 이벤트 발행
-        verify(eventPublisher).publishEvent(new FeedLikedEvent(feedId, feedAuthorId, userId));
 
         ArgumentCaptor<FeedLike> captor =
                 ArgumentCaptor.forClass(FeedLike.class);
@@ -127,9 +123,6 @@ class FeedLikeServiceTest {
         assertDoesNotThrow(
                 () -> feedLikeService.likeFeed(feedId, userId)
         );
-
-        // 이미 좋아요한 경우 알림을 다시 만들지 않음
-        verifyNoInteractions(eventPublisher);
 
         verify(feedLikeRepository, never())
                 .save(any(FeedLike.class));

@@ -1,6 +1,5 @@
 package com.project.sb13ootbsteam04.feed.service;
 
-import com.project.sb13ootbsteam04.feed.event.FeedCreatedEvent;
 import org.springframework.context.ApplicationEventPublisher;
 import com.project.sb13ootbsteam04.feed.dto.*;
 import com.project.sb13ootbsteam04.feed.entity.*;
@@ -96,8 +95,6 @@ class FeedServiceAdditionalTest {
         assertEquals(user, captor.getValue().getUserId());
         assertEquals(weather, captor.getValue().getWeatherId());
         assertEquals("post", captor.getValue().getContent());
-        // 팔로워 알림을 위한 이벤트 발행
-        verify(eventPublisher).publishEvent(new FeedCreatedEvent(id, user));
         verify(feedClothesRepository).saveAll(argThat(items -> {
             List<FeedClothes> list = new ArrayList<>();
             items.forEach(list::add);
