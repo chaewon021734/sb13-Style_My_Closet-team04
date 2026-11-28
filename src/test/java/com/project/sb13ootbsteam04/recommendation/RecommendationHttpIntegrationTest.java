@@ -9,6 +9,7 @@ import com.project.sb13ootbsteam04.clothes.entity.ClothesAttributeDef;
 import com.project.sb13ootbsteam04.clothes.entity.ClothesType;
 import com.project.sb13ootbsteam04.clothes.repository.ClothesAttributeDefRepository;
 import com.project.sb13ootbsteam04.clothes.repository.ClothesRepository;
+import com.project.sb13ootbsteam04.feed.dto.CreateFeedRequest;
 import com.project.sb13ootbsteam04.user.entity.User;
 import com.project.sb13ootbsteam04.user.repository.UserRepository;
 import com.project.sb13ootbsteam04.weather.entity.PrecipitationType;
@@ -17,6 +18,12 @@ import com.project.sb13ootbsteam04.weather.entity.Weather;
 import com.project.sb13ootbsteam04.weather.entity.WindStrength;
 import com.project.sb13ootbsteam04.weather.repository.WeatherRepository;
 import java.time.Instant;
+import java.net.URLDecoder;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.IntStream;
@@ -109,6 +116,37 @@ class RecommendationHttpIntegrationTest {
     assertThat(recommendedClothes.get(0).path("clothesId").asText())
         .isEqualTo(winterTop.getId().toString());
 
+    List<UUID> recommendedClothesIds = IntStream.range(0, recommendedClothes.size())
+        .mapToObj(index -> UUID.fromString(
+            recommendedClothes.get(index).path("clothesId").asText()))
+        .toList();
+    Csrf csrf = issueCsrf();
+    var createdFeed = client.post()
+        .uri("/api/feeds")
+        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+        .header(HttpHeaders.COOKIE, csrf.cookie())
+        .header("X-XSRF-TOKEN", csrf.token())
+        .body(new CreateFeedRequest(
+            user.getId(),
+            weather.getId(),
+            recommendedClothesIds,
+            "오늘의 추천 OOTD"))
+        .exchange((request, response) -> new HttpResult(
+            response.getStatusCode().value(),
+            new String(response.getBody().readAllBytes())));
+
+    assertThat(createdFeed.status()).isEqualTo(HttpStatus.CREATED.value());
+    JsonNode feed = objectMapper.readTree(createdFeed.body());
+    assertThat(feed.path("author").path("userId").asText())
+        .isEqualTo(user.getId().toString());
+    assertThat(feed.path("weather").path("weatherId").asText())
+        .isEqualTo(weather.getId().toString());
+    JsonNode ootds = feed.path("ootds");
+    assertThat(IntStream.range(0, ootds.size())
+        .mapToObj(index -> UUID.fromString(ootds.get(index).path("clothesId").asText()))
+        .toList())
+        .containsExactlyElementsOf(recommendedClothesIds);
+
     UUID missingWeatherId = UUID.randomUUID();
     var notFound = client.get()
         .uri("/api/recommendations?weatherId=" + missingWeatherId)
@@ -136,6 +174,30 @@ class RecommendationHttpIntegrationTest {
     return clothesRepository.saveAndFlush(clothes);
   }
 
+  private Csrf issueCsrf() throws Exception {
+    HttpRequest request = HttpRequest.newBuilder()
+        .uri(URI.create("http://localhost:" + port + "/api/auth/csrf-token"))
+        .GET()
+        .build();
+    HttpResponse<Void> response = HttpClient.newHttpClient()
+        .send(request, HttpResponse.BodyHandlers.discarding());
+    assertThat(response.statusCode()).isEqualTo(HttpStatus.NO_CONTENT.value());
+    String setCookie = response.headers()
+        .allValues("set-cookie")
+        .stream()
+        .filter(cookie -> cookie.startsWith("XSRF-TOKEN="))
+        .findFirst()
+        .orElseThrow(() -> new AssertionError(response.headers().map().toString()));
+    String cookie = setCookie.substring(0, setCookie.indexOf(';'));
+    String token = URLDecoder.decode(
+        cookie.substring("XSRF-TOKEN=".length()),
+        StandardCharsets.UTF_8);
+    return new Csrf(cookie, token);
+  }
+
   private record HttpResult(int status, String body) {
+  }
+
+  private record Csrf(String cookie, String token) {
   }
 }

@@ -1,5 +1,6 @@
 package com.project.sb13ootbsteam04.feed.service;
 
+import com.project.sb13ootbsteam04.clothes.entity.Clothes;
 import com.project.sb13ootbsteam04.clothes.repository.ClothesRepository;
 import com.project.sb13ootbsteam04.feed.dto.CreateFeedRequest;
 import com.project.sb13ootbsteam04.feed.dto.FeedPageResponse;
@@ -11,6 +12,7 @@ import com.project.sb13ootbsteam04.feed.repository.FeedClothesRepository;
 import com.project.sb13ootbsteam04.feed.repository.FeedLikeRepository;
 import com.project.sb13ootbsteam04.feed.repository.FeedRepository;
 import com.project.sb13ootbsteam04.user.repository.UserRepository;
+import com.project.sb13ootbsteam04.user.entity.User;
 import com.project.sb13ootbsteam04.weather.entity.PrecipitationType;
 import com.project.sb13ootbsteam04.weather.entity.SkyStatus;
 import com.project.sb13ootbsteam04.weather.repository.WeatherRepository;
@@ -172,6 +174,33 @@ class FeedServiceTest {
                 IllegalArgumentException.class,
                 () -> feedService.createFeed(request, userId)
         );
+    }
+
+    @Test
+    void 피드_생성시_다른_사용자의_의상이면_예외() {
+        UUID clothesId = UUID.randomUUID();
+        CreateFeedRequest request = new CreateFeedRequest(
+                userId,
+                weatherId,
+                List.of(clothesId),
+                "추천 OOTD"
+        );
+        Clothes clothes = mock(Clothes.class);
+        User otherOwner = mock(User.class);
+
+        when(weatherRepository.existsById(weatherId)).thenReturn(true);
+        when(userRepository.existsById(userId)).thenReturn(true);
+        when(clothesRepository.findAllById(List.of(clothesId))).thenReturn(List.of(clothes));
+        when(clothes.getOwner()).thenReturn(otherOwner);
+        when(otherOwner.getId()).thenReturn(UUID.randomUUID());
+
+        AccessDeniedException exception = assertThrows(
+                AccessDeniedException.class,
+                () -> feedService.createFeed(request, userId)
+        );
+
+        assertEquals("본인이 소유한 의상만 피드에 등록할 수 있습니다.", exception.getMessage());
+        verifyNoInteractions(feedRepository);
     }
 
     // ========================================
