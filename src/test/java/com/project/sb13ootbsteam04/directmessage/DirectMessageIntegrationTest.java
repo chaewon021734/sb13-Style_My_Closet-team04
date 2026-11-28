@@ -237,6 +237,53 @@ class DirectMessageIntegrationTest {
         assertThat(body.has("nextIdAfter")).isTrue();
     }
 
+    @Test
+    @DisplayName("대화 참여자가 아니면 그 대화 채널을 구독해도 메시지를 받지 못한다")
+    void outsiderCannotSubscribeToConversation() throws Exception {
+        var sender = saveUser("참여자1");
+        var receiver = saveUser("참여자2");
+        var outsider = saveUser("제3자");
+        var outsiderInbox = subscribe(connect(outsider), sender, receiver);
+        var receiverInbox = subscribe(connect(receiver), sender, receiver);
+
+        send(connect(sender), sender.getId(), receiver.getId(), "둘만의 대화");
+
+        await(receiverInbox);
+        assertNothingReceived(outsiderInbox);
+    }
+
+    @Test
+    @DisplayName("구독 채널로 직접 보낸 메시지는 구독자에게 전달되지 않는다")
+    void rejectsSendToBrokerDestination() throws Exception {
+        var sender = saveUser("위조대상1");
+        var receiver = saveUser("위조대상2");
+        var attacker = saveUser("위조자");
+        var receiverInbox = subscribe(connect(receiver), sender, receiver);
+
+        connect(attacker).send("/sub/direct-messages_" + dmKey(sender, receiver), Map.of(
+                "sender", Map.of("userId", sender.getId(), "name", sender.getName()),
+                "receiver", Map.of("userId", receiver.getId(), "name", receiver.getName()),
+                "content", "가짜 메시지"));
+
+        assertNothingReceived(receiverInbox);
+    }
+
+    @Test
+    @DisplayName("연결 후 계정이 잠기면 메시지를 보낼 수 없다")
+    void rejectsSendAfterAccountLocked() throws Exception {
+        var sender = saveUser("잠길사용자");
+        var receiver = saveUser("잠금받는사람");
+        var receiverInbox = subscribe(connect(receiver), sender, receiver);
+        var senderSession = connect(sender);
+        sender.changeLocked(true);
+        userRepository.saveAndFlush(sender);
+
+        send(senderSession, sender.getId(), receiver.getId(), "잠긴 뒤 전송");
+
+        assertNothingReceived(receiverInbox);
+        assertThat(directMessageRepository.countMessagesBetweenUsers(sender.getId(), receiver.getId())).isZero();
+    }
+
     private User saveUser(String name) {
         return userRepository.save(new User(name, UUID.randomUUID() + "@test.io", "encoded"));
     }
@@ -298,6 +345,10 @@ class DirectMessageIntegrationTest {
         payload.put("receiverId", receiverId);
         payload.put("content", content);
         session.send("/pub/direct-messages_send", payload);
+    }
+
+    private void assertNothingReceived(BlockingQueue<JsonNode> inbox) throws InterruptedException {
+        assertThat(inbox.poll(2, TimeUnit.SECONDS)).as("전달되지 않아야 할 메시지").isNull();
     }
 
     private JsonNode await(BlockingQueue<JsonNode> inbox) throws InterruptedException {
