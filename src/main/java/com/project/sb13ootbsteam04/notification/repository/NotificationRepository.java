@@ -48,6 +48,26 @@ public interface NotificationRepository extends JpaRepository<Notification, UUID
   // 수신자의 전체 알림 개수
   long countByReceiver_Id(UUID receiverId);
 
+  // 마지막으로 받은 알림 이후의 알림 (재연결 시 재전송, 오래된 순)
+  @Query("""
+            SELECT n
+            FROM Notification n
+            WHERE n.receiver.id = :receiverId
+            AND (
+                n.createdAt > :createdAt
+                OR (
+                    n.createdAt = :createdAt
+                    AND n.id > :id
+                )
+            )
+            ORDER BY n.createdAt ASC, n.id ASC
+            """)
+  List<Notification> findAfter(
+      @Param("receiverId") UUID receiverId,
+      @Param("createdAt") Instant createdAt,
+      @Param("id") UUID id
+  );
+
   // 같은 내용의 알림이 이미 있는지 확인 (날씨 변화 중복 방지)
   boolean existsByReceiver_IdAndContent(UUID receiverId, String content);
 }
