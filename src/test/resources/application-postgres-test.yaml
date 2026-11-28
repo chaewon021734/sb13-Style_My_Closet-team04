@@ -14,5 +14,7 @@ spring:
     enabled: false
 
 jwt:
+  # 독립 실행되는 PostgreSQL 테스트 프로필의 서명 키입니다.
+  secret: AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=
   refresh-token-cleanup:
     enabled: false

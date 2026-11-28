@@ -1,0 +1,102 @@
+name: dev-build-test
+
+on:
+  pull_request:
+    branches:
+      - dev
+      - main
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - ready_for_review
+  push:
+    branches:
+      - dev
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dev-build-test-${{ github.event.pull_request.number || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  build-test:
+    name: build-test
+    runs-on: ubuntu-latest
+    env:
+      # 두 Gradle 단계가 같은 입력으로 동일한 PostgreSQL 테스트 결과를 재사용합니다.
+      OTBOO_POSTGRES_TEST: "true"
+      # 통합 테스트가 허용하는 전용 DB에서만 스키마를 생성한다.
+      OTBOO_TEST_DB_URL: jdbc:postgresql://localhost:5432/ootb_test
+      OTBOO_TEST_DB_USERNAME: postgres
+      OTBOO_TEST_DB_PASSWORD: postgres-ci-test-only
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: ootb_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres-ci-test-only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d ootb_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - name: Reject main to dev PR
+        if: ${{ github.event_name == 'pull_request' }}
+        env:
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        shell: bash
+        run: |
+          if [ "$BASE_REF" = "dev" ] && [ "$HEAD_REF" = "main" ]; then
+            echo "::error::dev 브랜치 PR은 main 외의 작업 브랜치에서만 생성할 수 있습니다."
+            exit 1
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Test application and generate coverage report
+        run: ./gradlew clean test jacocoTestReport --no-daemon
+
+      # 현재 팀 전체 커버리지가 80%에 미달하므로 지표는 공개하되 PR을 즉시 차단하지 않습니다.
+      - name: Verify coverage threshold
+        continue-on-error: true
+        run: ./gradlew jacocoTestCoverageVerification --no-daemon
+
+      - name: Upload JaCoCo report
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacoco-report
+          path: build/reports/jacoco/test
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Validate Docker image build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          platforms: linux/amd64
+          tags: otboo:${{ github.sha }}
+          cache-from: type=gha,scope=otboo-api
+          cache-to: type=gha,mode=max,scope=otboo-api

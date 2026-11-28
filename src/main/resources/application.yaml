@@ -4,6 +4,10 @@ spring:
 
   application:
     name: sb13-OOTBS-team04
+  profiles:
+    default: dev
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
 
   servlet:
     multipart:
@@ -76,3 +80,22 @@ management:
     web:
       exposure:
         include: health,info,metrics
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
+
+server:
+  shutdown: graceful
+
+# 의상 이미지 저장과 브라우저 조회 주소를 분리한다.
+otboo:
+  storage:
+    s3:
+      bucket: ${OTBOO_CLOTHES_S3_BUCKET:}
+      region: ${OTBOO_AWS_REGION:ap-northeast-2}
+      endpoint: ${OTBOO_AWS_ENDPOINT:}
+      public-base-url: ${OTBOO_CLOTHES_IMAGE_PUBLIC_BASE_URL:}
+      api-call-timeout: ${OTBOO_CLOTHES_S3_API_CALL_TIMEOUT:10s}
+      api-call-attempt-timeout: ${OTBOO_CLOTHES_S3_API_CALL_ATTEMPT_TIMEOUT:5s}

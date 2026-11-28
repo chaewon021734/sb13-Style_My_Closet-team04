@@ -1,0 +1,35 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://${DB_HOST}:${DB_PORT:5432}/${DB_NAME}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: ${DB_DDL_AUTO:validate}
+    properties:
+      hibernate:
+        format_sql: false
+    show-sql: false
+  flyway:
+    enabled: ${OTBOO_FLYWAY_ENABLED:true}
+
+server:
+  port: ${OTBOO_SERVER_PORT:8080}
+  # ALB에서 HTTPS를 종료해도 Swagger가 올바른 scheme과 host를 사용하게 합니다.
+  forward-headers-strategy: framework
+
+logging:
+  level:
+    root: info
+    com.project.sb13ootbsteam04: info
+    org.hibernate.SQL: warn
+    org.hibernate.orm.jdbc.batch: warn
+    org.hibernate.orm.jdbc.bind: warn
+
+# 비공개 S3 객체는 CloudFront OAC 등 공개 전달 계층을 통해서만 노출합니다.
+otboo:
+  storage:
+    s3:
+      bucket: ${OTBOO_CLOTHES_S3_BUCKET}
+      public-base-url: ${OTBOO_CLOTHES_IMAGE_PUBLIC_BASE_URL}
