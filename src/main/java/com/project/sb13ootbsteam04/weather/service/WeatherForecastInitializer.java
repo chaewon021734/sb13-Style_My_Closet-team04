@@ -20,6 +20,8 @@ import java.time.Clock;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
+import java.util.Optional;
 import java.util.stream.IntStream;
 
 @Service
@@ -87,8 +89,16 @@ public class WeatherForecastInitializer {
         }
 
         var location = latest.map(ForecastSource::getLocation)
-                .orElseGet(() -> registerLocation(condition, grid));
+                .or(() -> locations.findFirstByGridXAndGridYOrderByCreatedAtAsc(grid.x(), grid.y()))
+                .or(() -> registerLocation(condition, grid));
+        if (location.isEmpty()) {
+            return;
+        }
 
+        collectForecast(location.get(), issue, grid);
+    }
+
+    private void collectForecast(WeatherLocation location, ZonedDateTime issue, WeatherGridConverter.Grid grid) {
         try {
             var items = forecastClient.getVillageForecast(
                     issue.toLocalDate(), issue.toLocalTime(), grid.x(), grid.y());
@@ -110,19 +120,27 @@ public class WeatherForecastInitializer {
         return available.withHour(issueHour).truncatedTo(ChronoUnit.HOURS);
     }
 
-    private WeatherLocation registerLocation(WeatherLocationCondition condition, WeatherGridConverter.Grid grid) {
+    // 행정구역 이름을 확인한 뒤에만 위치를 등록한다. 이름 없는 위치는 화면에 표시할 수 없다.
+    private Optional<WeatherLocation> registerLocation(
+            WeatherLocationCondition condition, WeatherGridConverter.Grid grid) {
+        List<String> names;
+        try {
+            names = locationClient.getLocationNames(condition.latitude(), condition.longitude());
+        } catch (WeatherLocationException exception) {
+            log.warn("날씨 위치 행정구역 조회 실패: gridX={}, gridY={}, errorCode={}",
+                    grid.x(), grid.y(), exception.getErrorCode().getCode());
+            return Optional.empty();
+        }
+        if (names.isEmpty()) {
+            log.warn("날씨 위치 행정구역 이름 없음: gridX={}, gridY={}", grid.x(), grid.y());
+            return Optional.empty();
+        }
+
         var location = locations.save(new WeatherLocation(
                 condition.latitude(), condition.longitude(), grid.x(), grid.y()));
-        try {
-            var names = locationClient.getLocationNames(condition.latitude(), condition.longitude());
-            locationNames.saveAll(IntStream.range(0, names.size())
-                    .mapToObj(order -> new WeatherLocationName(location.getId(), order, names.get(order)))
-                    .toList());
-        } catch (WeatherLocationException exception) {
-            // 행정구역 이름이 없어도 날씨 조회는 가능하다.
-            log.warn("날씨 위치 행정구역 조회 실패: locationId={}, errorCode={}",
-                    location.getId(), exception.getErrorCode().getCode());
-        }
-        return location;
+        locationNames.saveAll(IntStream.range(0, names.size())
+                .mapToObj(order -> new WeatherLocationName(location.getId(), order, names.get(order)))
+                .toList());
+        return Optional.of(location);
     }
 }

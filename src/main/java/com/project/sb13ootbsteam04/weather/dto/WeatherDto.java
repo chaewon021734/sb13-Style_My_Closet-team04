@@ -34,6 +34,13 @@ public record WeatherDto(
                 new WindSpeedDto(weather.getWindSpeed(), weather.getWindSpeedAsWord()));
     }
 
+    // 하루 대표 예보에 그날의 최저·최고 기온을 채운다.
+    public WeatherDto withTemperatureRange(Double min, Double max) {
+        return new WeatherDto(id, forecastedAt, forecastAt, location, skyStatus, precipitation, humidity,
+                new TemperatureDto(temperature.current(), temperature.comparedToDayBefore(), min, max),
+                windSpeed);
+    }
+
     @Schema(name = "WeatherForecastPrecipitationDto")
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public record PrecipitationDto(PrecipitationType type, Double amount, Double probability) {
