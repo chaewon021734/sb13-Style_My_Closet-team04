@@ -50,8 +50,15 @@ public class ClothesController implements ClothesApi {
   @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
   public ResponseEntity<ClothesDto> create(
       @Valid @RequestPart("request") ClothesCreateRequest request,
-      @RequestPart(value = "image", required = false) MultipartFile image
+      @RequestPart(value = "image", required = false) MultipartFile image,
+      Authentication authentication
   ) {
+    UUID actorId = authenticatedUserId(authentication);
+
+    // 로그인한 사용자 본인의 옷장에만 등록할 수 있다.
+    if (!actorId.equals(request.ownerId())) {
+      throw ClothesAccessException.forbidden();
+    }
 
     ClothesImageCommand imageCommand = toImageCommand(image);
     ClothesCreateCommand requestCommand = clothesMapper.toCommand(request);

@@ -35,6 +35,14 @@ public interface ClothesApi {
           description = "옷 등록 실패",
           content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
       @ApiResponse(
+          responseCode = "401",
+          description = "유효한 사용자 인증이 필요합니다. 보안 필터에서 거부하면 응답 본문이 없을 수 있습니다.",
+          content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
+      @ApiResponse(
+          responseCode = "403",
+          description = "본인 옷장에만 등록할 수 있습니다. 요청의 ownerId가 로그인 사용자와 다르면 오류 본문을 반환합니다.",
+          content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
+      @ApiResponse(
           responseCode = "404",
           description = "소유자 또는 의상 속성 정의를 찾을 수 없음",
           content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
@@ -61,7 +69,8 @@ public interface ClothesApi {
           )
       )
       ClothesCreateRequest request,
-      MultipartFile image
+      MultipartFile image,
+      @Parameter(hidden = true) Authentication authentication
   );
 
   @Operation(
