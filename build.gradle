@@ -53,6 +53,9 @@ dependencies {
     // 테스트 전용 H2 데이터베이스
     testRuntimeOnly 'com.h2database:h2'
 
+    // Redis 연동 테스트용 컨테이너 (Docker가 없으면 해당 테스트만 건너뜀)
+    testImplementation 'org.testcontainers:testcontainers'
+
     // Lombok 테스트
     testCompileOnly 'org.projectlombok:lombok'
     testAnnotationProcessor 'org.projectlombok:lombok'

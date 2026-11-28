@@ -1,6 +1,9 @@
 package com.project.sb13ootbsteam04.auth.ratelimit;
 
 import com.project.sb13ootbsteam04.auth.exception.TemporaryPasswordRateLimitException;
+import com.project.sb13ootbsteam04.global.support.RedisTestSupport;
+import org.springframework.data.redis.RedisConnectionFailureException;
+import org.springframework.data.redis.core.StringRedisTemplate;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -19,6 +22,8 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.*;
 
 class TemporaryPasswordRateLimiterTest {
@@ -30,6 +35,7 @@ class TemporaryPasswordRateLimiterTest {
             Instant.parse("2026-01-01T00:00:00Z");
 
     private Clock clock;
+    private StringRedisTemplate redisTemplate;
     private TemporaryPasswordRateLimiter rateLimiter;
 
     @BeforeEach
@@ -38,7 +44,9 @@ class TemporaryPasswordRateLimiterTest {
 
         when(clock.instant()).thenReturn(INITIAL_TIME);
 
-        rateLimiter = new TemporaryPasswordRateLimiter(clock);
+        // 여러 서버가 공유하는 Redis에 요청 기록을 저장
+        redisTemplate = RedisTestSupport.template();
+        rateLimiter = new TemporaryPasswordRateLimiter(redisTemplate, clock);
     }
 
     @Test
@@ -286,6 +294,39 @@ class TemporaryPasswordRateLimiterTest {
     }
 
     @Test
+    @DisplayName("서버가 여러 대여도 같은 Redis를 쓰면 요청 횟수를 합산해 제한한다")
+    void shouldShareLimitAcrossInstances() {
+
+        TemporaryPasswordRateLimiter otherInstance =
+                new TemporaryPasswordRateLimiter(redisTemplate, clock);
+
+        rateLimiter.checkAndRecord(EMAIL, IP);
+        otherInstance.checkAndRecord(EMAIL, IP);
+        rateLimiter.checkAndRecord(EMAIL, IP);
+
+        assertThrows(
+                TemporaryPasswordRateLimitException.class,
+                () -> otherInstance.checkAndRecord(EMAIL, IP)
+        );
+    }
+
+    @Test
+    @DisplayName("Redis를 사용할 수 없으면 요청을 막지 않는다")
+    void shouldAllowRequestWhenRedisIsUnavailable() {
+
+        StringRedisTemplate unavailable = mock(StringRedisTemplate.class);
+        when(unavailable.execute(any(), anyList(), any(Object[].class)))
+                .thenThrow(new RedisConnectionFailureException("연결 실패"));
+
+        TemporaryPasswordRateLimiter limiter =
+                new TemporaryPasswordRateLimiter(unavailable, clock);
+
+        for (int i = 0; i < 5; i++) {
+            assertDoesNotThrow(() -> limiter.checkAndRecord(EMAIL, IP));
+        }
+    }
+
+    @Test
     @DisplayName("동시 요청이 발생해도 이메일 요청 제한을 우회할 수 없다")
     void shouldPreventRateLimitBypassUnderConcurrentRequests()
             throws Exception {
@@ -294,6 +335,7 @@ class TemporaryPasswordRateLimiterTest {
 
         TemporaryPasswordRateLimiter concurrentRateLimiter =
                 new TemporaryPasswordRateLimiter(
+                        redisTemplate,
                         Clock.fixed(INITIAL_TIME, ZoneOffset.UTC)
                 );
 

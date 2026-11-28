@@ -6,12 +6,17 @@ import com.project.sb13ootbsteam04.auth.service.TemporaryPasswordService;
 import com.project.sb13ootbsteam04.global.config.SecurityConfig;
 import com.project.sb13ootbsteam04.global.exception.GlobalExceptionHandler;
 import jakarta.servlet.http.Cookie;
+import com.project.sb13ootbsteam04.global.support.RedisTestSupport;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.MediaType;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.annotation.DirtiesContext;
@@ -39,6 +44,21 @@ class TemporaryPasswordRateLimiterIntegrationTest {
     @Autowired private MockMvc mockMvc;
     @MockitoBean private JwtDecoder jwtDecoder;
     @MockitoBean private TemporaryPasswordService temporaryPasswordService;
+
+    // 요청 기록은 테스트용 Redis 컨테이너에 저장
+    @TestConfiguration
+    static class RedisConfig {
+        @Bean
+        StringRedisTemplate stringRedisTemplate() {
+            return RedisTestSupport.template();
+        }
+    }
+
+    // Docker가 없으면 컨텍스트를 띄우기 전에 건너뛴다
+    @BeforeAll
+    static void requireRedis() {
+        RedisTestSupport.template();
+    }
     private Cookie csrfCookie;
 
     @BeforeEach
