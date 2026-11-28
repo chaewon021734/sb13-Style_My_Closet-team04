@@ -10,6 +10,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -18,6 +19,7 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.time.Instant;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -60,177 +62,291 @@ class AuthServiceTest {
         );
     }
 
-    // ========================================
-    // 1. 정상 로그인
-    // ========================================
-
+    // 1. 일반 비밀번호 로그인 성공
     @Test
     void shouldLoginSuccessfully() {
 
-        // given
-        when(userRepository.findByEmail("test@example.com"))
+        when(userRepository.findByEmailForUpdate("test@example.com"))
                 .thenReturn(Optional.of(user));
 
         when(passwordEncoder.matches(
-                "password123",
-                "encodedPassword"
+                "password123", "encodedPassword"
         )).thenReturn(true);
 
         when(jwtTokenProvider.generateAccessToken(user))
                 .thenReturn("test.jwt.token");
 
-        // when
+        long previousVersion = user.getLoginVersion();
+
         LoginResponse response = authService.login(loginRequest);
 
-        // then
         assertEquals("test.jwt.token", response.accessToken());
         assertEquals("Bearer", response.tokenType());
+        assertEquals(previousVersion + 1, user.getLoginVersion());
 
-        verify(userRepository).findByEmail("test@example.com");
+        verify(userRepository)
+                .findByEmailForUpdate("test@example.com");
 
-        verify(passwordEncoder).matches(
-                "password123",
-                "encodedPassword"
-        );
+        verify(passwordEncoder)
+                .matches("password123", "encodedPassword");
 
         verify(jwtTokenProvider).generateAccessToken(user);
+        verify(jwtTokenProvider, never())
+                .generateTemporaryAccessToken(any(User.class));
     }
 
-    // ========================================
     // 2. 존재하지 않는 이메일
-    // ========================================
-
     @Test
     void shouldRejectUnknownEmail() {
 
-        // given
-        when(userRepository.findByEmail("test@example.com"))
+        when(userRepository.findByEmailForUpdate("test@example.com"))
                 .thenReturn(Optional.empty());
 
-        // when
         BadCredentialsException exception = assertThrows(
                 BadCredentialsException.class,
                 () -> authService.login(loginRequest)
         );
 
-        // then
         assertEquals(LOGIN_FAILURE_MESSAGE, exception.getMessage());
 
-        // 사용자가 없으면 JWT를 발급하지 않음
-        verifyNoInteractions(jwtTokenProvider);
-
-        // 현재 구현에서는 존재하지 않는 이메일에 대해
-        // 비밀번호 비교를 수행하지 않음
-        verifyNoInteractions(passwordEncoder);
+        verifyNoInteractions(passwordEncoder, jwtTokenProvider);
     }
 
-    // ========================================
-    // 3. 비밀번호가 틀린 경우
-    // ========================================
-
+    // 3. 잘못된 비밀번호
     @Test
     void shouldRejectWrongPassword() {
 
-        // given
-        when(userRepository.findByEmail("test@example.com"))
+        when(userRepository.findByEmailForUpdate("test@example.com"))
                 .thenReturn(Optional.of(user));
 
         when(passwordEncoder.matches(
-                "password123",
-                "encodedPassword"
+                "password123", "encodedPassword"
         )).thenReturn(false);
 
-        // when
+        long previousVersion = user.getLoginVersion();
+
         BadCredentialsException exception = assertThrows(
                 BadCredentialsException.class,
                 () -> authService.login(loginRequest)
         );
 
-        // then
         assertEquals(LOGIN_FAILURE_MESSAGE, exception.getMessage());
+        assertEquals(previousVersion, user.getLoginVersion());
 
-        verify(passwordEncoder).matches(
-                "password123",
-                "encodedPassword"
+        verify(passwordEncoder)
+                .matches("password123", "encodedPassword");
+
+        verifyNoInteractions(jwtTokenProvider);
+    }
+
+    // 4. 잠긴 계정 + 올바른 비밀번호
+    @Test
+    void shouldRejectLoginWhenAccountIsLocked() {
+
+        ReflectionTestUtils.setField(user, "locked", true);
+
+        when(userRepository.findByEmailForUpdate("test@example.com"))
+                .thenReturn(Optional.of(user));
+
+        long previousVersion = user.getLoginVersion();
+
+        BadCredentialsException exception = assertThrows(
+                BadCredentialsException.class,
+                () -> authService.login(loginRequest)
         );
 
-        // 비밀번호가 틀리면 JWT를 발급하지 않음
+        assertEquals(LOGIN_FAILURE_MESSAGE, exception.getMessage());
+        assertEquals(previousVersion, user.getLoginVersion());
+
+        // 잠긴 계정은 비밀번호 비교 없이 거부
+        verifyNoInteractions(passwordEncoder, jwtTokenProvider);
+    }
+
+    // 5. 잠긴 계정 + 잘못된 비밀번호
+    @Test
+    void shouldRejectLockedAccountWithWrongPassword() {
+
+        ReflectionTestUtils.setField(user, "locked", true);
+
+        when(userRepository.findByEmailForUpdate("test@example.com"))
+                .thenReturn(Optional.of(user));
+
+        long previousVersion = user.getLoginVersion();
+
+        BadCredentialsException exception = assertThrows(
+                BadCredentialsException.class,
+                () -> authService.login(loginRequest)
+        );
+
+        assertEquals(LOGIN_FAILURE_MESSAGE, exception.getMessage());
+        assertEquals(previousVersion, user.getLoginVersion());
+
+        verifyNoInteractions(passwordEncoder, jwtTokenProvider);
+    }
+
+    // 6. 로그인 성공마다 버전 증가
+    @Test
+    void shouldIncreaseLoginVersionOnEverySuccessfulLogin() {
+
+        when(userRepository.findByEmailForUpdate("test@example.com"))
+                .thenReturn(Optional.of(user));
+
+        when(passwordEncoder.matches(
+                "password123", "encodedPassword"
+        )).thenReturn(true);
+
+        when(jwtTokenProvider.generateAccessToken(user))
+                .thenReturn("test.jwt.token");
+
+        authService.login(loginRequest);
+        long firstVersion = user.getLoginVersion();
+
+        authService.login(loginRequest);
+        long secondVersion = user.getLoginVersion();
+
+        assertEquals(1L, firstVersion);
+        assertEquals(2L, secondVersion);
+
+        verify(jwtTokenProvider, times(2))
+                .generateAccessToken(user);
+    }
+
+    // 7. JWT 발급 전에 버전 증가
+    @Test
+    void shouldIncreaseLoginVersionBeforeIssuingJwt() {
+
+        when(userRepository.findByEmailForUpdate("test@example.com"))
+                .thenReturn(Optional.of(user));
+
+        when(passwordEncoder.matches(
+                "password123", "encodedPassword"
+        )).thenReturn(true);
+
+        when(jwtTokenProvider.generateAccessToken(user))
+                .thenAnswer(invocation -> {
+                    assertEquals(1L, user.getLoginVersion());
+                    return "test.jwt.token";
+                });
+
+        authService.login(loginRequest);
+
+        assertEquals(1L, user.getLoginVersion());
+
+        InOrder inOrder = inOrder(
+                userRepository,
+                passwordEncoder,
+                jwtTokenProvider
+        );
+
+        inOrder.verify(userRepository)
+                .findByEmailForUpdate("test@example.com");
+
+        inOrder.verify(passwordEncoder)
+                .matches("password123", "encodedPassword");
+
+        inOrder.verify(jwtTokenProvider)
+                .generateAccessToken(user);
+    }
+
+    // 8. 유효한 임시 비밀번호로 로그인
+    @Test
+    void shouldLoginWithTemporaryPassword() {
+
+        user.issueTemporaryPassword(
+                "temporaryEncodedPassword",
+                Instant.now().plusSeconds(180)
+        );
+
+        when(userRepository.findByEmailForUpdate("test@example.com"))
+                .thenReturn(Optional.of(user));
+
+        when(passwordEncoder.matches(
+                "password123", "encodedPassword"
+        )).thenReturn(false);
+
+        when(passwordEncoder.matches(
+                "password123", "temporaryEncodedPassword"
+        )).thenReturn(true);
+
+        when(jwtTokenProvider.generateTemporaryAccessToken(user))
+                .thenReturn("temporary.jwt.token");
+
+        long previousVersion = user.getLoginVersion();
+
+        LoginResponse response = authService.login(loginRequest);
+
+        assertEquals("temporary.jwt.token", response.accessToken());
+        assertEquals("Bearer", response.tokenType());
+        assertEquals(previousVersion + 1, user.getLoginVersion());
+
+        verify(jwtTokenProvider)
+                .generateTemporaryAccessToken(user);
+
         verify(jwtTokenProvider, never())
                 .generateAccessToken(any(User.class));
     }
 
-    // ========================================
-    // 4. 잠긴 계정 + 올바른 비밀번호
-    // ========================================
-
+    // 9. 만료된 임시 비밀번호는 로그인 거부
     @Test
-    void shouldRejectLoginWhenAccountIsLocked() {
+    void shouldRejectExpiredTemporaryPassword() {
 
-        // given
-        ReflectionTestUtils.setField(user, "locked", true);
+        user.issueTemporaryPassword(
+                "temporaryEncodedPassword",
+                Instant.now().minusSeconds(60)
+        );
 
-        when(userRepository.findByEmail("test@example.com"))
+        when(userRepository.findByEmailForUpdate("test@example.com"))
                 .thenReturn(Optional.of(user));
 
-        // 비밀번호 검증은 성공
         when(passwordEncoder.matches(
-                "password123",
-                "encodedPassword"
-        )).thenReturn(true);
+                "password123", "encodedPassword"
+        )).thenReturn(false);
 
-        // when
+        long previousVersion = user.getLoginVersion();
+
         BadCredentialsException exception = assertThrows(
                 BadCredentialsException.class,
                 () -> authService.login(loginRequest)
         );
 
-        // then
         assertEquals(LOGIN_FAILURE_MESSAGE, exception.getMessage());
+        assertEquals(previousVersion, user.getLoginVersion());
 
-        // 잠금 상태 확인 전에 비밀번호 검증을 수행했는지 확인
-        verify(passwordEncoder).matches(
-                "password123",
-                "encodedPassword"
-        );
+        verify(passwordEncoder, never())
+                .matches("password123", "temporaryEncodedPassword");
 
-        // 잠긴 계정에는 JWT를 발급하지 않음
         verifyNoInteractions(jwtTokenProvider);
     }
 
-    // ========================================
-    // 5. 잠긴 계정 + 잘못된 비밀번호
-    // ========================================
-
+    // 10. 일반 비밀번호가 일치하면 일반 JWT 우선 발급
     @Test
-    void shouldRejectLockedAccountWithWrongPassword() {
+    void shouldPreferNormalPasswordWhenBothExist() {
 
-        // given
-        ReflectionTestUtils.setField(user, "locked", true);
+        user.issueTemporaryPassword(
+                "temporaryEncodedPassword",
+                Instant.now().plusSeconds(180)
+        );
 
-        when(userRepository.findByEmail("test@example.com"))
+        when(userRepository.findByEmailForUpdate("test@example.com"))
                 .thenReturn(Optional.of(user));
 
-        // 비밀번호 검증 실패
         when(passwordEncoder.matches(
-                "password123",
-                "encodedPassword"
-        )).thenReturn(false);
+                "password123", "encodedPassword"
+        )).thenReturn(true);
 
-        // when
-        BadCredentialsException exception = assertThrows(
-                BadCredentialsException.class,
-                () -> authService.login(loginRequest)
-        );
+        when(jwtTokenProvider.generateAccessToken(user))
+                .thenReturn("normal.jwt.token");
 
-        // then
-        assertEquals(LOGIN_FAILURE_MESSAGE, exception.getMessage());
+        LoginResponse response = authService.login(loginRequest);
 
-        verify(passwordEncoder).matches(
-                "password123",
-                "encodedPassword"
-        );
+        assertEquals("normal.jwt.token", response.accessToken());
 
-        // 잠긴 계정 + 잘못된 비밀번호에서도 JWT 발급 금지
-        verifyNoInteractions(jwtTokenProvider);
+        verify(passwordEncoder, never())
+                .matches("password123", "temporaryEncodedPassword");
+
+        verify(jwtTokenProvider).generateAccessToken(user);
+
+        verify(jwtTokenProvider, never())
+                .generateTemporaryAccessToken(any(User.class));
     }
 }

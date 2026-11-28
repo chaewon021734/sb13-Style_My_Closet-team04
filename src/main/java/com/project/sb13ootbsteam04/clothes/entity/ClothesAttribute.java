@@ -4,9 +4,11 @@ import com.project.sb13ootbsteam04.global.entity.IdEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
+import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.util.Objects;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -16,7 +18,14 @@ import lombok.NoArgsConstructor;
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@Table(name = "clothes_attributes")
+@Table(
+    name = "clothes_attributes",
+    uniqueConstraints = @UniqueConstraint(
+        name = "uk_clothes_attributes_clothes_definition",
+        columnNames = {"clothes_id", "definition_id"}
+    ),
+    indexes = @Index(name = "idx_clothes_attributes_definition_id", columnList = "definition_id")
+)
 public class ClothesAttribute extends IdEntity {
 
   @ManyToOne(fetch = FetchType.LAZY, optional = false)
@@ -40,5 +49,10 @@ public class ClothesAttribute extends IdEntity {
     ClothesAttribute attribute = new ClothesAttribute(clothes, definition, value);
     clothes.registerAttribute(attribute);
     return attribute;
+  }
+
+  public void changeValue(String value) {
+    // 기존 행을 유지하고 정의에 등록된 표기로 값을 저장한다.
+    this.value = definition.resolveSelectableValue(value);
   }
 }

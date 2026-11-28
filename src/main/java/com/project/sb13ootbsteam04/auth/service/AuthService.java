@@ -3,6 +3,7 @@ package com.project.sb13ootbsteam04.auth.service;
 import com.project.sb13ootbsteam04.auth.dto.LoginRequest;
 import com.project.sb13ootbsteam04.auth.dto.LoginResponse;
 import com.project.sb13ootbsteam04.auth.jwt.JwtTokenProvider;
+import com.project.sb13ootbsteam04.user.dto.response.UserDto;
 import com.project.sb13ootbsteam04.user.entity.User;
 import com.project.sb13ootbsteam04.user.repository.UserRepository;
 
@@ -12,6 +13,8 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Instant;
 
 @Service
 @RequiredArgsConstructor
@@ -24,34 +27,78 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
 
-    @Transactional(readOnly = true)
+    @Transactional
     public LoginResponse login(LoginRequest request) {
 
-        // 1. 이메일로 사용자 조회
-        User user = userRepository.findByEmail(request.email())
+        // 1. 사용자 조회 및 비관적 쓰기 락 획득
+        User user = userRepository
+                .findByEmailForUpdate(request.email())
                 .orElseThrow(() ->
-                        new BadCredentialsException(LOGIN_FAILURE_MESSAGE)
+                        new BadCredentialsException(
+                                LOGIN_FAILURE_MESSAGE
+                        )
                 );
 
-        // 2. 비밀번호 먼저 검증
-        if (!passwordEncoder.matches(
-                request.password(),
-                user.getPassword()
-        )) {
-            throw new BadCredentialsException(LOGIN_FAILURE_MESSAGE);
-        }
-
-        // 3. 계정 잠금 여부 확인
-        // 외부에 잠금 상태를 노출하지 않도록 동일한 인증 실패 예외 사용
+        // 2. 계정 잠금 여부 검증
         if (user.isLocked()) {
-            throw new BadCredentialsException(LOGIN_FAILURE_MESSAGE);
+            throw new BadCredentialsException(
+                    LOGIN_FAILURE_MESSAGE
+            );
         }
 
-        // 4. JWT Access Token 발급
-        String accessToken =
-                jwtTokenProvider.generateAccessToken(user);
+        // 3. 일반 비밀번호 검증
+        boolean normalPasswordMatches =
+                passwordEncoder.matches(
+                        request.password(),
+                        user.getPassword()
+                );
 
-        // 5. 로그인 응답 반환
-        return new LoginResponse(accessToken, "Bearer");
+        // 4. 임시 비밀번호 검증
+        boolean temporaryPasswordMatches = false;
+
+        if (!normalPasswordMatches
+                && user.isTemporaryPasswordActive(Instant.now())) {
+
+            temporaryPasswordMatches = passwordEncoder.matches(
+                    request.password(),
+                    user.getTemporaryPasswordHash()
+            );
+        }
+
+        // 5. 두 비밀번호 모두 일치하지 않으면 로그인 실패
+        if (!normalPasswordMatches && !temporaryPasswordMatches) {
+            throw new BadCredentialsException(
+                    LOGIN_FAILURE_MESSAGE
+            );
+        }
+
+        // 6. 기존 JWT 무효화를 위한 로그인 버전 증가
+        user.increaseLoginVersion();
+
+        // 7. 인증 방식에 따라 JWT 발급
+        String accessToken;
+
+        if (temporaryPasswordMatches) {
+
+            // 임시 JWT는 비밀번호 재설정 전용
+            accessToken =
+                    jwtTokenProvider.generateTemporaryAccessToken(user);
+
+        } else {
+
+            // 일반 JWT
+            accessToken =
+                    jwtTokenProvider.generateAccessToken(user);
+        }
+
+        // 8. 프론트엔드에서 사용하는 사용자 정보 변환
+        UserDto userDto = UserDto.from(user);
+
+        // 9. JWT 및 사용자 정보 반환
+        return new LoginResponse(
+                accessToken,
+                "Bearer",
+                userDto
+        );
     }
 }

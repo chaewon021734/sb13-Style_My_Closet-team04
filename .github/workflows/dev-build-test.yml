@@ -29,22 +29,21 @@ jobs:
     env:
       # 두 Gradle 단계가 같은 입력으로 동일한 PostgreSQL 테스트 결과를 재사용합니다.
       OTBOO_POSTGRES_TEST: "true"
-      DB_HOST: localhost
-      DB_PORT: "5432"
-      DB_NAME: ootb
-      DB_USERNAME: postgres
-      DB_PASSWORD: postgres-ci-test-only
+      # 통합 테스트가 허용하는 전용 DB에서만 스키마를 생성한다.
+      OTBOO_TEST_DB_URL: jdbc:postgresql://localhost:5432/ootb_test
+      OTBOO_TEST_DB_USERNAME: postgres
+      OTBOO_TEST_DB_PASSWORD: postgres-ci-test-only
     services:
       postgres:
         image: postgres:16
         env:
-          POSTGRES_DB: ootb
+          POSTGRES_DB: ootb_test
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres-ci-test-only
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U postgres -d ootb"
+          --health-cmd "pg_isready -U postgres -d ootb_test"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5

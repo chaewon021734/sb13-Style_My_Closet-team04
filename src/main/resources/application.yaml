@@ -1,50 +1,88 @@
-# 공통 설정만 유지
-# 기본 프로파일: dev
-
 spring:
+  config:
+    import: optional:file:.env[.properties]
+
   application:
     name: sb13-OOTBS-team04
   profiles:
     default: dev
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+
   servlet:
     multipart:
       max-file-size: 10MB
       max-request-size: 11MB
+
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:ootb}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+
   jpa:
+    hibernate:
+      ddl-auto: ${DB_DDL_AUTO:validate}
     open-in-view: false
-  lifecycle:
-    timeout-per-shutdown-phase: 30s
 
-# 진행 중인 요청 작업을 마무리한 뒤 종료하기 위해 graceful shutdown을 사용합니다.
-server:
-  shutdown: graceful
+  batch:
+    job:
+      enabled: false
+    jdbc:
+      initialize-schema: ${BATCH_SCHEMA_INITIALIZE:always}
 
-# ECS/ALB의 상태 확인에 필요한 endpoint만 노출합니다.
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+  # PR C - 임시 비밀번호 이메일 발송 설정
+  mail:
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
+
+# JWT 로그인 및 인증 설정
+jwt:
+  secret: ${JWT_SECRET}
+  access-token-expiration: ${JWT_ACCESS_TOKEN_EXPIRATION:3600000}
+
+# 날씨 API 설정
+weather:
+  kakao:
+    api-key: ${KAKAO_REST_API_KEY:}
+  kma:
+    api-key: ${KMA_SERVICE_KEY:}
+  batch:
+    schedule:
+      enabled: ${WEATHER_BATCH_SCHEDULE_ENABLED:true}
+      cron: "${WEATHER_BATCH_SCHEDULE_CRON:0 20 2,5,8,11,14,17,20,23 * * *}"
+
 management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,metrics
   endpoint:
     health:
       probes:
         enabled: true
       show-details: never
-  health:
-    livenessstate:
-      enabled: true
-    readinessstate:
-      enabled: true
 
-# 로그인 토큰 서명 키는 실행 환경에서 주입한다.
-jwt:
-  secret: ${JWT_SECRET}
-  access-token-expiration: ${JWT_ACCESS_TOKEN_EXPIRATION:3600000}
+server:
+  shutdown: graceful
 
-weather:
-  kakao:
-    api-key: ${KAKAO_REST_API_KEY:}
-
+# 의상 이미지 저장과 브라우저 조회 주소를 분리한다.
 otboo:
   storage:
     s3:

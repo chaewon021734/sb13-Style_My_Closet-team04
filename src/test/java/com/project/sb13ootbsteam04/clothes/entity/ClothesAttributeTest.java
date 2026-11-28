@@ -75,16 +75,19 @@ class ClothesAttributeTest {
   @Test
   @DisplayName("대소문자가 다른 값은 정의에 저장된 표기로 정규화한다")
   void 속성값_표기_정규화() {
+    // given
     Clothes clothes = clothes();
-    ClothesAttributeDef definition = ClothesAttributeDef.create("색상", List.of("Black"));
+    ClothesAttributeDef definition = ClothesAttributeDef.create("색상", List.of("KIRMIZI"));
 
-    ClothesAttribute attribute = ClothesAttribute.create(clothes, definition, " black ");
+    // when
+    ClothesAttribute attribute = ClothesAttribute.create(clothes, definition, " kırmızı ");
 
-    assertEquals("Black", attribute.getValue());
+    // then
+    assertEquals("KIRMIZI", attribute.getValue());
   }
 
   private Clothes clothes() {
     User owner = new User("소유자", "owner@example.com", "encoded-password");
-    return Clothes.create(owner, "셔츠", ClothesType.TOP, null);
+    return Clothes.create(owner, "셔츠", ClothesType.TOP);
   }
 }
