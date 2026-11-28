@@ -31,8 +31,9 @@ public class FeedLikeService {
             throw new IllegalArgumentException("사용자 ID는 필수입니다.");
         }
 
+        // 이미 좋아요한 피드면 저장 없이 성공 처리
         if (feedLikeRepository.existsByFeed_IdAndUserId(feedId, userId)) {
-            throw new IllegalStateException("이미 좋아요를 누른 피드입니다.");
+            return;
         }
 
         FeedLike feedLike = new FeedLike(feed, userId);
