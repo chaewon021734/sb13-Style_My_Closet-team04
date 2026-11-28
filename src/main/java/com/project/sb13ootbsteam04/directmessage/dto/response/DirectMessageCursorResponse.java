@@ -8,6 +8,8 @@ public record DirectMessageCursorResponse(
     String nextCursor,
     UUID nextIdAfter,
     boolean hasNext,
-    long totalCount
+    long totalCount,
+    String sortBy,
+    String sortDirection
 ) {
 }

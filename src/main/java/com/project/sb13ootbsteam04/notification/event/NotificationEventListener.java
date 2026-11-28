@@ -1,6 +1,7 @@
 package com.project.sb13ootbsteam04.notification.event;
 
 import com.project.sb13ootbsteam04.clothes.event.ClothesAttributeDefCreatedEvent;
+import com.project.sb13ootbsteam04.directmessage.event.DirectMessageSentEvent;
 import com.project.sb13ootbsteam04.feed.event.FeedCommentedEvent;
 import com.project.sb13ootbsteam04.feed.event.FeedCreatedEvent;
 import com.project.sb13ootbsteam04.feed.event.FeedLikedEvent;
@@ -53,6 +54,19 @@ public class NotificationEventListener {
   private final FollowRepository followRepository;
   private final ProfileRepository profileRepository;
   private final WeatherLocationRepository weatherLocationRepository;
+
+  // 새 DM 수신 (프론트는 제목의 '메시지'로 메시지 아이콘을 표시한다)
+  @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  public void handle(DirectMessageSentEvent event) {
+    var message = event.message();
+    notifySafely("DM", () -> notificationService.create(
+        message.receiver().userId(),
+        "새 메시지",
+        message.sender().name() + "님: " + preview(message.content()),
+        NotificationLevel.INFO
+    ));
+  }
 
   // 다른 사용자가 나를 팔로우
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
