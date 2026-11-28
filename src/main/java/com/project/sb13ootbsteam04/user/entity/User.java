@@ -186,4 +186,12 @@ public class User extends BaseEntity {
         // 기존 JWT 모두 무효화
         increaseLoginVersion();
     }
+
+    // 프로필 수정에서 이름 변경
+    public void changeName(String name) {
+        if (name == null || name.isBlank()) {
+            throw new IllegalArgumentException("이름은 비어 있을 수 없습니다.");
+        }
+        this.name = name;
+    }
 }
