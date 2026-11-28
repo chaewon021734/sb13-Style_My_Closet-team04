@@ -16,7 +16,12 @@ public class SseEmitterRegistry {
   private final Map<UUID, List<SseEmitter>> emitters = new ConcurrentHashMap<>();
 
   public void add(UUID userId, SseEmitter emitter) {
-    emitters.computeIfAbsent(userId, key -> new CopyOnWriteArrayList<>()).add(emitter);
+    // 같은 사용자의 연결 정리와 겹쳐도 빠지지 않도록 한 번에 등록
+    emitters.compute(userId, (key, list) -> {
+      List<SseEmitter> target = list == null ? new CopyOnWriteArrayList<>() : list;
+      target.add(emitter);
+      return target;
+    });
 
     // 연결이 끝나면 목록에서 제거
     emitter.onCompletion(() -> remove(userId, emitter));
