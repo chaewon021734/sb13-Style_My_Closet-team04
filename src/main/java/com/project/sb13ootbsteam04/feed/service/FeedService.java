@@ -1,6 +1,7 @@
 
 package com.project.sb13ootbsteam04.feed.service;
 
+import com.project.sb13ootbsteam04.clothes.entity.Clothes;
 import com.project.sb13ootbsteam04.clothes.repository.ClothesRepository;
 import com.project.sb13ootbsteam04.feed.dto.CreateFeedRequest;
 import com.project.sb13ootbsteam04.feed.dto.FeedPageResponse;
@@ -95,10 +96,17 @@ public class FeedService {
                 .distinct()
                 .toList();
 
-        if (clothesRepository.findAllById(distinctClothesIds).size()
-                != distinctClothesIds.size()) {
+        List<Clothes> selectedClothes = clothesRepository.findAllById(distinctClothesIds);
+
+        if (selectedClothes.size() != distinctClothesIds.size()) {
             throw new IllegalArgumentException(
                     "존재하지 않는 의상 ID가 포함되어 있습니다."
+            );
+        }
+        if (selectedClothes.stream().anyMatch(clothes ->
+                !currentUserId.equals(clothes.getOwner().getId()))) {
+            throw new AccessDeniedException(
+                    "본인이 소유한 의상만 피드에 등록할 수 있습니다."
             );
         }
 
