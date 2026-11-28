@@ -3,6 +3,7 @@ package com.project.sb13ootbsteam04.weather.controller;
 import com.project.sb13ootbsteam04.global.exception.ApiErrorResponse;
 import com.project.sb13ootbsteam04.weather.dto.WeatherDto;
 import com.project.sb13ootbsteam04.weather.dto.WeatherLocationResponse;
+import com.project.sb13ootbsteam04.weather.service.WeatherForecastInitializer;
 import com.project.sb13ootbsteam04.weather.service.WeatherLocationService;
 import com.project.sb13ootbsteam04.weather.service.WeatherQueryService;
 import com.project.sb13ootbsteam04.weather.service.condition.WeatherLocationCondition;
@@ -29,6 +30,7 @@ public class WeatherController {
 
     private final WeatherLocationService weatherLocationService;
     private final WeatherQueryService weatherQueryService;
+    private final WeatherForecastInitializer weatherForecastInitializer;
 
     @Operation(summary = "날씨 정보 조회", responses = {
             @ApiResponse(responseCode = "200", description = "날씨 조회 성공",
@@ -42,6 +44,8 @@ public class WeatherController {
             @RequestParam @DecimalMin("-90") @DecimalMax("90") double latitude
     ) {
         var condition = new WeatherLocationCondition(latitude, longitude);
+        // 처음 조회하는 위치나 오래된 예보는 조회 전에 수집한다.
+        weatherForecastInitializer.ensureForecast(condition);
         return ResponseEntity.ok(weatherQueryService.getWeather(condition));
     }
 

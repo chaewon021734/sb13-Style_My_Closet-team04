@@ -44,6 +44,8 @@ class WeatherQueryIntegrationTest {
     @Autowired private WeatherForecastService forecastService;
     @MockitoBean private WeatherLocationService locationService;
     @MockitoBean private WeatherChangeEventPublisher changeEventPublisher;
+    // 저장된 예보 조회만 검증하므로 외부 API 수집은 대체한다
+    @MockitoBean private WeatherForecastInitializer forecastInitializer;
 
     private MockMvc mvc;
 
