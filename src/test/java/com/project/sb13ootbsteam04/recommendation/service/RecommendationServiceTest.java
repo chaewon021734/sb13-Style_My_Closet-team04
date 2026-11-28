@@ -10,6 +10,7 @@ import com.project.sb13ootbsteam04.clothes.entity.Clothes;
 import com.project.sb13ootbsteam04.clothes.entity.ClothesType;
 import com.project.sb13ootbsteam04.clothes.repository.ClothesRepository;
 import com.project.sb13ootbsteam04.recommendation.exception.RecommendationException;
+import com.project.sb13ootbsteam04.recommendation.mapper.RecommendationMapper;
 import com.project.sb13ootbsteam04.user.entity.Profile;
 import com.project.sb13ootbsteam04.user.repository.ProfileRepository;
 import com.project.sb13ootbsteam04.weather.entity.Weather;
@@ -35,7 +36,13 @@ class RecommendationServiceTest {
 
   @BeforeEach
   void setUp() {
-    service = new RecommendationService(weatherRepository, profileRepository, clothesRepository, policy);
+    service = new RecommendationService(
+        weatherRepository,
+        profileRepository,
+        clothesRepository,
+        policy,
+        new RecommendationMapper()
+    );
   }
 
   @Test
