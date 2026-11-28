@@ -126,6 +126,20 @@ class ProfileIntegrationTest {
     }
 
     @Test
+    @DisplayName("위치를 일부만 보내면 400이고 기존 위치가 유지된다")
+    void rejectsIncompleteLocation() throws Exception {
+        var user = saveUser("위치");
+        update(user, user, Map.of("location", LOCATION), null);
+
+        var response = update(user, user, Map.of("location", Map.of("latitude", 35.1)), null);
+
+        assertThat(response.andReturn().getResponse().getStatus()).isEqualTo(400);
+        var location = body(fetch(user, user)).get("location");
+        assertThat(location.get("x").asInt()).isEqualTo(60);
+        assertThat(location.get("latitude").asDouble()).isEqualTo(37.5665);
+    }
+
+    @Test
     @DisplayName("이미지와 함께 수정하면 저장소에 올린 이미지 URL이 프로필 이미지가 된다")
     void savesUploadedImageUrl() throws Exception {
         var user = saveUser("사진");
