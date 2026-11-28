@@ -10,6 +10,7 @@ import com.project.sb13ootbsteam04.weather.entity.WeatherLocation;
 import com.project.sb13ootbsteam04.weather.entity.WindStrength;
 import com.project.sb13ootbsteam04.weather.exception.WeatherForecastException;
 import com.project.sb13ootbsteam04.weather.event.WeatherChangeDetectedEvent;
+import com.project.sb13ootbsteam04.weather.event.WeatherChangeEventPublisher;
 import com.project.sb13ootbsteam04.weather.event.WeatherChangeType;
 import com.project.sb13ootbsteam04.weather.repository.WeatherLocationRepository;
 import com.project.sb13ootbsteam04.weather.repository.WeatherRepository;
@@ -20,7 +21,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.context.annotation.Import;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.ActiveProfiles;
 
@@ -51,7 +51,7 @@ class WeatherForecastServiceTest {
     @Autowired private WeatherLocationRepository locations;
     @Autowired private WeatherRepository weathers;
     @Autowired private EntityManager entityManager;
-    @MockitoBean private ApplicationEventPublisher eventPublisher;
+    @MockitoBean private WeatherChangeEventPublisher eventPublisher;
 
     private UUID locationId;
 
@@ -162,7 +162,7 @@ class WeatherForecastServiceTest {
         assertThat(service.saveForecast(locationId, slot("1400", "1600", changed))).isEqualTo(1);
 
         var eventCaptor = org.mockito.ArgumentCaptor.forClass(WeatherChangeDetectedEvent.class);
-        verify(eventPublisher).publishEvent(eventCaptor.capture());
+        verify(eventPublisher).publish(eventCaptor.capture());
         assertThat(eventCaptor.getValue().locationId()).isEqualTo(locationId);
         assertThat(eventCaptor.getValue().forecastAt()).isEqualTo(Instant.parse("2026-11-09T07:00:00Z"));
         assertThat(eventCaptor.getValue().previousWeatherId()).isNotNull();
