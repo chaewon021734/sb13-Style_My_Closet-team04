@@ -1,0 +1,20 @@
+spring:
+  datasource:
+    url: ${OTBOO_TEST_DB_URL}
+    username: ${OTBOO_TEST_DB_USERNAME}
+    password: ${OTBOO_TEST_DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    open-in-view: false
+
+  flyway:
+    enabled: false
+
+jwt:
+  # 독립 실행되는 PostgreSQL 테스트 프로필의 서명 키입니다.
+  secret: AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=
+  refresh-token-cleanup:
+    enabled: false

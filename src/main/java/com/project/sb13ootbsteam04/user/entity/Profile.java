@@ -40,4 +40,30 @@ public class Profile {
 
     @Column(name = "profile_image_url", length = 500)
     private String profileImageUrl;
+
+    // 프로필 첫 수정 시 생성
+    public Profile(User user) {
+        this.user = user;
+    }
+
+    // 보낸 값만 변경한다 (null은 기존 값 유지)
+    public void update(String gender, LocalDate birthDate, Map<String, Object> location,
+                       Integer temperatureSensitivity) {
+        if (gender != null) {
+            this.gender = gender;
+        }
+        if (birthDate != null) {
+            this.birthDate = birthDate;
+        }
+        if (location != null) {
+            this.location = location;
+        }
+        if (temperatureSensitivity != null) {
+            this.temperatureSensitivity = temperatureSensitivity;
+        }
+    }
+
+    public void changeProfileImageUrl(String profileImageUrl) {
+        this.profileImageUrl = profileImageUrl;
+    }
 }

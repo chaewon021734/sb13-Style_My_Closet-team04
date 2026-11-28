@@ -1,9 +1,101 @@
 spring:
+  config:
+    import: optional:file:.env[.properties]
+
   application:
     name: sb13-OOTBS-team04
+  profiles:
+    default: dev
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 11MB
 
   datasource:
     url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:ootb}
     username: ${DB_USERNAME:postgres}
     password: ${DB_PASSWORD:postgres}
     driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: ${DB_DDL_AUTO:validate}
+    open-in-view: false
+
+  batch:
+    job:
+      enabled: false
+    jdbc:
+      initialize-schema: ${BATCH_SCHEMA_INITIALIZE:always}
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+  # PR C - 임시 비밀번호 이메일 발송 설정
+  mail:
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
+
+# JWT 로그인 및 인증 설정
+jwt:
+  secret: ${JWT_SECRET}
+  access-token-expiration: ${JWT_ACCESS_TOKEN_EXPIRATION:3600000}
+  refresh-token-cookie-secure: ${JWT_REFRESH_TOKEN_COOKIE_SECURE:true}
+
+  # 만료된 Refresh Token 자동 정리
+  refresh-token-cleanup:
+    enabled: ${JWT_REFRESH_TOKEN_CLEANUP_ENABLED:true}
+    initial-delay-ms: ${JWT_REFRESH_TOKEN_CLEANUP_INITIAL_DELAY_MS:60000}
+    fixed-delay-ms: ${JWT_REFRESH_TOKEN_CLEANUP_FIXED_DELAY_MS:3600000}
+
+# 날씨 API 설정
+weather:
+  kakao:
+    api-key: ${KAKAO_REST_API_KEY:}
+  kma:
+    api-key: ${KMA_SERVICE_KEY:}
+  batch:
+    schedule:
+      enabled: ${WEATHER_BATCH_SCHEDULE_ENABLED:true}
+      cron: "${WEATHER_BATCH_SCHEDULE_CRON:0 20 2,5,8,11,14,17,20,23 * * *}"
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
+
+server:
+  shutdown: graceful
+
+# 의상 이미지 저장과 브라우저 조회 주소를 분리한다.
+otboo:
+  storage:
+    s3:
+      bucket: ${OTBOO_CLOTHES_S3_BUCKET:}
+      region: ${OTBOO_AWS_REGION:ap-northeast-2}
+      endpoint: ${OTBOO_AWS_ENDPOINT:}
+      public-base-url: ${OTBOO_CLOTHES_IMAGE_PUBLIC_BASE_URL:}
+      api-call-timeout: ${OTBOO_CLOTHES_S3_API_CALL_TIMEOUT:10s}
+      api-call-attempt-timeout: ${OTBOO_CLOTHES_S3_API_CALL_ATTEMPT_TIMEOUT:5s}

@@ -1,0 +1,27 @@
+spring:
+  datasource:
+    # 실제 커밋을 수행하는 테스트가 다른 컨텍스트의 스키마를 공유하지 않도록 한다.
+    url: jdbc:h2:mem:ootbtest-${random.uuid};MODE=PostgreSQL;NON_KEYWORDS=VALUE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    open-in-view: false
+
+  flyway:
+    enabled: false
+
+# 테스트 전용 JWT 설정
+jwt:
+  secret: AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=
+  access-token-expiration: 3600000
+  refresh-token-cleanup:
+    enabled: false
+
+weather:
+  batch:
+    schedule:
+      enabled: false

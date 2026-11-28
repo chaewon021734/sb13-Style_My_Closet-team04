@@ -1,0 +1,12 @@
+# 비밀정보와 빌드 산출물을 Docker 빌드 컨텍스트에서 제외합니다.
+.git
+.github
+.gradle
+.idea
+build
+out
+.env
+.env.*
+!.env.example
+*.log
+docs
