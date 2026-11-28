@@ -59,7 +59,10 @@ public enum ErrorCode {
 
   // RECOMMENDATION
   RECOMMENDATION_WEATHER_NOT_FOUND(
-      "REC_001", HttpStatus.NOT_FOUND, "추천 기준이 되는 날씨 정보를 찾을 수 없습니다.");
+      "REC_001", HttpStatus.NOT_FOUND, "추천 기준이 되는 날씨 정보를 찾을 수 없습니다."),
+
+  // USER
+  USER_NOT_FOUND("USR_001", HttpStatus.NOT_FOUND, "존재하지 않는 사용자입니다.");
 
   private final String code;
   private final HttpStatus status;

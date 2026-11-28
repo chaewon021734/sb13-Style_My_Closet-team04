@@ -1,8 +1,10 @@
 package com.project.sb13ootbsteam04.user.service;
 
+import com.project.sb13ootbsteam04.user.dto.response.UserDto;
 import com.project.sb13ootbsteam04.user.entity.AdminOperationLock;
 import com.project.sb13ootbsteam04.user.entity.User;
 import com.project.sb13ootbsteam04.user.entity.UserRole;
+import com.project.sb13ootbsteam04.user.exception.UserException;
 import com.project.sb13ootbsteam04.user.repository.AdminOperationLockRepository;
 import com.project.sb13ootbsteam04.user.repository.UserRepository;
 
@@ -26,7 +28,7 @@ public class AdminUserService {
     // ========================================
 
     @Transactional
-    public void changeRole(UUID userId, UserRole newRole) {
+    public UserDto changeRole(UUID userId, UserRole newRole) {
 
         Objects.requireNonNull(
                 userId,
@@ -43,15 +45,11 @@ public class AdminUserService {
 
         // 잠금 획득 후 대상 사용자 조회
         User user = userRepository.findByIdForUpdate(userId)
-                .orElseThrow(() ->
-                        new IllegalArgumentException(
-                                "존재하지 않는 사용자입니다."
-                        )
-                );
+                .orElseThrow(() -> UserException.userNotFound(userId));
 
         // 동일 권한이면 변경하지 않음
         if (user.getRole() == newRole) {
-            return;
+            return UserDto.from(user);
         }
 
         // 관리자 강등 시 다른 활성 관리자가 존재해야 함
@@ -77,6 +75,8 @@ public class AdminUserService {
 
         // User.changeRole()에서 loginVersion 증가
         user.changeRole(newRole);
+
+        return UserDto.from(user);
     }
 
     // ========================================
@@ -84,7 +84,7 @@ public class AdminUserService {
     // ========================================
 
     @Transactional
-    public void changeLocked(
+    public UserDto changeLocked(
             UUID userId,
             boolean locked,
             UUID currentAdminId
@@ -112,15 +112,11 @@ public class AdminUserService {
 
         // 잠금 획득 후 대상 사용자 조회
         User user = userRepository.findByIdForUpdate(userId)
-                .orElseThrow(() ->
-                        new IllegalArgumentException(
-                                "존재하지 않는 사용자입니다."
-                        )
-                );
+                .orElseThrow(() -> UserException.userNotFound(userId));
 
         // 동일한 상태면 변경하지 않음
         if (user.isLocked() == locked) {
-            return;
+            return UserDto.from(user);
         }
 
         // 활성 관리자 잠금 시 다른 활성 관리자 존재 여부 확인
@@ -145,6 +141,8 @@ public class AdminUserService {
 
         // User.changeLocked()에서 loginVersion 증가
         user.changeLocked(locked);
+
+        return UserDto.from(user);
     }
 
     // ========================================

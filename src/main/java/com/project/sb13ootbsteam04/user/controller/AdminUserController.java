@@ -1,5 +1,6 @@
 package com.project.sb13ootbsteam04.user.controller;
 
+import com.project.sb13ootbsteam04.user.dto.response.UserDto;
 import com.project.sb13ootbsteam04.user.entity.UserRole;
 import com.project.sb13ootbsteam04.user.service.AdminUserService;
 
@@ -16,7 +17,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/admin/users")
+@RequestMapping("/api/users")
 @RequiredArgsConstructor
 public class AdminUserController {
 
@@ -27,25 +28,26 @@ public class AdminUserController {
     // ========================================
 
     @PatchMapping("/{userId}/role")
-    public ResponseEntity<Void> changeRole(
+    public ResponseEntity<UserDto> changeRole(
             @PathVariable UUID userId,
             @Valid @RequestBody ChangeRoleRequest request
     ) {
 
-        adminUserService.changeRole(
+        // 프론트가 응답의 role로 목록을 갱신하므로 변경된 UserDto 반환
+        UserDto userDto = adminUserService.changeRole(
                 userId,
                 request.role()
         );
 
-        return ResponseEntity.noContent().build();
+        return ResponseEntity.ok(userDto);
     }
 
     // ========================================
     // 2. 사용자 계정 잠금 및 해제
     // ========================================
 
-    @PatchMapping("/{userId}/locked")
-    public ResponseEntity<Void> changeLocked(
+    @PatchMapping("/{userId}/lock")
+    public ResponseEntity<UserDto> changeLocked(
             @PathVariable UUID userId,
             @Valid @RequestBody ChangeLockedRequest request,
             @AuthenticationPrincipal Jwt jwt
@@ -56,13 +58,14 @@ public class AdminUserController {
                 jwt.getSubject()
         );
 
-        adminUserService.changeLocked(
+        // 프론트가 응답의 locked로 목록을 갱신하므로 변경된 UserDto 반환
+        UserDto userDto = adminUserService.changeLocked(
                 userId,
                 request.locked(),
                 currentAdminId
         );
 
-        return ResponseEntity.noContent().build();
+        return ResponseEntity.ok(userDto);
     }
 
     // ========================================
