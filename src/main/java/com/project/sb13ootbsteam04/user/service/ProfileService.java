@@ -9,14 +9,19 @@ import com.project.sb13ootbsteam04.user.entity.User;
 import com.project.sb13ootbsteam04.user.exception.UserException;
 import com.project.sb13ootbsteam04.user.repository.ProfileRepository;
 import com.project.sb13ootbsteam04.user.repository.UserRepository;
+import com.project.sb13ootbsteam04.clothes.storage.StoredImage;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -52,9 +57,28 @@ public class ProfileService {
         request.temperatureSensitivity()
     );
     if (image != null) {
-      profile.changeProfileImageUrl(imageStorage.upload(image).url());
+      StoredImage stored = imageStorage.upload(image);
+      deleteIfRolledBack(stored.objectKey());
+      profile.changeProfileImageUrl(stored.url());
     }
     return ProfileDto.of(user, profile);
+  }
+
+  // 업로드 후 저장이 취소되면 올린 이미지를 지운다(의상 이미지와 같은 방식)
+  private void deleteIfRolledBack(String objectKey) {
+    TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+      @Override
+      public void afterCompletion(int status) {
+        if (status != STATUS_ROLLED_BACK) {
+          return;
+        }
+        try {
+          imageStorage.delete(objectKey);
+        } catch (RuntimeException cleanupFailure) {
+          log.error("프로필 이미지 정리에 실패했습니다. objectKey={}", objectKey, cleanupFailure);
+        }
+      }
+    });
   }
 
   private User findUser(UUID userId) {
