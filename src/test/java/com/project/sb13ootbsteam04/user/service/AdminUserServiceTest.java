@@ -1,9 +1,11 @@
 package com.project.sb13ootbsteam04.user.service;
 
+import com.project.sb13ootbsteam04.global.exception.ErrorCode;
 import com.project.sb13ootbsteam04.user.dto.response.UserDto;
 import com.project.sb13ootbsteam04.user.entity.AdminOperationLock;
 import com.project.sb13ootbsteam04.user.entity.User;
 import com.project.sb13ootbsteam04.user.entity.UserRole;
+import com.project.sb13ootbsteam04.user.exception.UserException;
 import com.project.sb13ootbsteam04.user.repository.AdminOperationLockRepository;
 import com.project.sb13ootbsteam04.user.repository.UserRepository;
 
@@ -225,11 +227,16 @@ class AdminUserServiceTest {
         when(userRepository.findByIdForUpdate(userId))
                 .thenReturn(Optional.empty());
 
-        assertThrows(
-                IllegalArgumentException.class,
+        UserException exception = assertThrows(
+                UserException.class,
                 () -> adminUserService.changeRole(
                         userId, UserRole.ADMIN
                 )
+        );
+
+        assertEquals(
+                ErrorCode.USER_NOT_FOUND,
+                exception.getErrorCode()
         );
     }
 
@@ -434,11 +441,16 @@ class AdminUserServiceTest {
         when(userRepository.findByIdForUpdate(userId))
                 .thenReturn(Optional.empty());
 
-        assertThrows(
-                IllegalArgumentException.class,
+        UserException exception = assertThrows(
+                UserException.class,
                 () -> adminUserService.changeLocked(
                         userId, true, UUID.randomUUID()
                 )
+        );
+
+        assertEquals(
+                ErrorCode.USER_NOT_FOUND,
+                exception.getErrorCode()
         );
     }
 
