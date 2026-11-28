@@ -4,6 +4,7 @@ package com.project.sb13ootbsteam04.feed.controller;
 import com.project.sb13ootbsteam04.feed.service.FeedLikeService;
 import com.project.sb13ootbsteam04.global.security.JwtUserIdResolver;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -28,7 +29,14 @@ public class FeedLikeController {
         // 공통 JWT 인증 처리 클래스로 사용자 ID 추출
         UUID currentUserId = jwtUserIdResolver.resolve(authentication);
 
-        feedLikeService.likeFeed(feedId, currentUserId);
+        try {
+            feedLikeService.likeFeed(feedId, currentUserId);
+        } catch (DataIntegrityViolationException exception) {
+            // 동시 요청이 먼저 저장해 중복 제약에 걸린 경우는 이미 좋아요 상태이므로 성공 처리
+            if (!feedLikeService.isLikedByMe(feedId, currentUserId)) {
+                throw exception;
+            }
+        }
 
         return ResponseEntity.noContent().build();
     }
