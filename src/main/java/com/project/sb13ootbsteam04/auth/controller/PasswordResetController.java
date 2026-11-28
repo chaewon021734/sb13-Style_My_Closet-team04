@@ -7,6 +7,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -30,14 +31,27 @@ public class PasswordResetController {
             @Valid @RequestBody PasswordResetRequest request
     ) {
 
-        // SecurityConfig의 PASSWORD_RESET 권한 검증을 통과한
-        // JWT에서 사용자 ID 추출
+        // 1. JWT에서 사용자 ID 추출
         UUID userId = UUID.fromString(jwt.getSubject());
 
-        // 새로운 비밀번호로 변경
+        // 2. JWT 로그인 버전 추출 및 검증
+        Object loginVersionClaim =
+                jwt.getClaim("loginVersion");
+
+        if (!(loginVersionClaim instanceof Number tokenLoginVersion)
+                || tokenLoginVersion.doubleValue()
+                != (double) tokenLoginVersion.longValue()) {
+
+            throw new BadCredentialsException(
+                    "사용할 수 없는 인증 토큰입니다."
+            );
+        }
+
+        // 3. 사용자 ID 및 로그인 버전을 전달하여 비밀번호 변경
         passwordResetService.resetPassword(
                 userId,
-                request.newPassword()
+                request.newPassword(),
+                tokenLoginVersion.longValue()
         );
 
         return ResponseEntity.noContent().build();

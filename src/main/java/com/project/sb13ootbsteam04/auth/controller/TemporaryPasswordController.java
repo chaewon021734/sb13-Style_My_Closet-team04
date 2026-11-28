@@ -23,7 +23,8 @@ public class TemporaryPasswordController {
     private final TemporaryPasswordService temporaryPasswordService;
     private final TemporaryPasswordRateLimiter rateLimiter;
 
-    @PostMapping("/temporary-password")
+    // 기존 API 및 프론트엔드 호환 API 지원
+    @PostMapping({"/temporary-password", "/reset-password"})
     public ResponseEntity<Void> issueTemporaryPassword(
             @Valid @RequestBody TemporaryPasswordRequest request,
             HttpServletRequest httpRequest
