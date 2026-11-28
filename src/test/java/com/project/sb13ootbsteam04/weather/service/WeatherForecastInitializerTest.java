@@ -26,6 +26,7 @@ import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -117,22 +118,46 @@ class WeatherForecastInitializerTest {
     }
 
     @Test
-    @DisplayName("행정구역 이름 조회에 실패해도 예보는 수집한다")
-    void collectsForecastWhenLocationNameLookupFails() {
+    @DisplayName("행정구역 이름 조회에 실패하면 위치를 등록하지 않고 다음 조회에서 다시 시도한다")
+    void skipsRegistrationWhenLocationNameLookupFails() {
         var initializer = initializerAt(2026, 11, 28, 14, 30);
-        var locationId = UUID.randomUUID();
         givenNoForecast();
-        when(locations.save(any(WeatherLocation.class))).thenAnswer(invocation -> {
-            WeatherLocation saved = invocation.getArgument(0);
-            ReflectionTestUtils.setField(saved, "id", locationId);
-            return saved;
-        });
         when(locationClient.getLocationNames(anyDouble(), anyDouble()))
                 .thenThrow(new WeatherLocationException(ErrorCode.WEATHER_LOCATION_SERVICE_UNAVAILABLE));
 
+        assertThatCode(() -> initializer.ensureForecast(condition)).doesNotThrowAnyException();
+
+        // 이름 없는 위치가 응답되면 화면이 행정구역 이름을 그리지 못한다
+        verify(locations, never()).save(any());
+        verifyNoInteractions(forecastClient, forecastService);
+    }
+
+    @Test
+    @DisplayName("행정구역 이름이 비어 있으면 위치를 등록하지 않는다")
+    void skipsRegistrationWhenLocationNamesAreEmpty() {
+        var initializer = initializerAt(2026, 11, 28, 14, 30);
+        givenNoForecast();
+        when(locationClient.getLocationNames(anyDouble(), anyDouble())).thenReturn(List.of());
+
         initializer.ensureForecast(condition);
 
-        verify(locationNames, never()).saveAll(any());
+        verify(locations, never()).save(any());
+        verifyNoInteractions(forecastClient, forecastService);
+    }
+
+    @Test
+    @DisplayName("예보는 없지만 같은 격자 위치가 있으면 그 위치로 수집한다")
+    void reusesExistingLocationWithoutForecast() {
+        var initializer = initializerAt(2026, 11, 28, 14, 30);
+        var locationId = UUID.randomUUID();
+        givenNoForecast();
+        when(locations.findFirstByGridXAndGridYOrderByCreatedAtAsc(GRID_X, GRID_Y))
+                .thenReturn(Optional.of(location(locationId)));
+
+        initializer.ensureForecast(condition);
+
+        verify(locations, never()).save(any());
+        verifyNoInteractions(locationClient);
         verify(forecastService).saveForecast(eq(locationId), any());
     }
 
